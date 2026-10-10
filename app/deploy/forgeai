@@ -1,0 +1,106 @@
+#!/bin/sh
+# ForgeAI command-line tool (macOS, Linux). Installed on PATH by the ForgeAI installers.
+#   forgeai status | start | stop | restart | open [--web] | device status | version | help
+# It talks to the ForgeAI service running on this computer (loopback only) and uses the
+# operating system's own service tools to start and stop it. It cannot see or change other computers.
+set -eu
+OS=$(uname -s)
+SELF=$(basename "$0")
+
+# ---- find the running service: read runtime.json from the known data dirs, else scan common ports
+data_dirs() {
+  echo "$HOME/Library/Application Support/ForgeAI/data"
+  echo "/Library/Application Support/ForgeAI/data"
+  echo "$HOME/.forgeai/data"
+  echo "/opt/forgeai/data"
+  [ -n "${AICORE_DATA:-}" ] && echo "$AICORE_DATA"
+}
+URL=""
+find_url() {
+  for d in $(data_dirs); do
+    f="$d/runtime.json"
+    [ -f "$f" ] || continue
+    u=$(sed -n 's/.*"url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' "$f" 2>/dev/null)
+    [ -n "$u" ] || continue
+    if curl -fsSk --max-time 2 "$u/api/ping" >/dev/null 2>&1; then URL="$u"; return 0; fi
+  done
+  for p in 4545 4600 39280 8777; do
+    for sch in http https; do
+      if curl -fsSk --max-time 1 "$sch://127.0.0.1:$p/api/ping" >/dev/null 2>&1; then URL="$sch://127.0.0.1:$p"; return 0; fi
+    done
+  done
+  return 1
+}
+ping_json() { curl -fsSk --max-time 3 "$URL/api/ping" 2>/dev/null; }
+jget() { sed -n "s/.*\"$1\"[ ]*:[ ]*\"\\?\\([^,\"}]*\\)\"\\?.*/\\1/p"; }
+
+svc() { # svc start|stop|restart — uses the right service manager for how ForgeAI was installed here
+  action="$1"
+  if [ "$OS" = Darwin ]; then
+    if [ -f /Library/LaunchDaemons/com.forgeai.service.plist ]; then
+      case "$action" in start) sudo launchctl bootstrap system /Library/LaunchDaemons/com.forgeai.service.plist 2>/dev/null || sudo launchctl load /Library/LaunchDaemons/com.forgeai.service.plist;;
+        stop) sudo launchctl bootout system /Library/LaunchDaemons/com.forgeai.service.plist 2>/dev/null || sudo launchctl unload /Library/LaunchDaemons/com.forgeai.service.plist;;
+        restart) svc stop; sleep 1; svc start;; esac
+    elif [ -f "$HOME/Library/LaunchAgents/com.forgeai.app.plist" ]; then
+      case "$action" in start) launchctl load "$HOME/Library/LaunchAgents/com.forgeai.app.plist" 2>/dev/null || open -g -a ForgeAI --args --hidden;;
+        stop) launchctl unload "$HOME/Library/LaunchAgents/com.forgeai.app.plist" 2>/dev/null; osascript -e 'quit app "ForgeAI"' 2>/dev/null || true;;
+        restart) svc stop; sleep 1; svc start;; esac
+    else
+      case "$action" in start) open -g -a ForgeAI --args --hidden 2>/dev/null || echo "ForgeAI app not found. Install it, or open it from Applications.";;
+        stop) osascript -e 'quit app "ForgeAI"' 2>/dev/null || true;; restart) svc stop; sleep 1; svc start;; esac
+    fi
+  else # Linux
+    if command -v systemctl >/dev/null 2>&1 && { systemctl --user status forgeai >/dev/null 2>&1 || [ -f "$HOME/.config/systemd/user/forgeai.service" ]; }; then
+      systemctl --user "$action" forgeai
+    elif command -v systemctl >/dev/null 2>&1; then
+      sudo systemctl "$action" forgeai
+    else echo "No systemd service found for ForgeAI." >&2; return 1; fi
+  fi
+}
+
+cmd=${1:-help}; sub=${2:-}
+case "$cmd" in
+  status)
+    if find_url; then j=$(ping_json)
+      v=$(printf '%s' "$j" | jget version); mg=$(printf '%s' "$j" | jget managed); cl=$(printf '%s' "$j" | jget claimed)
+      echo "ForgeAI is running  ($URL)"
+      echo "  version:  ${v:-unknown}"
+      echo "  mode:     $([ "$mg" = true ] && echo 'background service' || echo 'application')"
+      echo "  account:  $([ "$cl" = true ] && echo 'set up' || echo 'not set up — available to claim')"
+    else echo "ForgeAI is not running on this computer."; exit 1; fi ;;
+  start)   svc start;   echo "ForgeAI starting." ;;
+  stop)    svc stop;    echo "ForgeAI stopped." ;;
+  restart) svc restart; echo "ForgeAI restarting." ;;
+  open)
+    if [ "${2:-}" = "--web" ]; then find_url || { echo "ForgeAI is not running. Start it with: $SELF start" >&2; exit 1; }
+      ( [ "$OS" = Darwin ] && open "$URL" ) || ( command -v xdg-open >/dev/null 2>&1 && xdg-open "$URL" ) || echo "Open this in a browser: $URL"
+    else
+      if [ "$OS" = Darwin ]; then open -a ForgeAI 2>/dev/null || { echo "ForgeAI app not found; opening the web interface instead."; find_url && open "$URL"; }
+      else find_url && { command -v xdg-open >/dev/null 2>&1 && xdg-open "$URL" || echo "Open this in a browser: $URL"; } || echo "ForgeAI is not running. Start it with: $SELF start"; fi
+    fi ;;
+  device)
+    if [ "$sub" = status ]; then
+      if find_url; then j=$(ping_json)
+        echo "This computer:"
+        echo "  $([ "$(printf '%s' "$j" | jget claimed)" = true ] && echo 'Set up with an owner account.' || echo 'Not set up yet — available to claim from another ForgeAI.')"
+        echo "  $([ "$(printf '%s' "$j" | jget joined)" = true ] && echo 'Joined to a hub.' || echo 'Not joined to a hub.')"
+      else echo "ForgeAI is not running on this computer."; exit 1; fi
+    else echo "Usage: $SELF device status"; fi ;;
+  version) if find_url; then printf 'ForgeAI %s\n' "$(ping_json | jget version)"; else echo "ForgeAI (not running)"; fi ;;
+  help|--help|-h|*)
+    cat <<EOF
+ForgeAI — control the ForgeAI service on this computer.
+
+  $SELF status            is it running, which version, is it set up
+  $SELF start             start the background service / app
+  $SELF stop              stop it
+  $SELF restart           restart it
+  $SELF open              open the ForgeAI app window
+  $SELF open --web        open the ForgeAI dashboard in a browser
+  $SELF device status     show whether this computer is set up and joined to a hub
+  $SELF version           show the version
+
+ForgeAI only ever controls this computer. Manage other computers from your hub.
+EOF
+    [ "$cmd" = help ] || [ "$cmd" = --help ] || [ "$cmd" = -h ] || exit 2 ;;
+esac
