@@ -1,13 +1,15 @@
 {
   "name": "forge-ai",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "electron:dev": "electron .",
+    "dist": "electron-builder"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -20,6 +22,57 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "electron": "38.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "productName": "Forge AI",
+  "description": "Local, private AI chat that runs models on your own computer.",
+  "author": {
+    "name": "Forge AI"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "ai.forge.desktop",
+    "productName": "Forge AI",
+    "directories": {
+      "output": "release",
+      "buildResources": "src-tauri/icons"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "engine",
+        "to": "engine"
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "src-tauri/icons/icon.icns",
+      "identity": null,
+      "artifactName": "Forge-AI-${version}-mac-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "src-tauri/icons/icon.ico",
+      "artifactName": "Forge-AI-${version}-win-${arch}-${ext}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
   }
 }

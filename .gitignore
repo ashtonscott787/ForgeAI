@@ -1,23 +1,16 @@
-# Dependencies & build output
 node_modules/
 dist/
-out/
-*.log
-
-# Bundled llama.cpp engine binaries (large; fetched per platform, not tracked)
-app/engines/*
-!app/engines/VERSION
-
-# Runtime data, secrets, local state (never commit)
-data/
-**/data/
-*.db
-*.sqlite
-runtime.json
-.env
-*.pem
-*.key
-tls*.json
-
-# OS cruft
+target/
+src-tauri/binaries/
 .DS_Store
+*.gguf
+
+# build output
+/web/node_modules/
+*.deb
+*.dmg
+*.msi
+app-icon.png
+engine/
+release/
+_dl/

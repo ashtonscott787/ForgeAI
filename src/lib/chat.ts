@@ -9,6 +9,8 @@
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  /** Which model produced this turn, for the line under the reply. */
+  model?: string;
 }
 
 export interface StreamHandle {
@@ -35,7 +37,12 @@ export function streamChat(
       const res = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, stream: true, cache_prompt: true }),
+        // Only the two fields the server expects; anything else is local bookkeeping.
+        body: JSON.stringify({
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          stream: true,
+          cache_prompt: true,
+        }),
         signal: controller.signal,
       });
 

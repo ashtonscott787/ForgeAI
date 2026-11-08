@@ -1,9 +1,7 @@
 {
   "bundle": {
     "externalBin": [
-      "binaries/llama-server",
-      "binaries/rpc-server",
-      "binaries/forge-mesh"
+      "binaries/llama-server"
     ]
   }
 }

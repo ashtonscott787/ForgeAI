@@ -1,0 +1,462 @@
+{
+ "schema": 2,
+ "generated_at": "2026-11-08",
+ "note": "Download links are resolved from the Hugging Face repository at download time, so exact file names are read from the source rather than stored here.",
+ "models": [
+  {
+   "id": "qwen2.5-1.5b-instruct",
+   "name": "Qwen2.5 1.5B Instruct",
+   "family": "Qwen",
+   "developer": "Alibaba Qwen",
+   "params_b": 1.5,
+   "layers": 28,
+   "max_context": 32768,
+   "license": "apache-2.0",
+   "caps": [
+    "chat",
+    "fast",
+    "multilingual"
+   ],
+   "repo": "bartowski/Qwen2.5-1.5B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 998579896,
+    "Q5_K_M": 1207959552,
+    "Q8_0": 1739461754
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "qwen2.5-3b-instruct",
+   "name": "Qwen2.5 3B Instruct",
+   "family": "Qwen",
+   "developer": "Alibaba Qwen",
+   "params_b": 3,
+   "layers": 36,
+   "max_context": 32768,
+   "license": "qwen-research",
+   "caps": [
+    "chat",
+    "multilingual"
+   ],
+   "repo": "bartowski/Qwen2.5-3B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 1997159792,
+    "Q5_K_M": 2415919104,
+    "Q8_0": 3478923509
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "qwen2.5-7b-instruct",
+   "name": "Qwen2.5 7B Instruct",
+   "family": "Qwen",
+   "developer": "Alibaba Qwen",
+   "params_b": 7,
+   "layers": 28,
+   "max_context": 32768,
+   "license": "apache-2.0",
+   "caps": [
+    "chat",
+    "reasoning",
+    "multilingual"
+   ],
+   "repo": "bartowski/Qwen2.5-7B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 4660039516,
+    "Q5_K_M": 5637144576,
+    "Q8_0": 8117488189
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "qwen2.5-coder-1.5b",
+   "name": "Qwen2.5 Coder 1.5B",
+   "family": "Qwen",
+   "developer": "Alibaba Qwen",
+   "params_b": 1.5,
+   "layers": 28,
+   "max_context": 32768,
+   "license": "apache-2.0",
+   "caps": [
+    "code",
+    "fast"
+   ],
+   "repo": "bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 998579896,
+    "Q5_K_M": 1207959552,
+    "Q8_0": 1739461754
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "qwen2.5-coder-7b",
+   "name": "Qwen2.5 Coder 7B",
+   "family": "Qwen",
+   "developer": "Alibaba Qwen",
+   "params_b": 7,
+   "layers": 28,
+   "max_context": 32768,
+   "license": "apache-2.0",
+   "caps": [
+    "code",
+    "chat"
+   ],
+   "repo": "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 4660039516,
+    "Q5_K_M": 5637144576,
+    "Q8_0": 8117488189
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "llama-3.2-1b",
+   "name": "Llama 3.2 1B Instruct",
+   "family": "Llama",
+   "developer": "Meta",
+   "params_b": 1.2,
+   "layers": 16,
+   "max_context": 131072,
+   "license": "llama-3.2",
+   "caps": [
+    "chat",
+    "fast",
+    "long"
+   ],
+   "repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 798863917,
+    "Q5_K_M": 966367641,
+    "Q8_0": 1391569403
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "llama-3.2-3b",
+   "name": "Llama 3.2 3B Instruct",
+   "family": "Llama",
+   "developer": "Meta",
+   "params_b": 3.2,
+   "layers": 28,
+   "max_context": 131072,
+   "license": "llama-3.2",
+   "caps": [
+    "chat",
+    "long"
+   ],
+   "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 2130303778,
+    "Q5_K_M": 2576980377,
+    "Q8_0": 3710851743
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "llama-3.1-8b",
+   "name": "Llama 3.1 8B Instruct",
+   "family": "Llama",
+   "developer": "Meta",
+   "params_b": 8,
+   "layers": 32,
+   "max_context": 131072,
+   "license": "llama-3.1",
+   "caps": [
+    "chat",
+    "reasoning",
+    "long"
+   ],
+   "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 5325759447,
+    "Q5_K_M": 6442450944,
+    "Q8_0": 9277129359
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "gemma-2-2b-it",
+   "name": "Gemma 2 2B",
+   "family": "Gemma",
+   "developer": "Google DeepMind",
+   "params_b": 2.6,
+   "layers": 26,
+   "max_context": 8192,
+   "license": "gemma",
+   "caps": [
+    "chat",
+    "fast"
+   ],
+   "repo": "bartowski/gemma-2-2b-it-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 1730871820,
+    "Q5_K_M": 2093796556,
+    "Q8_0": 3015067041
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "gemma-2-9b-it",
+   "name": "Gemma 2 9B",
+   "family": "Gemma",
+   "developer": "Google DeepMind",
+   "params_b": 9.2,
+   "layers": 42,
+   "max_context": 8192,
+   "license": "gemma",
+   "caps": [
+    "chat",
+    "reasoning"
+   ],
+   "repo": "bartowski/gemma-2-9b-it-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 6124623364,
+    "Q5_K_M": 7408818585,
+    "Q8_0": 10668698763
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "deepseek-r1-qwen-1.5b",
+   "name": "DeepSeek R1 Distill Qwen 1.5B",
+   "family": "DeepSeek",
+   "developer": "DeepSeek",
+   "params_b": 1.5,
+   "layers": 28,
+   "max_context": 32768,
+   "license": "mit",
+   "caps": [
+    "reasoning",
+    "math",
+    "fast"
+   ],
+   "repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 998579896,
+    "Q5_K_M": 1207959552,
+    "Q8_0": 1739461754
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "deepseek-r1-qwen-7b",
+   "name": "DeepSeek R1 Distill Qwen 7B",
+   "family": "DeepSeek",
+   "developer": "DeepSeek",
+   "params_b": 7,
+   "layers": 28,
+   "max_context": 32768,
+   "license": "mit",
+   "caps": [
+    "reasoning",
+    "math",
+    "code"
+   ],
+   "repo": "bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 4660039516,
+    "Q5_K_M": 5637144576,
+    "Q8_0": 8117488189
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "mistral-7b-v0.3",
+   "name": "Mistral 7B Instruct v0.3",
+   "family": "Mistral",
+   "developer": "Mistral AI",
+   "params_b": 7.2,
+   "layers": 32,
+   "max_context": 32768,
+   "license": "apache-2.0",
+   "caps": [
+    "chat"
+   ],
+   "repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 4793183502,
+    "Q5_K_M": 5798205849,
+    "Q8_0": 8349416423
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "phi-3.5-mini",
+   "name": "Phi-3.5 Mini Instruct",
+   "family": "Phi",
+   "developer": "Microsoft",
+   "params_b": 3.8,
+   "layers": 32,
+   "max_context": 131072,
+   "license": "mit",
+   "caps": [
+    "chat",
+    "reasoning",
+    "long"
+   ],
+   "repo": "bartowski/Phi-3.5-mini-instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 2529735737,
+    "Q5_K_M": 3060164198,
+    "Q8_0": 4406636445
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "granite-3.1-8b",
+   "name": "Granite 3.1 8B Instruct",
+   "family": "Granite",
+   "developer": "IBM",
+   "params_b": 8.2,
+   "layers": 40,
+   "max_context": 131072,
+   "license": "apache-2.0",
+   "caps": [
+    "chat",
+    "code",
+    "long"
+   ],
+   "repo": "bartowski/granite-3.1-8b-instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 5458903433,
+    "Q5_K_M": 6603512217,
+    "Q8_0": 9509057593
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  },
+  {
+   "id": "smollm2-1.7b",
+   "name": "SmolLM2 1.7B Instruct",
+   "family": "SmolLM",
+   "developer": "Hugging Face",
+   "params_b": 1.7,
+   "layers": 24,
+   "max_context": 8192,
+   "license": "apache-2.0",
+   "caps": [
+    "chat",
+    "fast"
+   ],
+   "repo": "bartowski/SmolLM2-1.7B-Instruct-GGUF",
+   "quants": [
+    "Q4_K_M",
+    "Q5_K_M",
+    "Q8_0"
+   ],
+   "vision": false,
+   "est_bytes": {
+    "Q4_K_M": 1131723882,
+    "Q5_K_M": 1369020825,
+    "Q8_0": 1971389988
+   },
+   "reference_tok_s": 0.0,
+   "note": ""
+  }
+ ]
+}

@@ -1,128 +1,79 @@
 # Forge AI
 
-A local-first desktop AI app for macOS and Windows. Download a model, run it on
-your own hardware, chat with it. No account, no API key, nothing else to
-install.
+A desktop app that runs open-weight AI models on your own computer. No account,
+no cloud inference, no data leaving the machine. macOS and Windows.
 
-<p align="center"><em>Your AI. Your hardware. Your control.</em></p>
+> **Status: 0.2.0, early.** Everything listed under *What works* has been built
+> and exercised; everything under *Not built yet* is absent rather than stubbed.
+> Where something has not been verified, it says so.
 
-## Getting the app
+## What works
 
-**Users:** the download page is `web/index.html`, and installers come from the
-Releases page. Step-by-step instructions are in **[docs/INSTALL.md](docs/INSTALL.md)**.
+- **Chat** with streaming replies, saved conversations, light and dark themes.
+- **Local inference** through a bundled `llama-server` (llama.cpp `b12180`),
+  bound to loopback on a free port. Metal on Apple Silicon; CPU on Windows.
+- **Model library** across Qwen, Llama, Gemma, DeepSeek, Mistral, Phi, Granite
+  and SmolLM. Each download link is resolved from the Hugging Face repository at
+  the moment you click Download, so a renamed upload cannot become a dead link.
+  Downloads resume, check their SHA-256 when the repository publishes one, and
+  refuse to start without the disk space.
+- **Add from URL** for any GGUF file the catalogue does not list.
+- **Automatic loading.** There is no Load button: sending a message starts the
+  model if it is not already running, then sends. Idle models unload after 20
+  minutes.
+- **Auto model selection.** Picks among *installed* models by matching the
+  request against each model's declared strengths and your free memory, and says
+  which it chose and why. It never downloads anything and never calls out.
+- **Hardware detection** drives the Recommended / Compatible / May be slow /
+  Not enough memory labels. They come from measured memory, not guesses.
+- **Live HTML preview.** Ask for a page and it renders in a sandboxed frame:
+  Preview / Code / Split, three device widths, open in browser, export. The
+  frame allows scripts and nothing else — no file access, no app access.
+- **Interactive blocks.** A model can emit a `forge-ui` JSON block and get back
+  real checkboxes, sliders, dropdowns and dates; your selections are sent as
+  your next message. Validated against a strict schema, and anything malformed
+  falls back to plain text. Small models mostly ignore the convention; 7B-class
+  instruct models use it.
+- **Email replies** render with separate copy buttons for recipients, subject
+  and body.
 
-**Maintainer:** no installers exist until you tag a release — see
-**[docs/RELEASING.md](docs/RELEASING.md)**. It is two commands.
+## Not built yet
 
-## Verification status
+Machine clustering, invitation links, lightweight remote compute workers and
+distributed inference. The planner and capability model for placement exist in
+`core/` with unit tests, and the app detects a Tailscale-style mesh address, but
+no inference is distributed and the feature ships off. Vision and multi-file
+projects are also absent.
 
-Everything in this table was checked on a Linux x86_64 machine, which is where
-the code was written. **No macOS or Windows installer has been produced or
-opened yet** — that happens on GitHub's runners, and it is the one thing that
-cannot be done anywhere else.
-
-| Part | Status | How it was checked |
-| --- | --- | --- |
-| `forge-core` — types, hardware, registry, planner, runtime | **Verified** | `cargo test` — 26 tests pass |
-| Workspace lint | **Verified** | `cargo clippy --workspace --all-targets -- -D warnings` clean |
-| Desktop shell — downloads, engine supervision, settings, IPC | **Compiles** | `cargo check -p forge-ai`, clippy clean |
-| Frontend — chat streaming, model manager, settings, themes | **Compiles** | `tsc --noEmit` clean, `vite build` succeeds |
-| **Whole app, built and bundled** | **Verified on Linux** | `tauri build` produced a working binary and a 7 MB `.deb` |
-| macOS `.dmg` / Windows `.exe` | **Not yet built** | needs GitHub's macOS and Windows runners |
-| Inference against a real model | **Not yet run** | needs a built installer and a downloaded model |
-| Distributed inference across machines | **Off, by design** | designed and unit-tested; never run on two real machines |
-
-The Linux `.deb` matters more than it looks: it proves the Rust core, the
-embedded frontend and Tauri's bundler all work together. The macOS and Windows
-jobs run the same code through the same bundler with a different target.
-
-## What 0.1 does
-
-Working, and built rather than mocked:
-
-- **Chat** with a local model, streaming token by token, with a Stop button.
-- **Models** — browse a bundled catalogue, download with live progress,
-  resume an interrupted download, verify sha256 before use, load, unload, delete.
-- **Hardware detection** — RAM, CPU, GPU backend, VRAM via `nvidia-smi`, and an
-  honest usable-memory budget with real headroom.
-- **Settings** — context size, GPU layers, CPU threads, theme. Persisted
-  atomically.
-- **Themes** — light, dark, or follow the OS.
-- **Model selector** — searchable, keyboard-navigable, with a preview card whose
-  four metric bars respond live to the quantization and reasoning controls
-  inside it.
-
-Deliberately not in 0.1:
-
-- **GPU acceleration on Windows.** macOS uses Metal; Windows ships CPU-only.
-  A Vulkan build needs an SDK on the runner and three GPU vendors to test
-  against, and an untested GPU path means crashes.
-- **Distributed inference.** The planner is implemented and tested and
-  `sidecar/mesh` holds a working mesh design, but it has never run across two
-  real machines, so the app reports it as off. See `src-tauri/src/cluster.rs`.
-- Vision and document models, agents, tools, memory.
-
-## No invented numbers
-
-A speed figure appears only after a real run, measured from that run. The
-bundled catalogue sets `reference_tok_s` to `0` for every entry and the UI shows
-"unmeasured", because Forge has not benchmarked those models. A catalogue entry
-with an empty `sha256` is labelled "Unverified digest" in the UI and logs a
-warning rather than quietly skipping verification.
-
-## Architecture
-
-The rule: **the UI never talks to a runtime, a peer or the network directly.**
-
-```
-React (src/)
-   │  typed invoke — src/lib/ipc.ts mirrors the serde types
-   ▼
-Tauri shell (src-tauri/)  ──spawns──▶  llama-server (loopback only)
-   │                                        ▲
-   │ calls                                  │ direct SSE from the webview
-   ▼                                        │  (CSP permits 127.0.0.1 only)
-forge-core (core/) ─────────────────────────┘
-```
-
-`core/` has no Tauri and no GPU dependency, so the logic that matters tests on a
-bare runner. Full detail in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
-
-## Developing
-
-Prerequisites: Rust stable, Node 22 + pnpm 10, and the
-[Tauri system dependencies](https://tauri.app/start/prerequisites/) for your OS.
-
-```bash
-pnpm install
-
-cargo test --workspace                  # the gate — runs anywhere
-cargo clippy --workspace --all-targets -- -D warnings
-pnpm typecheck
-
-pnpm dev          # frontend in a browser; the core is unreachable, says so
-pnpm tauri dev    # the real app
-```
-
-`pnpm tauri dev` runs without a bundled runtime — the app opens and says it has
-no inference runtime, which is the honest state. To get a working runtime
-locally, build llama.cpp and drop `llama-server` into `src-tauri/binaries/`
-named with your target triple; the release workflow shows the exact commands.
+Distributing a model across machines raises the memory ceiling. It does not make
+a model smarter or faster, and over a high-latency link it is slower than one
+machine. The planner refuses to split a model that already fits.
 
 ## Layout
 
+| Path | What it is |
+| --- | --- |
+| `src/` | React + TypeScript frontend |
+| `electron/` | Desktop shell: IPC, engine supervision, downloads, Hugging Face resolution |
+| `core/` | Rust: hardware profiling, placement planner, catalogue validation (unit-tested) |
+| `src-tauri/` | Earlier Tauri shell, kept for the Rust core and the icons |
+| `.github/workflows/` | CI and the installer builds |
+
+## Building
+
 ```
-core/            Rust domain logic. No Tauri, no GPU deps.
-src-tauri/       Desktop shell: downloads, engine supervision, settings, IPC.
-src/             React + TypeScript frontend.
-sidecar/mesh/    Go mesh sidecar — NOT wired in. See sidecar/README.md.
-web/             The installer download page.
-docs/            INSTALL, RELEASING, ARCHITECTURE.
+pnpm install
+pnpm build                 # type-check + bundle the frontend
+pnpm exec electron-builder --mac   # or --win, on that OS
 ```
 
-## Licensing
+The engine is not in this repository. The workflow downloads it from the
+llama.cpp release into `engine/` before packaging; do the same locally.
 
-MIT. Bundled llama.cpp is MIT. Model weights keep their own licences — some
-forbid commercial use — and `CatalogueEntry.license` carries each one so the UI
-can show it before download. `sidecar/mesh` would depend on the Tailscale client
-(BSD-3); get that reviewed before shipping it commercially.
+Pushing a tag beginning with `v` builds both platforms and attaches the
+installers to a draft release. That workflow has not completed a run yet.
+
+## Licence
+
+MIT, see `LICENSE`. Bundled llama.cpp is MIT. Each model carries its own licence,
+shown on its card before you download it.

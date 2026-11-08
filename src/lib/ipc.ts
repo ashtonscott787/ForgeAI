@@ -4,8 +4,25 @@
  * Every type mirrors a `serde` type in the shell or in `forge-core`. If the two
  * drift, the build breaks here rather than at runtime.
  */
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { listen as tauriListen } from "@tauri-apps/api/event";
+
+/** Electron exposes `window.forge` from its preload; Tauri exposes its own IPC. */
+type Bridge = {
+  invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+  on: (event: string, cb: (payload: unknown) => void) => () => void;
+};
+const bridge: Bridge | undefined =
+  typeof window !== "undefined" ? (window as unknown as { forge?: Bridge }).forge : undefined;
+
+function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (bridge) return bridge.invoke(cmd, args) as Promise<T>;
+  return tauriInvoke<T>(cmd, args);
+}
+function listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<() => void> {
+  if (bridge) return Promise.resolve(bridge.on(event, (p) => cb({ payload: p as T })));
+  return tauriListen<T>(event, cb);
+}
 
 export type Backend = "metal" | "cuda" | "vulkan" | "cpu";
 export type Trust = "selfhost" | "approved" | "pending";
@@ -28,23 +45,44 @@ export interface MachineCapability {
   online: boolean;
 }
 
-export interface Artifact { quant: Quant; url: string; bytes: number; sha256: string }
+export type Capability = "chat" | "code" | "reasoning" | "math" | "fast" | "long" | "multilingual" | "vision";
 
+/** A catalogue row names a repository; the file itself is resolved on demand. */
 export interface CatalogueEntry {
   id: string;
   name: string;
   family: string;
+  developer: string;
   params_b: number;
   layers: number;
   max_context: number;
+  license: string;
+  caps: Capability[];
+  repo: string;
+  quants: string[];
   vision: boolean;
+  /** Estimated weight size per quantization. Replaced by the real figure once resolved. */
+  est_bytes: Record<string, number>;
   /** Zero means Forge has not measured it. Show "unmeasured", never a guess. */
   reference_tok_s: number;
-  artifacts: Artifact[];
-  license: string;
+  note?: string;
 }
 
 export interface Catalogue { schema: number; generated_at: string; models: CatalogueEntry[] }
+
+/** What the Hugging Face repository actually holds, read at download time. */
+export interface Resolved {
+  repo: string;
+  quant: string;
+  matched_requested_quant: boolean;
+  file_name: string;
+  url: string;
+  bytes: number;
+  sha256: string;
+  available_quants: string[];
+}
+
+export interface HubHit { repo: string; downloads: number; likes: number; license: string }
 
 export interface Health {
   runtime_available: boolean;
@@ -98,6 +136,16 @@ export const api = {
     invoke<string>("download_model", { modelId, url, fileName, sha256 }),
   deleteModel: (fileName: string) => invoke<void>("delete_model", { fileName }),
   startEngine: (modelFile: string) => invoke<EngineStatus>("start_engine", { modelFile }),
+  /** Start the model only if it is not already the one running. */
+  ensureEngine: (modelFile: string) => invoke<EngineStatus>("ensure_engine", { modelFile }),
+  resolveArtifact: (repo: string, quant: string) =>
+    invoke<Resolved>("resolve_artifact", { repo, quant }),
+  searchHub: (query: string) => invoke<HubHit[]>("search_hub", { query }),
+  openExternal: (url: string) => invoke<void>("open_external", { url }),
+  previewInBrowser: (html: string, name: string) =>
+    invoke<string>("preview_in_browser", { html, name }),
+  saveTextFile: (suggestedName: string, content: string) =>
+    invoke<string | null>("save_text_file", { suggestedName, content }),
   stopEngine: () => invoke<void>("stop_engine"),
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
@@ -106,7 +154,8 @@ export const api = {
 };
 
 /** True when running in a plain browser (`pnpm dev`) rather than inside Tauri. */
-export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const inTauri =
+  typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "forge" in window);
 
 export const GB = 1024 ** 3;
 export const fmtBytes = (b: number) => {
@@ -114,5 +163,13 @@ export const fmtBytes = (b: number) => {
   if (b >= 1024 ** 2) return `${Math.round(b / 1024 ** 2)} MB`;
   return `${Math.round(b / 1024)} KB`;
 };
-export const fileNameFor = (entry: CatalogueEntry, a: Artifact) =>
-  a.url.split("/").pop() ?? `${entry.id}.gguf`;
+export const CAP_LABEL: Record<string, string> = {
+  chat: "Chat",
+  code: "Coding",
+  reasoning: "Reasoning",
+  math: "Maths",
+  fast: "Fast",
+  long: "Long context",
+  multilingual: "Multilingual",
+  vision: "Vision",
+};

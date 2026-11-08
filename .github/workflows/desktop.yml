@@ -1,0 +1,91 @@
+# Builds the Electron desktop app on real macOS and Windows runners.
+#
+# Nothing here is code-signed: macOS shows "unidentified developer" and Windows
+# shows SmartScreen on first launch. Signing needs paid certificates.
+#
+# UNVERIFIED: this workflow has never completed a run. Treat the first run as
+# the test of the workflow itself.
+name: Desktop installers
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  LLAMA_TAG: b12180
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS (Apple Silicon)
+            asset: llama-b12180-bin-macos-arm64.tar.gz
+            builder: --mac
+          - os: windows-latest
+            label: Windows (x64)
+            asset: llama-b12180-bin-win-cpu-x64.zip
+            builder: --win
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Fetch the inference engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p engine _dl
+          url="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/${{ matrix.asset }}"
+          curl -sSfL "$url" -o "_dl/${{ matrix.asset }}"
+          case "${{ matrix.asset }}" in
+            *.tar.gz) tar xzf "_dl/${{ matrix.asset }}" -C _dl ;;
+            *.zip)    unzip -q "_dl/${{ matrix.asset }}" -d _dl ;;
+          esac
+          # Keep llama-server plus the libraries it loads; drop the other tools.
+          find _dl -type f \( -name 'llama-server' -o -name 'llama-server.exe' \
+            -o -name '*.dylib' -o -name '*.dll' -o -name 'LICENSE*' \) -exec cp {} engine/ \;
+          test -f engine/llama-server -o -f engine/llama-server.exe
+          chmod +x engine/llama-server 2>/dev/null || true
+          ls -l engine
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Package
+        run: pnpm exec electron-builder ${{ matrix.builder }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge-ai-${{ matrix.os }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+          if-no-files-found: error
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
