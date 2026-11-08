@@ -1,16 +1,24 @@
 import { useState } from "react";
-import { api, type Settings } from "../lib/ipc";
+import { api, type Settings, type UpdateInfo } from "../lib/ipc";
 
 export function SettingsView({
   settings,
   onChange,
+  version,
+  update,
+  checking,
+  onCheck,
 }: {
   settings: Settings;
   onChange: (s: Settings) => void;
+  version: string;
+  update: UpdateInfo | null;
+  checking: boolean;
+  onCheck: () => void;
 }) {
   const [saved, setSaved] = useState(false);
 
-  const update = async (patch: Partial<Settings>) => {
+  const save = async (patch: Partial<Settings>) => {
     const next = { ...settings, ...patch };
     onChange(next);
     try {
@@ -31,6 +39,56 @@ export function SettingsView({
       <div className="scroll">
         <div className="pbody">
           <div className="panel">
+            <div className="panel-h"><span className="t">Updates</span></div>
+            <div className="panel-b">
+              <Field label="Automatically check for updates" hint="Looks at the GitHub releases page on launch and every few hours.">
+                <Toggle on={settings.update_check !== false} onChange={(v) => save({ update_check: v })} />
+              </Field>
+              <Field label="Automatically download updates" hint="Fetches the update in the background once one is found.">
+                <Toggle on={settings.update_download === true} onChange={(v) => save({ update_download: v })} />
+              </Field>
+              <Field label="Install when safe" hint="Applies a downloaded update once nothing is generating or downloading. Forge AI restarts itself.">
+                <Toggle on={settings.update_install === true} onChange={(v) => save({ update_install: v })} />
+              </Field>
+              <Field label="Channel" hint="Beta also offers pre-releases.">
+                <select
+                  value={settings.update_channel ?? "stable"}
+                  onChange={(e) => save({ update_channel: e.target.value as "stable" | "beta", skipped_version: null })}
+                >
+                  <option value="stable">Stable</option>
+                  <option value="beta">Beta</option>
+                </select>
+              </Field>
+              <Field
+                label="This version"
+                hint={`Forge AI ${version}${settings.last_update_check ? ` · last checked ${new Date(settings.last_update_check).toLocaleString()}` : " · not checked yet"}`}
+              >
+                <div className="rowbtns">
+                  <button className="ghostbtn" disabled={checking} onClick={onCheck}>
+                    {checking ? "Checking…" : "Check for updates"}
+                  </button>
+                  {update?.html_url && (
+                    <button className="ghostbtn" onClick={() => void api.openExternal(update.html_url!)}>
+                      Release notes
+                    </button>
+                  )}
+                </div>
+              </Field>
+              {update && !update.available && (
+                <p className="fhint">Forge AI {version} is the newest release.</p>
+              )}
+              {settings.skipped_version && (
+                <p className="fhint">
+                  Skipping {settings.skipped_version}.{" "}
+                  <button className="linkbtn" onClick={() => save({ skipped_version: null })}>
+                    Stop skipping
+                  </button>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
             <div className="panel-h"><span className="t">Inference</span></div>
             <div className="panel-b">
               <Field
@@ -39,7 +97,7 @@ export function SettingsView({
               >
                 <select
                   value={settings.context_size}
-                  onChange={(e) => update({ context_size: Number(e.target.value) })}
+                  onChange={(e) => save({ context_size: Number(e.target.value) })}
                 >
                   {[2048, 4096, 8192, 16384, 32768].map((n) => (
                     <option key={n} value={n}>{n.toLocaleString()}</option>
@@ -56,7 +114,7 @@ export function SettingsView({
                   min={0}
                   max={999}
                   value={settings.gpu_layers}
-                  onChange={(e) => update({ gpu_layers: Number(e.target.value) })}
+                  onChange={(e) => save({ gpu_layers: Number(e.target.value) })}
                 />
               </Field>
 
@@ -68,7 +126,7 @@ export function SettingsView({
                   value={settings.threads ?? ""}
                   placeholder="auto"
                   onChange={(e) =>
-                    update({ threads: e.target.value === "" ? null : Number(e.target.value) })
+                    save({ threads: e.target.value === "" ? null : Number(e.target.value) })
                   }
                 />
               </Field>
@@ -84,7 +142,7 @@ export function SettingsView({
                     <button
                       key={t}
                       className={settings.theme === t ? "on" : ""}
-                      onClick={() => update({ theme: t })}
+                      onClick={() => save({ theme: t })}
                     >
                       {t === "system" ? "System" : t === "light" ? "Light" : "Dark"}
                     </button>
@@ -116,5 +174,13 @@ function Field({
       </div>
       <div className="fctl">{children}</div>
     </div>
+  );
+}
+
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button className={`toggle${on ? " on" : ""}`} role="switch" aria-checked={on} onClick={() => onChange(!on)}>
+      <span className="knob" />
+    </button>
   );
 }

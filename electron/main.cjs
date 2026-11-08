@@ -9,7 +9,9 @@ const net = require("node:net");
 const https = require("node:https");
 const http = require("node:http");
 const crypto = require("node:crypto");
-const { spawn, execFileSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
+const { readAttachment, selectRelevant } = require("./extract.cjs");
+const updater = require("./updater.cjs");
 
 const RUNTIME_ID = "llamacpp-b12180";
 const IDLE_UNLOAD_MS = 20 * 60 * 1000;
@@ -250,6 +252,62 @@ function register(win) {
   h("resolve_artifact", resolveArtifact);
   h("search_hub", (a) => searchHub(a || {}));
   h("list_repo_files", (a) => listRepoFiles(a || {}));
+  // ── attachments ───────────────────────────────────────────
+  h("pick_files", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "Documents and code", extensions: ["pdf","docx","pptx","xlsx","txt","md","csv","tsv","json","html","css","js","ts","tsx","py","rs","go","java","c","cpp","sh","sql","xml","yml","yaml","log"] },
+        { name: "Images", extensions: ["png","jpg","jpeg","webp","gif"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+    if (canceled) return [];
+    return Promise.all(filePaths.map(readAttachment));
+  });
+  h("read_files", ({ paths }) => Promise.all((Array.isArray(paths) ? paths : []).map(readAttachment)));
+  h("build_context", ({ files, question, budget }) => {
+    const list = Array.isArray(files) ? files : [];
+    const cap = Math.max(2000, Number(budget) || 24000);
+    const share = Math.floor(cap / Math.max(1, list.length));
+    const parts = [];
+    const report = [];
+    for (const f of list) {
+      const { text, trimmed } = selectRelevant(String(f.text || ""), String(question || ""), share);
+      parts.push(`<<<FILE: ${f.name}${trimmed ? " (most relevant extracts)" : ""}>>>\n${text}\n<<<END ${f.name}>>>`);
+      report.push({ name: f.name, trimmed, chars: text.length });
+    }
+    return { context: parts.join("\n\n"), report };
+  });
+
+  // ── updates ───────────────────────────────────────────────
+  h("check_update", (a) => updater.checkForUpdate(a || {}));
+  h("download_update", async ({ info }) => {
+    const r = await updater.fetchUpdate(info, (p) => win.webContents.send("update://progress", p));
+    return r;
+  });
+  h("apply_update", ({ file }) => updater.applyUpdate({ file }));
+
+  // ── publisher avatars ─────────────────────────────────────
+  // Shown from Hugging Face at display time; nothing is copied into the app.
+  h("publisher_avatar", async ({ author }) => {
+    const a = String(author || "").trim();
+    if (!/^[\w.-]+$/.test(a)) return { avatar: null };
+    for (const url of [
+      `https://huggingface.co/api/organizations/${a}/overview`,
+      `https://huggingface.co/api/users/${a}/overview`,
+    ]) {
+      try {
+        const d = await getJSON(url);
+        const avatar = d && (d.avatarUrl || d.avatar_url || (d.user && d.user.avatarUrl));
+        if (typeof avatar === "string" && avatar.startsWith("https://")) return { avatar };
+      } catch {
+        /* try the next shape, then give up quietly and use the built-in mark */
+      }
+    }
+    return { avatar: null };
+  });
+
   h("open_external", ({ url }) => {
     if (!/^https?:\/\//.test(String(url))) throw new Error("only http(s) links can be opened");
     return shell.openExternal(url);
@@ -299,6 +357,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   settings = loadSettings();
+  updater.cleanupOldBundles();
   // The renderer is a file:// page; let it read the loopback engine's streamed replies.
   session.defaultSession.webRequest.onHeadersReceived({ urls: ["http://127.0.0.1/*"] }, (d, cb) => {
     const h = d.responseHeaders || {};

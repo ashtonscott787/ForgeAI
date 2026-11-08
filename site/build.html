@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" class="dark-page">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeAI builds — websites and apps from a sentence</title>
+<meta name="description" content="Ask for a website, a calculator or a booking page and get a working link to share — built on your own computer and published where you choose.">
+<link rel="icon" href="favicon.png">
+<meta property="og:title" content="ForgeAI builds — websites and apps from a sentence">
+<meta property="og:description" content="Ask for a website, a calculator or a booking page and get a working link to share — built on your own computer and published where you choose.">
+<meta property="og:image" content="shots/sites.webp">
+<meta name="theme-color" content="#07090d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>
+@import url('assets/seq.css');
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap nav">
+  <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+  <button class="menubtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="links">
+    <a class="lnk" href="what-is-it.html">What it is</a>
+    <a class="lnk" href="watch.html">Watch it work</a>
+    <a class="lnk" href="models.html">Models</a>
+    <a class="lnk" href="ways.html">Ways to use it</a>
+    <a class="lnk" href="updates.html">Updates</a>
+    <a class="lnk" href="docs.html">Docs</a>
+    <a class="lnk" href="business.html">For business</a>
+    <a class="lnk" href="pricing.html">Pricing</a>
+    <a class="btn primary" href="download.html">Download</a>
+  </nav>
+</div></header>
+<main>
+<section class="hero" style="padding-bottom:40px">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="wrap">
+    <span class="pill rv"><span class="dot"></span> Scroll to watch one get built</span>
+    <h1 class="mega rv" style="--d:70ms">From a sentence<br><span class="grad">to a live link.</span></h1>
+    <p class="lede rv" style="--d:130ms">Describe the page you want. ForgeAI builds it, shows it to you, and hands back a link you can send — hosted by ForgeAI or pushed straight to your own web host.</p>
+    <div style="display:flex;justify-content:center;margin-top:34px;color:var(--fg-3)">
+      <svg class="bob" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+    </div>
+  </div>
+</section>
+
+<section id="track" aria-label="ForgeAI building a website">
+  <div class="seqwrap">
+    <canvas id="stage" aria-hidden="true"></canvas>
+    <div class="seq-vignette"></div><div class="seq-scrim"></div>
+    <div class="caps"><div class="inner"><div class="box">
+      <article class="cap" data-from="0" data-to="28">
+        <div class="eyebrow">You ask</div>
+        <h2>In the words you would use anyway.</h2>
+        <p>No template to pick, no builder to learn. Say what the page is for and what should be on it.</p>
+      </article>
+      <article class="cap" data-from="29" data-to="62">
+        <div class="eyebrow">It starts</div>
+        <h2>The page puts itself together.</h2>
+        <p>Header, hero, the words, the photo — laid out as it goes, in front of you, so you can stop it the moment it heads the wrong way.</p>
+      </article>
+      <article class="cap" data-from="63" data-to="98">
+        <div class="eyebrow">It keeps going</div>
+        <h2>Including the parts that actually do something.</h2>
+        <p>A booking form, a calculator, a price list that adds up — real working pieces, not pictures of them.</p>
+      </article>
+      <article class="cap" data-from="99" data-to="122">
+        <div class="eyebrow">It publishes</div>
+        <h2>A link you can send straight away.</h2>
+        <p>Hosted by ForgeAI with a private link, or pushed to Netlify, GitHub Pages or your own web space with one press.</p>
+      </article>
+      <article class="cap" data-from="123" data-to="999">
+        <div class="eyebrow">Then changed</div>
+        <h2>“Make the photo bigger and add the phone number.”</h2>
+        <p>Say what is wrong and it edits the real thing. The link stays the same, so whoever you sent it to sees the new one.</p>
+      </article>
+    </div></div></div>
+    <div id="loader"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div>
+  </div>
+</section>
+
+<section class="pad"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">In the app</div><h2>Everything it has built, in one place.</h2><p>Each site keeps its own link, its own files and its own history. Share it, lock it behind a key, or push it to your host.</p></div>
+  <div class="rv" style="margin-top:38px"><div class="frame"><div class="bar"><i></i><i></i><i></i><span>Sites</span></div><img src="shots/sites.webp" width="1800" height="1191" alt="The Sites page listing built sites with their share links." loading="lazy"></div></div>
+  <div class="grid">
+    <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></div><h3>Share links that just work</h3><p>Send the link and it opens — on a phone, on a laptop, for someone with no account. Private by key if you would rather.</p></div>
+    <div class="card rv" style="--d:60ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg></div><h3>Or your own host</h3><p>Netlify and GitHub Pages are one press away, with the token kept in the vault. Updates go out the same way.</p></div>
+    <div class="card rv" style="--d:120ms"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/></svg></div><h3>Little apps, not just pages</h3><p>A quote calculator, a stock sheet, a roster, a form that emails you. Interactive things people can actually use.</p></div>
+    <div class="card rv" style="--d:180ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>It keeps the files</h3><p>The HTML is yours, on your machine. Download it, edit it by hand, or hand it to whoever does your website.</p></div>
+  </div>
+</div></section>
+
+<section class="pad tight"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">Documents too</div><h2>The same trick, for paperwork.</h2><p>Word documents, PDFs, slide decks and spreadsheets, built from your own material and saved into Files — ready to send.</p></div>
+  <div class="rv" style="margin-top:34px"><div class="frame"><div class="bar"><i></i><i></i><i></i><span>Files</span></div><img src="shots/knowledge.webp" width="1800" height="1191" alt="Knowledge and files kept on this computer." loading="lazy"></div></div>
+</div></section>
+
+<section class="pad tight"><div class="wrap center">
+  <div class="sechead center rv"><h2>Describe something. See it built.</h2><p>Free on one computer, no account.</p></div>
+  <div class="cta rv" style="margin-top:30px">
+    <a class="btn primary big" href="download.html"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>Download ForgeAI</a>
+    <a class="btn big" href="watch.html">Watch it answer a question</a>
+  </div>
+</div></section>
+</main>
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div>
+      <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+      <p class="small" style="color:var(--fg-2);max-width:34ch">Private AI that runs on computers you own. Made in Hawke's Bay, New Zealand.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="what-is-it.html">What it is</a><a href="watch.html">Watch it work</a><a href="agents.html">Agents</a><a href="customers.html">Customers</a><a href="build.html">Websites &amp; apps</a><a href="models.html">Models &amp; training</a>
+    </div>
+    <div>
+      <h4>Get it</h4>
+      <a href="download.html">Download</a><a href="pricing.html">Pricing</a><a href="business.html">For business</a><a href="install.html">Install guide</a><a href="downloads/SHA256SUMS.txt">Checksums</a>
+    </div>
+    <div>
+      <h4>About</h4>
+      <a href="docs.html">Documentation</a><a href="index.html#private">Privacy</a><a href="index.html#what">What it does</a><a href="pricing.html#compare">How it compares</a>
+    </div>
+  </div>
+  <div class="base"><span>ForgeAI 2.28.0 · built 2 November 2026</span><span>No account. No subscription. No telemetry.</span></div>
+</div></footer>
+<script src="assets/site.js"></script>
+<script src="assets/seq.js"></script>
+<script src="assets/scenes.js"></script>
+<script src="assets/build-page.js"></script>
+</body>
+</html>

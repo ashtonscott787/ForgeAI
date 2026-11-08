@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Updates — ForgeAI</title>
+<meta name="description" content="Every release of ForgeAI, what changed, and what each stage actually looks like.">
+<link rel="icon" href="favicon.png">
+<meta property="og:title" content="Updates — ForgeAI">
+<meta property="og:description" content="ForgeAI is a private AI platform that runs on computers you own. Chat, email, documents, websites, phone lines and agents — nothing leaves your network unless you say so.">
+<meta property="og:image" content="shots/chat-dark.webp">
+<meta name="theme-color" content="#f7f8fa">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+
+</head>
+<body>
+<header class="top"><div class="wrap nav">
+  <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+  <button class="menubtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="links">
+    <a class="lnk" href="what-is-it.html">What it is</a>
+    <a class="lnk" href="watch.html">Watch it work</a>
+    <a class="lnk" href="models.html">Models</a>
+    <a class="lnk" href="ways.html">Ways to use it</a>
+    <a class="lnk" style="color:var(--ink)" href="updates.html">Updates</a>
+    <a class="lnk" href="docs.html">Docs</a>
+    <a class="lnk" href="business.html">For business</a>
+    <a class="lnk" href="pricing.html">Pricing</a>
+    <a class="btn primary" href="download.html">Download</a>
+  </nav>
+</div></header>
+<main>
+<section class="hero" style="padding-bottom:30px">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="wrap">
+    <span class="pill rv"><span class="dot"></span> Release history</span>
+    <h1 class="mega rv" style="--d:90ms">Every version,<br><span class="grad">and what it changed.</span></h1>
+    <p class="lede rv" style="--d:150ms">ForgeAI is built in the open and ships often. Each stage below is a real release with a screenshot of the thing that changed. Where something is unfinished, it says so.</p>
+    <div class="cta rv" style="--d:210ms">
+      <a class="btn primary big" href="download.html">Download the latest</a>
+      <a class="btn big" href="https://github.com/ashtonscott787/ForgeAI/releases">All releases on GitHub</a>
+    </div>
+  </div>
+</section>
+<section class="pad"><div class="wrap">
+  <div class="sechead rv">
+    <div class="eyebrow">Version 0.4.0 · 8 November 2026</div>
+    <h2>Updates itself, reads your files, and times every answer</h2>
+  </div>
+  <div class="grid rv">
+    <div class="card"><h3>Built-in updater</h3><p>Forge AI checks its own releases page, shows what changed, and installs the new version in place. One application that keeps updating — no more downloading a replacement.</p></div>
+    <div class="card"><h3>Attachments</h3><p>Drag in a PDF, Word document, spreadsheet, slide deck, CSV or source file and ask about it. The text is pulled out and handed to the model; a file it cannot read says so instead of pretending.</p></div>
+    <div class="card"><h3>Response timing</h3><p>Every answer carries the total time from pressing Send. Expand it for model loading time, time to first token, tokens generated and output speed — all measured, none estimated.</p></div>
+    <div class="card"><h3>New identity</h3><p>The orb artwork now runs through the app, the icon and this site.</p></div>
+  </div>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.4.0</span></div>
+    <img src="shots/u-040-chat.webp" alt="An answer about two attached documents, with the update notice above it and the measured timings expanded underneath." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">An answer about two attached documents, with the update notice above it and the measured timings expanded underneath.</p>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.4.0</span></div>
+    <img src="shots/u-040-settings.webp" alt="Update settings: check, download and install separately, with a stable or beta channel." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">Update settings: check, download and install separately, with a stable or beta channel.</p>
+</div></section>
+<section class="pad"><div class="wrap">
+  <div class="sechead rv">
+    <div class="eyebrow">Version 0.3.0 · 8 November 2026</div>
+    <h2>Every GGUF model on Hugging Face</h2>
+  </div>
+  <div class="grid rv">
+    <div class="card"><h3>Search the whole hub</h3><p>Not a fixed list. Search every repository that publishes GGUF files, sorted by downloads, likes, trending or recency.</p></div>
+    <div class="card"><h3>Pick the exact file</h3><p>Open a repository to see each quantization with its real size, and whether it fits the memory you actually have.</p></div>
+    <div class="card"><h3>Family marks</h3><p>Fifteen marks, one per maker, drawn for ForgeAI rather than borrowed from the model makers.</p></div>
+  </div>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.3.0</span></div>
+    <img src="shots/u-030-hub.webp" alt="Searching Hugging Face from inside the app and expanding a repository to choose a quantization." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">Searching Hugging Face from inside the app and expanding a repository to choose a quantization.</p>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.3.0</span></div>
+    <img src="shots/u-030-library.webp" alt="The curated library, with capability tags and memory-fit labels from detected hardware." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">The curated library, with capability tags and memory-fit labels from detected hardware.</p>
+</div></section>
+<section class="pad"><div class="wrap">
+  <div class="sechead rv">
+    <div class="eyebrow">Version 0.2.0 · 7 November 2026</div>
+    <h2>Live previews, interactive answers and conversation history</h2>
+  </div>
+  <div class="grid rv">
+    <div class="card"><h3>Live web previews</h3><p>Ask for a page and it renders inside the app, sandboxed: preview, code or split, three device widths, open in a browser, export.</p></div>
+    <div class="card"><h3>Interactive answers</h3><p>The model can ask a question with real checkboxes, sliders and dropdowns. Your selections go back into the conversation and shape the next answer.</p></div>
+    <div class="card"><h3>Emails with copy buttons</h3><p>Recipients, subject and body each get their own button, because they go into different boxes.</p></div>
+    <div class="card"><h3>Automatic model loading</h3><p>Sending a message loads the model if it is not already running. The Load button is gone.</p></div>
+    <div class="card"><h3>Auto model selection</h3><p>Picks among the models you have installed based on what you asked for, and says which it chose and why.</p></div>
+  </div>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.2.0</span></div>
+    <img src="shots/u-020-preview.webp" alt="A generated restaurant page running live inside the chat." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">A generated restaurant page running live inside the chat.</p>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.2.0</span></div>
+    <img src="shots/u-020-interactive.webp" alt="The model asking which foods to include, with working checkboxes and a slider." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">The model asking which foods to include, with working checkboxes and a slider.</p>
+  <div class="frame rv" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>ForgeAI 0.2.0</span></div>
+    <img src="shots/u-020-email.webp" alt="A drafted email with separate copy buttons for recipients, subject and message." loading="lazy">
+  </div>
+  <p class="fine rv" style="margin-top:10px">A drafted email with separate copy buttons for recipients, subject and message.</p>
+</div></section>
+<section class="pad"><div class="wrap">
+  <div class="sechead rv">
+    <div class="eyebrow">Version 0.1.0 · 7 November 2026</div>
+    <h2>The first working build</h2>
+  </div>
+  <div class="grid rv">
+    <div class="card"><h3>Local inference</h3><p>llama.cpp bundled inside the app: Metal on Apple Silicon, processor on Windows. Nothing is sent anywhere.</p></div>
+    <div class="card"><h3>Model downloads</h3><p>Resumable, checksum-verified, with a disk-space check before they start.</p></div>
+    <div class="card"><h3>Hardware detection</h3><p>Memory is measured, and model sizes are judged against it rather than guessed.</p></div>
+  </div>
+</div></section>
+<section class="pad"><div class="wrap">
+  <div class="sechead rv">
+    <div class="eyebrow">Being straight with you</div>
+    <h2>What is not finished.</h2>
+    <p>These are named here rather than hinted at in a feature list.</p>
+  </div>
+  <div class="grid rv">
+    <div class="card"><h3>Clustering</h3><p>Connecting several computers into one private pool is designed and partly written — the placement planner and its tests are in the repository — but no work is distributed yet, and the feature ships switched off.</p></div>
+    <div class="card"><h3>Reading images</h3><p>Images can be attached and previewed, but the engine in this build is text-only, so it will tell you it cannot read them rather than guess.</p></div>
+    <div class="card"><h3>Scanned documents</h3><p>A PDF with no text layer is recognised as a scan and reported as one. There is no OCR in this build.</p></div>
+    <div class="card"><h3>Signing</h3><p>Neither build is code-signed, so macOS and Windows each warn you once on first launch. Certificates cost money every year; this is free.</p></div>
+    <div class="card"><h3>Windows graphics</h3><p>The Windows build runs on the processor. GPU acceleration there is not wired up yet, so it is slower than the Mac build on the same model.</p></div>
+    <div class="card"><h3>Interactive answers depend on the model</h3><p>A small model will mostly ignore the interactive format. Seven-billion-parameter instruction models use it well. That is the model's doing, not the app's.</p></div>
+  </div>
+</div></section>
+</main>
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div>
+      <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+      <p class="small" style="color:var(--fg-2);max-width:34ch">Private AI that runs on computers you own. Made in Hawke's Bay, New Zealand.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="what-is-it.html">What it is</a><a href="watch.html">Watch it work</a><a href="agents.html">Agents</a><a href="customers.html">Customers</a><a href="build.html">Websites &amp; apps</a><a href="models.html">Models &amp; training</a>
+    </div>
+    <div>
+      <h4>Get it</h4>
+      <a href="download.html">Download</a><a href="pricing.html">Pricing</a><a href="business.html">For business</a><a href="install.html">Install guide</a><a href="downloads/SHA256SUMS.txt">Checksums</a>
+    </div>
+    <div>
+      <h4>About</h4>
+      <a href="docs.html">Documentation</a><a href="index.html#private">Privacy</a><a href="index.html#what">What it does</a><a href="pricing.html#compare">How it compares</a>
+    </div>
+  </div>
+  <div class="base"><span>ForgeAI 2.28.0 · built 2 November 2026</span><span>No account. No subscription. No telemetry.</span></div>
+</div></footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

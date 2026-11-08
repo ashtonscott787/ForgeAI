@@ -11,6 +11,24 @@ export interface ChatMessage {
   content: string;
   /** Which model produced this turn, for the line under the reply. */
   model?: string;
+  /** Measured timings for this turn. Absent means nothing was measured. */
+  perf?: Perf;
+  /** Files the user attached to this turn. */
+  files?: { name: string; bytes: number; kind: string; readable: boolean }[];
+}
+
+/** Every figure here is measured. Nothing is estimated or filled in. */
+export interface Perf {
+  total_ms: number;
+  load_ms: number;
+  first_token_ms: number;
+  generate_ms: number;
+  tokens: number;
+  tok_s: number;
+  model: string;
+  machine: string;
+  where: "local" | "cluster";
+  context_chars?: number;
 }
 
 export interface StreamHandle {

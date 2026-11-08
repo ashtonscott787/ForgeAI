@@ -1,0 +1,4 @@
+c4766bf0b559fdcd3111ff8ed56db78f6375821ded2abb526cc8e15d188c8dd1  ForgeAI-Mac-AppleSilicon.zip
+e98b2f8eac074b80104bd120b52e69361badc279e9e8da048e998fa3fae35aff  ForgeAI-Server.zip
+78d9237b944f75d9af51dfca53b9a820cff0bce8186160bc856029761672150d  ForgeAI-Windows.zip
+90566a52c40db6969e8a6f508e97ae91d9cb6fd476c9b8a5ef287d36eac96333  Uninstall ForgeAI 2.28.0.exe

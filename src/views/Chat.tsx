@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { Attachments } from "../components/Attachments";
 import { AssistantMessage } from "../components/Message";
+import { PerfLine } from "../components/Perf";
 import { ModelSelectorPrompt } from "../components/ModelSelector";
 import { streamChat, type ChatMessage, type StreamHandle } from "../lib/chat";
-import type { EngineStatus, Health, MachineCapability } from "../lib/ipc";
-import { api } from "../lib/ipc";
+import type { Attachment, EngineStatus, Health, MachineCapability } from "../lib/ipc";
+import { api, pathForFile } from "../lib/ipc";
 import type { InstalledEntry } from "../lib/library";
 import type { LocalModel, ModelConfiguration } from "../lib/models";
 import { SYSTEM_PROMPT } from "../lib/prompt";
@@ -20,7 +22,8 @@ interface Props {
   onModelChange: (v: string) => void;
   onConfigurationChange: (v: string, c: ModelConfiguration) => void;
   onEngineChange: (e: EngineStatus) => void;
-  onGoto: (v: "models" | "setup") => void;
+  onGoto: (v: "models" | "setup" | "settings") => void;
+  contextSize: number;
   messages: ChatMessage[];
   onMessages: (m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 }
@@ -32,7 +35,9 @@ export function Chat(props: Props) {
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<string | null>(null);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [reading, setReading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const handleRef = useRef<StreamHandle | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +46,32 @@ export function Chat(props: Props) {
   }, [messages, streaming, status]);
 
   const hasModels = props.installed.length > 0;
+
+  async function addPaths(paths: string[]) {
+    const fresh = paths.filter((p) => p && !files.some((f) => f.path === p));
+    if (!fresh.length) return;
+    setReading(true);
+    try {
+      const read = await api.readFiles(fresh);
+      setFiles((prev) => [...prev, ...read]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReading(false);
+    }
+  }
+
+  async function pick() {
+    setReading(true);
+    try {
+      const read = await api.pickFiles();
+      setFiles((prev) => [...prev, ...read.filter((r) => !prev.some((p) => p.path === r.path))]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReading(false);
+    }
+  }
 
   /**
    * Sending is the only entry point, and it owns loading the model. There is
@@ -73,13 +104,47 @@ export function Chat(props: Props) {
     }
 
     setError(null);
-    setStats(null);
     setPrompt("");
-    const next: ChatMessage[] = [...messages, { role: "user", content: body }];
+    const started = performance.now();
+    const attached = files;
+    const usable = attached.filter((f) => f.readable && f.text.trim());
+
+    const next: ChatMessage[] = [
+      ...messages,
+      {
+        role: "user",
+        content: body,
+        files: attached.map((f) => ({ name: f.name, bytes: f.bytes, kind: f.kind, readable: f.readable })),
+      },
+    ];
     setMessages([...next, { role: "assistant", content: "", model: picked.label }]);
+    setFiles([]);
     setStreaming(true);
 
+    // Documents are folded into the message the model sees, not the one shown.
+    let contextChars = 0;
+    let sendContent = body;
+    if (usable.length) {
+      setStatus(`Reading ${usable.length} file${usable.length > 1 ? "s" : ""}…`);
+      try {
+        const built = await api.buildContext(
+          usable.map((f) => ({ name: f.name, text: f.text })),
+          body,
+          Math.max(4000, Math.floor(props.contextSize * 2.6)),
+        );
+        contextChars = built.context.length;
+        sendContent = `${built.context}\n\n${body}`;
+      } catch (e) {
+        setStatus(null);
+        setStreaming(false);
+        setMessages((prev) => prev.slice(0, -1));
+        setError(`Could not prepare the attached files: ${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
+    }
+
     let engine = props.engine;
+    const loadStarted = performance.now();
     if (!engine.running || engine.model_file !== picked.file_name) {
       setStatus(
         props.value === "auto"
@@ -99,13 +164,21 @@ export function Chat(props: Props) {
         return;
       }
     }
+    const loadMs = engine === props.engine ? 0 : performance.now() - loadStarted;
     setStatus(null);
+
+    const outbound: ChatMessage[] = next.map((m, i) =>
+      i === next.length - 1 ? { role: "user", content: sendContent } : { role: m.role, content: m.content },
+    );
+    let firstTokenAt = 0;
 
     handleRef.current = streamChat(
       engine.base_url,
-      [{ role: "system", content: SYSTEM_PROMPT }, ...next],
+      [{ role: "system", content: SYSTEM_PROMPT }, ...outbound],
       {
-        onToken: (piece) =>
+        onToken: (piece) => {
+          if (!firstTokenAt) firstTokenAt = performance.now();
+          return
           setMessages((prev) => {
             const copy = [...prev];
             const last = copy[copy.length - 1];
@@ -113,12 +186,35 @@ export function Chat(props: Props) {
               copy[copy.length - 1] = { ...last, content: last.content + piece };
             }
             return copy;
-          }),
-        onDone: ({ tokens, seconds }) => {
+          });
+        },
+        onDone: ({ tokens }) => {
           setStreaming(false);
-          if (tokens > 0 && seconds > 0) {
-            setStats(`${picked.label} · ${tokens} tokens · ${(tokens / seconds).toFixed(1)} tok/s`);
-          }
+          const ended = performance.now();
+          const first = firstTokenAt || ended;
+          const generateMs = ended - first;
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last && last.role === "assistant") {
+              copy[copy.length - 1] = {
+                ...last,
+                perf: {
+                  total_ms: ended - started,
+                  load_ms: loadMs,
+                  first_token_ms: first - started,
+                  generate_ms: generateMs,
+                  tokens,
+                  tok_s: generateMs > 0 ? (tokens / generateMs) * 1000 : 0,
+                  model: picked.label,
+                  machine: props.self?.name ?? "this computer",
+                  where: "local",
+                  context_chars: contextChars || undefined,
+                },
+              };
+            }
+            return copy;
+          });
         },
         onError: (message) => {
           setStreaming(false);
@@ -130,8 +226,27 @@ export function Chat(props: Props) {
 
   const empty = messages.length === 0;
 
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const paths = Array.from(e.dataTransfer.files).map(pathForFile).filter(Boolean);
+    if (paths.length) void addPaths(paths);
+    else if (e.dataTransfer.files.length) setError("Those files could not be read from the drop.");
+  };
+
   return (
-    <>
+    <div
+      className={`chatwrap${dragging ? " dropping" : ""}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false);
+      }}
+      onDrop={onDrop}
+    >
+      {dragging && <div className="dropnote">Drop files to attach them</div>}
       {!empty && (
         <div className="scroll chatlog">
           {messages.map((m, i) => (
@@ -151,11 +266,16 @@ export function Chat(props: Props) {
                 ) : (
                   m.content
                 )}
+                {m.role === "user" && m.files && m.files.length > 0 && (
+                  <div className="msgfiles num">
+                    {m.files.map((f) => `${f.name}${f.readable ? "" : " (not read)"}`).join(" · ")}
+                  </div>
+                )}
               </div>
+              {m.perf && <PerfLine perf={m.perf} />}
             </div>
           ))}
           {status && <div className="runstats loading">{status}</div>}
-          {stats && <div className="runstats num">{stats}</div>}
           <div ref={endRef} />
         </div>
       )}
@@ -188,6 +308,15 @@ export function Chat(props: Props) {
           )}
           {error && <div className="banner err">{error}</div>}
 
+          <Attachments files={files} reading={reading} onRemove={(n) => setFiles((p) => p.filter((f) => f.name !== n))} />
+
+          <div className="composerow">
+            <button className="attachbtn" title="Attach files" onClick={() => void pick()}>
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M20 11.5l-7.6 7.6a4.6 4.6 0 01-6.5-6.5l8-8a3 3 0 014.3 4.3l-8 8a1.5 1.5 0 01-2.1-2.1l7.3-7.3" />
+              </svg>
+            </button>
+            <div className="composergrow">
           <ModelSelectorPrompt
             models={props.models}
             value={props.value}
@@ -201,8 +330,10 @@ export function Chat(props: Props) {
             onStop={() => handleRef.current?.cancel()}
             onSubmit={({ prompt: text }) => void send(text)}
           />
+            </div>
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

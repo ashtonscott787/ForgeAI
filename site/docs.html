@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation — ForgeAI</title>
+<meta name="description" content="Full documentation for ForgeAI: what it is, who it is for, how to set it up, and how every part of it works.">
+<link rel="icon" href="favicon.png">
+<meta property="og:title" content="ForgeAI Documentation">
+<meta property="og:description" content="What ForgeAI is, who it is for, and how every part of it works.">
+<meta name="theme-color" content="#f7f8fa">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>
+  /* Documentation layout: a fixed sidebar of contents, a reading column, and a
+     search box that filters the contents as you type. One page, so a browser
+     find (⌘F) still works across the whole manual. */
+  .doc { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 56px; align-items: start; padding: 40px 0 96px; }
+  .doc-side { position: sticky; top: calc(var(--nav-h) + 20px); max-height: calc(100vh - var(--nav-h) - 40px); overflow-y: auto; padding-right: 8px; }
+  .doc-search { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 14px; background: var(--surface); color: var(--fg); margin-bottom: 18px; }
+  .doc-search:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .doc-side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--fg-3); margin: 22px 0 7px; font-weight: 700; }
+  .doc-side h4:first-of-type { margin-top: 0; }
+  .doc-side a { display: block; font-size: 14px; color: var(--fg-2); text-decoration: none; padding: 5px 10px; border-radius: 8px; line-height: 1.35; }
+  .doc-side a:hover { background: var(--surface-2); color: var(--fg); }
+  .doc-side a.on { background: var(--surface-2); color: var(--fg); font-weight: 600; }
+  .doc-side .nohit { display: none; }
+
+  .doc-main { max-width: 74ch; }
+  .doc-main section { scroll-margin-top: calc(var(--nav-h) + 24px); padding-bottom: 36px; }
+  .doc-main h2 { font-size: 30px; line-height: 1.18; letter-spacing: -.02em; margin: 44px 0 14px; }
+  .doc-main section:first-child h2 { margin-top: 0; }
+  .doc-main h3 { font-size: 19px; margin: 30px 0 9px; letter-spacing: -.01em; }
+  .doc-main p { color: var(--fg-2); line-height: 1.68; font-size: 15.5px; margin: 0 0 15px; }
+  .doc-main li { color: var(--fg-2); line-height: 1.68; font-size: 15.5px; }
+  .doc-main ul, .doc-main ol { margin: 0 0 16px; padding-left: 22px; }
+  .doc-main li { margin-bottom: 7px; }
+  .doc-main strong { color: var(--fg); font-weight: 600; }
+  .doc-main code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-size: 13.5px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--fg); }
+  .doc-main pre { background: var(--surface-2); padding: 15px 17px; border-radius: 12px; overflow-x: auto; border: 1px solid var(--line); }
+  .doc-main pre code { background: none; padding: 0; font-size: 13px; line-height: 1.65; }
+  .doc-main table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14.5px; }
+  .doc-main th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-3); padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .doc-main td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); color: var(--fg-2); vertical-align: top; line-height: 1.55; }
+  .doc-main td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 14px 18px; border-radius: 0 12px 12px 0; margin: 20px 0; }
+  .callout p { margin: 0; font-size: 14.5px; }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.ok { border-left-color: var(--ok); }
+  .callout b { color: var(--fg); }
+
+  .crumb { font-size: 13px; color: var(--fg-3); margin-bottom: 6px; }
+  /* The site header is fixed, so the first thing on the page has to clear it. */
+  .doc-hero { padding: calc(var(--nav-h) + 44px) 0 10px; border-bottom: 1px solid var(--line); }
+  .doc-hero h1 { font-size: 42px; letter-spacing: -.03em; line-height: 1.08; margin: 0 0 12px; }
+  .doc-hero p { font-size: 18px; color: var(--fg-2); max-width: 62ch; line-height: 1.6; margin: 0 0 22px; }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  .pill { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; background: var(--surface-2); color: var(--fg-2); border: 1px solid var(--line); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0; }
+  .boxy { border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; background: var(--surface); }
+  .boxy h4 { margin: 0 0 7px; font-size: 15px; }
+  .boxy p { margin: 0; font-size: 14px; }
+
+  @media (max-width: 900px) {
+    .doc { grid-template-columns: 1fr; gap: 0; }
+    .doc-side { position: static; max-height: none; margin-bottom: 28px; }
+    .two { grid-template-columns: 1fr; }
+    .doc-hero h1 { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap nav">
+  <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+  <button class="menubtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="links">
+    <a class="lnk" href="what-is-it.html">What it is</a>
+    <a class="lnk" href="watch.html">Watch it work</a>
+    <a class="lnk" href="models.html">Models</a>
+    <a class="lnk" href="updates.html">Updates</a>
+    <a class="lnk" href="docs.html">Docs</a>
+    <a class="lnk" href="business.html">For business</a>
+    <a class="lnk" href="pricing.html">Pricing</a>
+    <a class="btn primary" href="download.html">Download</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+
+<div class="doc-hero">
+  <div class="crumb">Documentation</div>
+  <h1>ForgeAI, end to end</h1>
+  <p>What it is, who it is for, what it can and cannot do, and how to run every part of it. If something here is unclear, that is a fault in this page — not in you.</p>
+  <div class="pill-row">
+    <span class="pill">Version 2.28.0</span>
+    <span class="pill">macOS &amp; Windows</span>
+    <span class="pill">No account required</span>
+    <span class="pill">No telemetry</span>
+  </div>
+</div>
+
+<div class="doc">
+
+  <aside class="doc-side">
+    <input class="doc-search" type="search" placeholder="Search the documentation" aria-label="Search the documentation">
+    <nav id="toc">
+      <h4>Start here</h4>
+      <a href="#objective">What ForgeAI is for</a>
+      <a href="#audience">Who it is for</a>
+      <a href="#capabilities">What it can and cannot do</a>
+      <a href="#install">Installing</a>
+      <a href="#first-run">Your first fifteen minutes</a>
+
+      <h4>Core ideas</h4>
+      <a href="#organisations">Organisations</a>
+      <a href="#people">People and roles</a>
+      <a href="#models-concept">Where answers come from</a>
+      <a href="#local-or-hub">Fully local, or a hub</a>
+
+      <h4>Using it</h4>
+      <a href="#chat">Chat</a>
+      <a href="#files">Files and knowledge</a>
+      <a href="#data">Databases</a>
+      <a href="#mail">Mail and calendar</a>
+      <a href="#agents">Agents</a>
+      <a href="#channels">WhatsApp, Telegram and voice</a>
+      <a href="#sites">Websites and apps</a>
+
+      <h4>Models</h4>
+      <a href="#models-run">Running models locally</a>
+      <a href="#providers">Cloud providers and keys</a>
+      <a href="#training">Training your own</a>
+      <a href="#performance">Performance profiles</a>
+
+      <h4>Several computers</h4>
+      <a href="#computers">Adding a computer</a>
+      <a href="#hub">Setting up a hub</a>
+      <a href="#pairing">Pairing safely</a>
+
+      <h4>Running it properly</h4>
+      <a href="#security">Security</a>
+      <a href="#privacy">What leaves your computer</a>
+      <a href="#backup">Backups</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#limits">Known limits</a>
+    </nav>
+  </aside>
+
+  <div class="doc-main">
+
+    <!-- ============================ START HERE ============================ -->
+    <section id="objective">
+      <h2>What ForgeAI is for</h2>
+      <p><strong>ForgeAI gives a small organisation a capable AI assistant that runs on computers it already owns, so that confidential work never has to leave the building.</strong></p>
+      <p>That is the whole objective. Every feature exists to serve it. If a feature would require sending your data to someone else's server by default, it is either not in ForgeAI or it is off until you turn it on and are told exactly what will be sent.</p>
+      <p>The ordinary way to use AI at work is to paste your information into someone else's website. For a lot of work that is fine. For client records, supplier contracts, patient notes, student information, payroll, or anything under a confidentiality agreement, it is not — and the usual answer is simply to go without. ForgeAI exists so that the answer can be yes instead.</p>
+      <div class="callout ok"><p><b>The short version.</b> Install it on a computer. It runs AI models on that computer. You chat with it, give it your files, connect your mailbox, and it helps — without a subscription, an account, or your data going anywhere.</p></div>
+    </section>
+
+    <section id="audience">
+      <h2>Who it is for</h2>
+      <p>ForgeAI is built for organisations of roughly <strong>1 to 50 people</strong> who have information they cannot casually hand to a third party, and who own some reasonably modern computers.</p>
+      <table>
+        <tr><th>You are</th><th>Why ForgeAI fits</th></tr>
+        <tr><td>A professional practice</td><td>Accountants, lawyers, surveyors, clinics. Client confidentiality is the job. ForgeAI reads your files and drafts your correspondence without any of it leaving your office.</td></tr>
+        <tr><td>A trade or small business</td><td>Quotes, supplier invoices, job records and a mailbox that never empties. ForgeAI drafts, sorts and answers from your own records.</td></tr>
+        <tr><td>A family business</td><td>One person doing six jobs. ForgeAI takes the repetitive ones — email triage, scheduling, drafting — and asks before it acts.</td></tr>
+        <tr><td>A school or club</td><td>Student and member information that must stay internal, and a budget that rules out per-seat subscriptions.</td></tr>
+        <tr><td>An individual</td><td>You want a capable assistant without a monthly fee or a company reading your notes.</td></tr>
+      </table>
+      <h3>Who it is not for</h3>
+      <p>Being honest about this saves everyone time.</p>
+      <ul>
+        <li><strong>If you want the strongest possible model and do not care where it runs</strong>, use ChatGPT, Claude or Gemini directly. They will be better at hard reasoning than a model running on your laptop. ForgeAI can call them too, with your own key — but then you are not running locally any more.</li>
+        <li><strong>If nobody at your organisation is willing to maintain a computer</strong>, a managed cloud service will be less work. ForgeAI is software you run.</li>
+        <li><strong>If you need certified compliance paperwork</strong> (HIPAA attestations, SOC 2 reports), ForgeAI does not come with them. It can help you meet the underlying requirements by keeping data local, but there is no auditor's certificate in the box.</li>
+      </ul>
+    </section>
+
+    <section id="capabilities">
+      <h2>What it can and cannot do</h2>
+      <h3>It can</h3>
+      <ul>
+        <li><strong>Chat</strong>, with streaming answers, from a local model or a cloud one.</li>
+        <li><strong>Read your documents</strong> — PDFs, Word files, spreadsheets, text — and answer from them.</li>
+        <li><strong>Query your databases</strong>, read-only, always. ForgeAI will not write to a connected database under any circumstance.</li>
+        <li><strong>Handle mail and calendar</strong>: read, sort, draft replies, send with your approval, add events.</li>
+        <li><strong>Run agents</strong> — named assistants with specific instructions and a defined set of tools, which can do multi-step work.</li>
+        <li><strong>Answer on WhatsApp, Telegram and by voice</strong>, including voice notes in and spoken replies out.</li>
+        <li><strong>Build small websites and apps</strong> and host them for you.</li>
+        <li><strong>Pool several computers</strong>, so a thin laptop can use the models on a powerful desktop.</li>
+        <li><strong>Train a model</strong> on your own material, and serve it alongside the rest.</li>
+        <li><strong>Keep organisations separate</strong>, with their own data, people and permissions.</li>
+      </ul>
+      <h3>It cannot</h3>
+      <ul>
+        <li><strong>Make a small model into a large one.</strong> On a laptop with 8&nbsp;GB of memory you are running models of roughly 3 to 8 billion parameters. They are genuinely useful for drafting, summarising, sorting and answering from documents. They are not as sharp as a frontier model at hard reasoning, long chains of logic, or obscure knowledge.</li>
+        <li><strong>Write to your databases.</strong> This is deliberate and not configurable.</li>
+        <li><strong>Act without you</strong> on anything that leaves the building. Sending mail, posting, paying — all require approval.</li>
+        <li><strong>Hide itself from the owner.</strong> Hidden mode keeps ForgeAI out of the way of everyday users; the platform owner always sees it.</li>
+      </ul>
+      <div class="callout"><p><b>How to think about model size.</b> A local model is a competent junior assistant with perfect patience and your filing cabinet memorised. A frontier model is a specialist consultant. Most daily work wants the former. ForgeAI lets you call the latter when you need it, with your own API key, and tells you when it is about to.</p></div>
+    </section>
+
+    <section id="install">
+      <h2>Installing</h2>
+      <h3>macOS</h3>
+      <ol>
+        <li>Download the Mac zip from the <a href="download.html">download page</a>.</li>
+        <li>Double-click to expand it, then drag <code>ForgeAI.app</code> into your Applications folder.</li>
+        <li>Open it. The first launch takes a moment while it prepares its data folder.</li>
+      </ol>
+      <div class="callout warn"><p><b>If expanding fails</b> with "damaged or incomplete", or error <code>-47</code> or <code>94</code>: this is almost always a permissions problem on your Downloads folder, not a bad download. The app bundle contains symbolic links, and if your Mac cannot replace existing files in that folder the expansion stops part-way. Move the zip to your Desktop and expand it there, or verify the checksum first — see <a href="#troubleshooting">Troubleshooting</a>.</p></div>
+      <h3>Windows</h3>
+      <ol>
+        <li>Download the installer for your processor — x64 for most machines, arm64 for Snapdragon and similar.</li>
+        <li>Run it. Windows may warn about an unrecognised publisher; choose More info then Run anyway.</li>
+        <li>Choose whether to install for everyone (needs administrator) or just you.</li>
+      </ol>
+      <h3>Checking what you downloaded</h3>
+      <p>Every release publishes SHA-256 checksums at <a href="downloads/SHA256SUMS.txt">downloads/SHA256SUMS.txt</a>. To check a file matches:</p>
+      <pre><code># macOS
+shasum -a 256 ~/Downloads/ForgeAI-2.28.0-mac.zip
+
+# Windows (PowerShell)
+Get-FileHash -Algorithm SHA256 "$HOME\Downloads\ForgeAI-2.28.0-win-x64.exe"</code></pre>
+      <p>Compare the result with the published value. If they differ, the download was incomplete — download it again.</p>
+    </section>
+
+    <section id="first-run">
+      <h2>Your first fifteen minutes</h2>
+      <p>ForgeAI asks you a small number of questions on first launch and then gets out of the way.</p>
+      <ol>
+        <li><strong>Create the owner account.</strong> This is you. The password is stored using scrypt and is never recoverable — write it down somewhere safe.</li>
+        <li><strong>Name the platform.</strong> It appears in the sidebar and on the sign-in page.</li>
+        <li><strong>Create your first organisation.</strong> Most people need exactly one. See <a href="#organisations">Organisations</a>.</li>
+        <li><strong>Choose fully local, or a hub.</strong> See <a href="#local-or-hub">Fully local, or a hub</a>. You can change this later.</li>
+        <li><strong>Get a model.</strong> Go to Models and download a suggested one. ForgeAI picks sizes that suit your computer's memory.</li>
+        <li><strong>Say hello.</strong> Open Chat and ask it something. That is the whole setup.</li>
+      </ol>
+      <p>Everything after that — mail, files, agents, other computers — is optional and can be added whenever you need it.</p>
+    </section>
+
+    <!-- ============================ CORE IDEAS ============================ -->
+    <section id="organisations">
+      <h2>Organisations</h2>
+      <p>An <strong>organisation</strong> is a wall around a set of information. Its files, chats, mailboxes, agents, databases and people belong to it, and nothing crosses to another organisation unless you explicitly allow it.</p>
+      <p>Use one organisation if you are one business. Use several if you genuinely run separate things — a winery and a consultancy, say — and want their information kept apart even from yourself.</p>
+      <p>Crossing the wall is possible but deliberate: under Settings → Cross-company you can allow agents in one organisation to ask agents in another. It is off by default, and every request is logged on both sides.</p>
+    </section>
+
+    <section id="people">
+      <h2>People and roles</h2>
+      <table>
+        <tr><th>Role</th><th>Can do</th></tr>
+        <tr><td>Platform owner</td><td>Everything, including other computers, providers, backups and uninstalling. There is always at least one.</td></tr>
+        <tr><td>Platform admin</td><td>Manage organisations, people, providers and computers. Cannot change a platform owner.</td></tr>
+        <tr><td>Organisation owner</td><td>Everything inside one organisation, including its members.</td></tr>
+        <tr><td>Organisation admin</td><td>Manage an organisation's data, agents and integrations.</td></tr>
+        <tr><td>Member</td><td>Use what they have been given access to. Sees computers exist, but not how to reach them.</td></tr>
+      </table>
+      <p>Sign-in attempts are rate-limited: eight wrong passwords locks the account, and variations in spacing or capitalisation share the same counter so the limit cannot be stepped around.</p>
+    </section>
+
+    <section id="models-concept">
+      <h2>Where answers come from</h2>
+      <p>Every answer in ForgeAI comes from a <strong>model</strong>, and every model is served by a <strong>runtime</strong> on a <strong>computer</strong>. Understanding those three words makes the rest of the app obvious.</p>
+      <ul>
+        <li>A <strong>model</strong> is the thing that writes the answer — <code>llama-3.1-8b</code>, <code>gpt-4o</code>, or one you trained.</li>
+        <li>A <strong>runtime</strong> is the program serving it: ForgeAI's own bundled engine, Ollama, LM Studio, MLX, or a cloud provider's API.</li>
+        <li>A <strong>computer</strong> is where that runtime is running — this one, or another you have added.</li>
+      </ul>
+      <p>When several computers can serve the same request, ForgeAI picks one. A model that names its own address is always served from that address, so two runtimes that happen to share a name are never confused for one another.</p>
+    </section>
+
+    <section id="local-or-hub">
+      <h2>Fully local, or a hub</h2>
+      <p>This is the most important choice in ForgeAI, and it is yours.</p>
+      <div class="two">
+        <div class="boxy">
+          <h4>Fully local</h4>
+          <p>ForgeAI runs on this computer and talks to nothing else. No hub, no other computers, no network connections out. The most private option, and the simplest. If this is all you want, you are already finished.</p>
+        </div>
+        <div class="boxy">
+          <h4>Joined to a hub</h4>
+          <p>This computer connects to a hub — another computer running ForgeAI, or a small rented server — so that several computers share models, people and settings. More capable, and your chat history lives on the hub.</p>
+        </div>
+      </div>
+      <div class="callout warn"><p><b>Be clear about what changes.</b> On a hub, conversations and settings are stored on the hub, not on your own machine. If the hub is a rented server, that means your conversations sit on hardware you do not own. That may be perfectly fine — or it may be exactly what you were avoiding. Choose deliberately.</p></div>
+      <p>You can change your mind at any time under Settings → Computers &amp; network.</p>
+    </section>
+
+    <!-- ============================ USING IT ============================ -->
+    <section id="chat">
+      <h2>Chat</h2>
+      <p>The main way to use ForgeAI. Conversations are listed in the sidebar and are searchable. You choose the model per conversation, or let ForgeAI choose based on what you are asking and what the computer can manage.</p>
+      <h3>Standing instructions</h3>
+      <p>Under Settings → General you can write instructions ForgeAI follows every time — your preferred spelling, how to sign off emails, things it should never do. These apply across chat, email drafts, the website chat and voice. They are added to the model's instructions locally and are never sent anywhere on their own.</p>
+      <h3>Attachments</h3>
+      <p>Drop a file into a conversation and ask about it. For something you will refer to repeatedly, put it in Files instead so it is available to every conversation.</p>
+    </section>
+
+    <section id="files">
+      <h2>Files and knowledge</h2>
+      <p>Files you add to an organisation become material ForgeAI can answer from. It reads PDFs, Word documents, spreadsheets, plain text and markdown.</p>
+      <p>Use this for the things you would otherwise have to explain repeatedly: your price list, your standard terms, your supplier list, your procedures. Once it is in Files, every conversation and every agent in that organisation can use it.</p>
+    </section>
+
+    <section id="data">
+      <h2>Databases</h2>
+      <p>ForgeAI can connect to a SQLite, PostgreSQL or MySQL database and answer questions from it — "how many orders last month", "which customers have not ordered since June".</p>
+      <div class="callout ok"><p><b>Read-only, always.</b> Every query is checked before it runs, and anything that could write, export a file, lock a row or call out to another system is refused. This is not a setting you can turn off. A connected database cannot be damaged by ForgeAI.</p></div>
+      <p>A data source also cannot point inside ForgeAI's own data folder or at private system folders such as <code>~/.ssh</code>.</p>
+    </section>
+
+    <section id="mail">
+      <h2>Mail and calendar</h2>
+      <p>Connect a mailbox under Settings → Mail &amp; calendar using IMAP and SMTP. ForgeAI can then read it, sort it, summarise what arrived, and draft replies.</p>
+      <p><strong>Nothing is sent without approval.</strong> A drafted reply waits for you. An agent asked to answer the mail will prepare the answers and ask.</p>
+      <p>Calendar events can be added and listed, so an agent handling a scheduling request can both reply and book the time.</p>
+      <h3>Credentials</h3>
+      <p>Mailbox passwords, API keys and tokens go into the vault — encrypted with AES-256-GCM, and on macOS protected by the system Keychain. They are never shown to the model and never appear in a conversation.</p>
+    </section>
+
+    <section id="agents">
+      <h2>Agents</h2>
+      <p>An agent is a named assistant with its own instructions and its own set of tools. Where chat answers questions, an agent does jobs.</p>
+      <p>Tools you can give an agent include listing, reading, replying to, sending and filing email; adding and listing calendar events; and notifying you. An agent only has the tools you grant it.</p>
+      <h3>Calling an agent</h3>
+      <p>Mention it by name — <code>@bob</code> — or ask in plain words: "ask Bob to go through this morning's mail". A bare mention of a name in passing will not trigger an agent.</p>
+      <h3>A worked example</h3>
+      <p>An agent given mail and calendar tools, pinned to a messaging channel, can run a morning routine: read overnight mail, text you a summary, take your spoken reply, draft the responses, and send them once you say yes. Each outbound action still waits for your approval, in the same thread you are already reading.</p>
+    </section>
+
+    <section id="channels">
+      <h2>WhatsApp, Telegram and voice</h2>
+      <p>ForgeAI can answer on messaging channels, so you do not have to open the app to use it.</p>
+      <ul>
+        <li><strong>Telegram</strong> — create a bot with BotFather, paste the token into Connections. Handles text and voice notes.</li>
+        <li><strong>WhatsApp</strong> — through the WhatsApp Business API with your own credentials.</li>
+        <li><strong>Voice</strong> — send a voice note and get a spoken answer back. Speech recognition runs locally where your computer supports it, falling back through several engines.</li>
+      </ul>
+      <p>A channel can be pinned to a particular agent, so messages to that number are handled by that agent with its tools available.</p>
+    </section>
+
+    <section id="sites">
+      <h2>Websites and apps</h2>
+      <p>ForgeAI can build small websites and hosted pages for you and serve them. Hosted pages run sandboxed, so a page cannot reach back into your ForgeAI session or act as you.</p>
+    </section>
+
+    <!-- ============================ MODELS ============================ -->
+    <section id="models-run">
+      <h2>Running models locally</h2>
+      <p>ForgeAI bundles its own engine, so you do not need to install anything else. Go to Models, pick a suggested model and download it. Suggestions are filtered by what your computer can actually run.</p>
+      <table>
+        <tr><th>Your computer</th><th>Sensible model size</th></tr>
+        <tr><td>4–6 GB memory</td><td>1–3 billion parameters. Useful for sorting, summarising and short drafting.</td></tr>
+        <tr><td>8 GB memory</td><td>3–8 billion. The common case for a laptop. Good general assistant.</td></tr>
+        <tr><td>16 GB memory</td><td>8–14 billion, or two smaller models at once.</td></tr>
+        <tr><td>32 GB+ with a real graphics card</td><td>14–70 billion, noticeably sharper reasoning.</td></tr>
+      </table>
+      <p>If you already use <strong>Ollama</strong>, <strong>LM Studio</strong> or <strong>MLX</strong>, ForgeAI finds them and offers their models alongside its own.</p>
+    </section>
+
+    <section id="providers">
+      <h2>Cloud providers and keys</h2>
+      <p>You can add your own API keys for OpenAI, Anthropic, Google and other OpenAI-compatible services under Settings → Providers &amp; keys. Those models then appear beside your local ones.</p>
+      <div class="callout warn"><p><b>This is the moment your data leaves your computer.</b> A conversation using a cloud model is sent to that provider under their terms, not yours. ForgeAI marks cloud models clearly so the choice is never accidental — but it is still a choice you are making.</p></div>
+      <p>Keys live in the vault. ForgeAI never invents a key, and never shows a stored one back to you or to a model.</p>
+    </section>
+
+    <section id="training">
+      <h2>Training your own model</h2>
+      <p>Under Models → Training you can fine-tune a model on your own material — your past correspondence, your documents, your way of writing. The result is served like any other model and keeps the name you gave it.</p>
+      <p>Training is demanding. It wants a capable machine and patience. Start with a small model and a focused set of examples rather than everything you own.</p>
+    </section>
+
+    <section id="performance">
+      <h2>Performance profiles</h2>
+      <p>One switch sets every setting that actually costs memory and processor time. ForgeAI detects a sensible profile from your hardware; you can override it at any time.</p>
+      <table>
+        <tr><th>Profile</th><th>For</th><th>What it does</th></tr>
+        <tr><td>Ultra Lite</td><td>4–6 GB, no graphics card</td><td>One small model, short context, background work almost entirely stopped, a plain interface.</td></tr>
+        <tr><td>Lite</td><td>Budget laptops, ~8 GB</td><td>Small models, conservative memory, a quieter interface.</td></tr>
+        <tr><td>Balanced</td><td>Typical modern computers</td><td>A sensible context window, models kept warm while there is room.</td></tr>
+        <tr><td>Performance</td><td>Desktops with memory and a GPU</td><td>Larger context, several models resident, more parallel requests.</td></tr>
+      </table>
+      <p>Every profile value maps to a real setting you can also change by hand. Nothing here is cosmetic.</p>
+    </section>
+
+    <!-- ============================ SEVERAL COMPUTERS ============================ -->
+    <section id="computers">
+      <h2>Adding a computer</h2>
+      <p>ForgeAI can use more than one computer, so an underpowered laptop can send work to a desktop with real memory. One computer is the <strong>hub</strong>; the others are <strong>spokes</strong>.</p>
+      <p>Spokes always dial out to the hub. That means a spoke needs no open ports, no port forwarding and no fixed address — it works from a school network, a home connection or a café. Only the hub needs to be reachable.</p>
+      <p>To add one: on the hub, go to Settings → Computers &amp; network and create a pairing code. On the other computer, enter the hub's address and that code. The code expires after fifteen minutes.</p>
+    </section>
+
+    <section id="hub">
+      <h2>Setting up a hub</h2>
+      <p>The hub can be any computer that is reliably on, or a small rented server. A hub <strong>coordinates</strong>; it does not have to run models itself, so it needs very little.</p>
+      <table>
+        <tr><th>Role</th><th>Needs</th></tr>
+        <tr><td>Coordination only</td><td>1 processor, 2 GB memory, 25 GB disk. Routes requests to whichever computer can serve them.</td></tr>
+        <tr><td>Coordination plus storage</td><td>2 processors, 4 GB, 50 GB. Several organisations and a long chat history.</td></tr>
+        <tr><td>Running models too</td><td>A graphics card and a great deal more money. Usually the wrong answer when you already own capable computers.</td></tr>
+      </table>
+      <p>Host the hub near the people using it. Distance shows up directly as delay before each answer starts.</p>
+    </section>
+
+    <section id="pairing">
+      <h2>Pairing safely</h2>
+      <p>When a spoke pairs with a hub it records the hub's certificate fingerprint and checks it on every connection afterwards. If the fingerprint ever changes, the spoke refuses to connect and tells you interception is possible.</p>
+      <div class="callout warn"><p><b>Confirm the fingerprint the first time.</b> The protection above begins at pairing. On a hub reachable over the internet, check that the fingerprint shown on the spoke matches the one shown on the hub before you accept it. On your own local network the risk is small; across the internet it is the one moment that matters.</p></div>
+      <p>The pairing code itself is single-use and expires in fifteen minutes. What the spoke receives in exchange is a 256-bit random token, stored in its vault, which it presents on every later connection. No password is ever shared between computers.</p>
+    </section>
+
+    <!-- ============================ RUNNING IT PROPERLY ============================ -->
+    <section id="security">
+      <h2>Security</h2>
+      <p>ForgeAI has a Security page that runs real checks against your actual configuration and shows what each one examined. The main protections:</p>
+      <ul>
+        <li><strong>Passwords</strong> stored with scrypt; eight failed attempts locks the account.</li>
+        <li><strong>The sign-in cookie</strong> is HttpOnly and SameSite=Strict, so other sites and scripts cannot read it.</li>
+        <li><strong>Secrets</strong> — mail passwords, API keys, computer tokens — live in an encrypted vault and are never shown to a model.</li>
+        <li><strong>Computer tokens</strong> are 256 bits of randomness, stored by reference, so a copied database yields nothing usable.</li>
+        <li><strong>Every secret comparison</strong> is constant-time, so no token can be guessed by timing the response.</li>
+        <li><strong>Databases</strong> are read-only, enforced at the query level.</li>
+        <li><strong>Hosted pages and artifacts</strong> are sandboxed and cannot call the API as you.</li>
+        <li><strong>Organisations</strong> cannot read each other's connectors, skills or files.</li>
+      </ul>
+    </section>
+
+    <section id="privacy">
+      <h2>What leaves your computer</h2>
+      <p>The honest list. Nothing else goes out.</p>
+      <table>
+        <tr><th>Leaves</th><th>When</th></tr>
+        <tr><td>Nothing</td><td>Default. Local models, local files, local database. No telemetry, no account, no usage reporting — ever, including on this list.</td></tr>
+        <tr><td>Your conversation</td><td>Only when you choose a cloud model, and only to that provider.</td></tr>
+        <tr><td>Model downloads</td><td>When you download a model, from the model's host.</td></tr>
+        <tr><td>Mail traffic</td><td>To your own mail server, when you connect a mailbox.</td></tr>
+        <tr><td>Messages</td><td>To Telegram or WhatsApp, when you connect those channels — those services carry the messages by nature.</td></tr>
+        <tr><td>Hub traffic</td><td>Between your computers, encrypted, when you use a hub. If the hub is rented, your conversations are stored there.</td></tr>
+      </table>
+    </section>
+
+    <section id="backup">
+      <h2>Backups</h2>
+      <p>ForgeAI can back up its data folder on a schedule to a destination you choose. Only the platform owner may set where backups go.</p>
+      <p>The data folder holds your conversations, settings, files and the encrypted vault. Models are not included — they are large and can be downloaded again.</p>
+      <p>Test a restore before you need one. An untested backup is a hope, not a backup.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <h3>macOS: "damaged or incomplete", error −47 or 94</h3>
+      <p>Usually a permissions problem on the folder you are expanding into, not a corrupt download. The app bundle contains symbolic links; if the folder will not let them be created, expansion stops part-way and you get a broken or missing app. Move the zip to your Desktop and expand it there. If that fails, check the checksum as shown under <a href="#install">Installing</a>.</p>
+      <h3>A model says "Needs more memory"</h3>
+      <p>Exactly what it says — the model is too large for the memory available. It is not a crash and nothing is broken. Use a smaller model, or switch to a lighter performance profile, or close other applications.</p>
+      <h3>A model shows a code like <code>tr_…</code> instead of its name</h3>
+      <p>Fixed in 2.28.0. Update.</p>
+      <h3>A computer shows offline</h3>
+      <p>The spoke dials out to the hub, so check in this order: is the spoke's computer awake; is ForgeAI running on it; can it reach the hub's address at all; has the hub been reinstalled since pairing (which changes its fingerprint and requires pairing again).</p>
+      <h3>Menus look transparent or text overlaps</h3>
+      <p>Fixed in 2.28.0. Update.</p>
+      <h3>Everything is slow</h3>
+      <p>Check the performance profile first. Ultra Lite and Lite deliberately keep only one model in memory and stop background work. If you are on Balanced with 8 GB, moving to Lite will often feel faster, not slower.</p>
+    </section>
+
+    <section id="limits">
+      <h2>Known limits</h2>
+      <p>Things that are genuinely not finished. Listed so you are not surprised by them.</p>
+      <ul>
+        <li><strong>No built-in VPN.</strong> A hub exposed to the internet is exposed directly. Put WireGuard or Tailscale in front of it, or keep the hub on your own network.</li>
+        <li><strong>Self-signed certificates only.</strong> There is no automatic certificate issuance, so a browser will warn on a hub reached by name. For a public hub, terminate TLS with a real certificate in front of ForgeAI.</li>
+        <li><strong>Intel Macs and Linux desktop</strong> are not in this release.</li>
+        <li><strong>Windows virtual machines</strong> are not implemented.</li>
+        <li><strong>No compliance certifications.</strong> See <a href="#audience">Who it is for</a>.</li>
+      </ul>
+      <p>If something you need is on this list, say so — the list is the roadmap.</p>
+    </section>
+
+  </div>
+</div>
+</main>
+
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div>
+      <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+      <p class="small" style="color:var(--fg-2);max-width:34ch">Private AI that runs on computers you own. Made in Hawke's Bay, New Zealand.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="what-is-it.html">What it is</a><a href="watch.html">Watch it work</a><a href="agents.html">Agents</a><a href="models.html">Models &amp; training</a>
+    </div>
+    <div>
+      <h4>Get it</h4>
+      <a href="download.html">Download</a><a href="pricing.html">Pricing</a><a href="install.html">Install guide</a><a href="downloads/SHA256SUMS.txt">Checksums</a>
+    </div>
+    <div>
+      <h4>Learn</h4>
+      <a href="docs.html">Documentation</a><a href="docs.html#objective">What it is for</a><a href="docs.html#privacy">What leaves your computer</a><a href="docs.html#limits">Known limits</a>
+    </div>
+  </div>
+  <div class="base"><span>ForgeAI 2.28.0 · built 2 November 2026</span><span>No account. No subscription. No telemetry.</span></div>
+</div></footer>
+
+<script>
+// Filter the table of contents as you type. Matches both the link text and the
+// heading text of the section it points at, so searching "memory" finds the
+// performance page even though the word is not in its title.
+(function () {
+  var box = document.querySelector('.doc-search');
+  var links = [].slice.call(document.querySelectorAll('#toc a'));
+  var heads = [].slice.call(document.querySelectorAll('#toc h4'));
+  var text = {};
+  links.forEach(function (a) {
+    var sec = document.querySelector(a.getAttribute('href'));
+    text[a.getAttribute('href')] = (a.textContent + ' ' + (sec ? sec.textContent : '')).toLowerCase();
+  });
+  box.addEventListener('input', function () {
+    var q = box.value.trim().toLowerCase();
+    links.forEach(function (a) {
+      a.classList.toggle('nohit', !!q && text[a.getAttribute('href')].indexOf(q) === -1);
+    });
+    // A group heading with nothing left under it disappears too.
+    heads.forEach(function (hh) {
+      var any = false, n = hh.nextElementSibling;
+      while (n && n.tagName === 'A') { if (!n.classList.contains('nohit')) any = true; n = n.nextElementSibling; }
+      hh.classList.toggle('nohit', !!q && !any);
+    });
+  });
+
+  // Highlight the section you are reading.
+  var secs = [].slice.call(document.querySelectorAll('.doc-main section'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  if (!('IntersectionObserver' in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) { a.classList.remove('on'); });
+      var a = byId[e.target.id];
+      if (a) a.classList.add('on');
+    });
+  }, { rootMargin: '-80px 0px -72% 0px' });
+  secs.forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

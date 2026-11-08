@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en" class="dark-page">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeAI models and training — what you can run, and teaching it your way</title>
+<meta name="description" content="Twenty free models you can download in one click, what each is good at, what your computer needs to run it, and how training teaches a model your tone, formats and facts.">
+<link rel="icon" href="favicon.png">
+<meta property="og:title" content="ForgeAI models and training — what you can run, and teaching it your way">
+<meta property="og:description" content="Twenty free models you can download in one click, what each is good at, what your computer needs to run it, and how training teaches a model your tone, formats and facts.">
+<meta property="og:image" content="shots/models-dark.webp">
+<meta name="theme-color" content="#07090d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>
+@import url('assets/seq.css');
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap nav">
+  <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+  <button class="menubtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="links">
+    <a class="lnk" href="what-is-it.html">What it is</a>
+    <a class="lnk" href="watch.html">Watch it work</a>
+    <a class="lnk" href="models.html">Models</a>
+    <a class="lnk" href="ways.html">Ways to use it</a>
+    <a class="lnk" href="updates.html">Updates</a>
+    <a class="lnk" href="docs.html">Docs</a>
+    <a class="lnk" href="business.html">For business</a>
+    <a class="lnk" href="pricing.html">Pricing</a>
+    <a class="btn primary" href="download.html">Download</a>
+  </nav>
+</div></header>
+<main>
+<section class="hero" style="padding-bottom:40px">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="wrap">
+    <span class="pill rv"><span class="dot"></span> Twenty models · one click each · all free</span>
+    <h1 class="mega rv" style="--d:70ms">Pick a brain.<br><span class="grad">Then teach it yours.</span></h1>
+    <p class="lede rv" style="--d:130ms">ForgeAI downloads open models straight from Hugging Face — no Ollama, no Python, no terminal. Then, on an Apple Silicon Mac, it can train one on your own examples until it answers the way you would.</p>
+    <div style="display:flex;justify-content:center;margin-top:34px;color:var(--fg-3)">
+      <svg class="bob" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+    </div>
+  </div>
+</section>
+
+<section id="track" aria-label="Training a model on your examples">
+  <div class="seqwrap">
+    <canvas id="stage" aria-hidden="true"></canvas>
+    <div class="seq-vignette"></div><div class="seq-scrim"></div>
+    <div class="caps"><div class="inner"><div class="box">
+      <article class="cap" data-from="0" data-to="30">
+        <div class="eyebrow">Step one</div>
+        <h2>You write down how you answer.</h2>
+        <p>A question, and the reply you would actually send. Thirty or forty of them is plenty — and you only write each one once.</p>
+      </article>
+      <article class="cap" data-from="31" data-to="54">
+        <div class="eyebrow">Step two</div>
+        <h2>It studies the pattern, not the words.</h2>
+        <p>A few hundred steps on your own machine. The line falling is the model getting less wrong about how you write.</p>
+      </article>
+      <article class="cap" data-from="55" data-to="92">
+        <div class="eyebrow">What comes out</div>
+        <h2>A small file, not a new model.</h2>
+        <p>Training produces an adapter of a few megabytes. The base model is untouched, so you can take the adapter off, keep several, or train again from where you stopped.</p>
+      </article>
+      <article class="cap" data-from="93" data-to="116">
+        <div class="eyebrow">Afterwards</div>
+        <h2>It writes like you, by default.</h2>
+        <p>Your prices, your sign-off, your rules about what never to quote. It appears in every model menu like any other.</p>
+      </article>
+      <article class="cap" data-from="117" data-to="999">
+        <div class="eyebrow">And it stays yours</div>
+        <h2>Nothing was uploaded to learn it.</h2>
+        <p>The examples, the training and the finished adapter all stayed on your computer. No one else got a copy of how your business talks.</p>
+      </article>
+    </div></div></div>
+    <div id="loader"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div>
+  </div>
+</section>
+
+<section class="pad"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">The catalogue</div><h2>Twenty models, grouped by the computer you have.</h2><p>Pick the group that matches your memory. ForgeAI checks your machine and tells you which ones will run well, which will be tight, and which are too big — before you download anything.</p></div>
+  <div class="mgroup rv">
+    <h3>Runs on any Mac or PC <span>8 GB of memory — the built-in assistant lives here</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>Llama 3.2 3B</b><span class="by">Meta</span></div>
+        <p>Tiny and very quick. Great for short answers on any Mac.</p>
+        <div class="facts"><span class="fact">2 GB download</span><span class="fact ram">8 GB memory</span></div>
+        <div class="tags"><span class="tag">Fast</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Qwen 3 4B</b><span class="by">Alibaba</span></div>
+        <p>Fast, surprisingly smart, uses tools.</p>
+        <div class="facts"><span class="fact">2.6 GB download</span><span class="fact ram">8 GB memory</span></div>
+        <div class="tags"><span class="tag">Fast</span><span class="tag">Everyday</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Gemma 3 4B</b><span class="by">Google</span></div>
+        <p>Quick, and can look at images.</p>
+        <div class="facts"><span class="fact">3.3 GB download</span><span class="fact ram">8 GB memory</span></div>
+        <div class="tags"><span class="tag">Fast</span><span class="tag">Sees images</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mgroup rv">
+    <h3>A 16 GB machine <span>the sweet spot for everyday work and email</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>Qwen 3 8B</b><span class="by">Alibaba</span></div>
+        <p>Best all-rounder for 16 GB. Good at email and tools.</p>
+        <div class="facts"><span class="fact">5.2 GB download</span><span class="fact ram">16 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Email</span><span class="tag">Fast</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Llama 3.1 8B</b><span class="by">Meta</span></div>
+        <p>Reliable general model, natural writing.</p>
+        <div class="facts"><span class="fact">4.9 GB download</span><span class="fact ram">16 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Email</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>DeepSeek R1 8B</b><span class="by">DeepSeek</span></div>
+        <p>Thinks step by step before answering.</p>
+        <div class="facts"><span class="fact">5.2 GB download</span><span class="fact ram">16 GB memory</span></div>
+        <div class="tags"><span class="tag">Reasoning</span><span class="tag">Strategy</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Gemma 3 12B</b><span class="by">Google</span></div>
+        <p>Excellent writing; reads images.</p>
+        <div class="facts"><span class="fact">8.1 GB download</span><span class="fact ram">16 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Email</span><span class="tag">Sees images</span><span class="tag">Writing</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mgroup rv">
+    <h3>A 24 GB machine <span>proper reasoning, coding and agent work</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>Qwen 3 14B</b><span class="by">Alibaba</span></div>
+        <p>Powerful, strong with tools and agents.</p>
+        <div class="facts"><span class="fact">9.3 GB download</span><span class="fact ram">24 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Strategy</span><span class="tag">Research</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Phi-4 14B</b><span class="by">Microsoft</span></div>
+        <p>Strong at maths and logic.</p>
+        <div class="facts"><span class="fact">9.1 GB download</span><span class="fact ram">24 GB memory</span></div>
+        <div class="tags"><span class="tag">Reasoning</span><span class="tag">Strategy</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>DeepSeek R1 14B</b><span class="by">DeepSeek</span></div>
+        <p>Deeper step-by-step reasoning.</p>
+        <div class="facts"><span class="fact">9 GB download</span><span class="fact ram">24 GB memory</span></div>
+        <div class="tags"><span class="tag">Reasoning</span><span class="tag">Strategy</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Qwen 2.5 Coder 14B</b><span class="by">Alibaba</span></div>
+        <p>Writes and fixes code.</p>
+        <div class="facts"><span class="fact">9 GB download</span><span class="fact ram">24 GB memory</span></div>
+        <div class="tags"><span class="tag">Code</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>GPT-OSS 20B</b><span class="by">OpenAI</span></div>
+        <p>OpenAI’s open model. Reasoning and tools.</p>
+        <div class="facts"><span class="fact">14 GB download</span><span class="fact ram">24 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Reasoning</span><span class="tag">Strategy</span><span class="tag">Research</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mgroup rv">
+    <h3>A 32 GB machine <span>polished writing and near-cloud quality</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>Mistral Small 3.2</b><span class="by">Mistral</span></div>
+        <p>Polished writing, follows instructions well.</p>
+        <div class="facts"><span class="fact">15 GB download</span><span class="fact ram">32 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Email</span><span class="tag">Writing</span><span class="tag">Sees images</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Gemma 3 27B</b><span class="by">Google</span></div>
+        <p>Google’s largest open model. Great writer.</p>
+        <div class="facts"><span class="fact">17 GB download</span><span class="fact ram">32 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Writing</span><span class="tag">Sees images</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Qwen 3 30B-A3B</b><span class="by">Alibaba</span></div>
+        <p>Big-model quality at small-model speed.</p>
+        <div class="facts"><span class="fact">19 GB download</span><span class="fact ram">32 GB memory</span></div>
+        <div class="tags"><span class="tag">Fast</span><span class="tag">Everyday</span><span class="tag">Research</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>Qwen 3 Coder 30B</b><span class="by">Alibaba</span></div>
+        <p>Fast, strong coding agent model.</p>
+        <div class="facts"><span class="fact">19 GB download</span><span class="fact ram">32 GB memory</span></div>
+        <div class="tags"><span class="tag">Code</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mgroup rv">
+    <h3>48 GB and up <span>the big open models</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>Qwen 3 32B</b><span class="by">Alibaba</span></div>
+        <p>Very capable. Needs a 48–64 GB Mac.</p>
+        <div class="facts"><span class="fact">20 GB download</span><span class="fact ram">48 GB memory</span></div>
+        <div class="tags"><span class="tag">Strategy</span><span class="tag">Research</span><span class="tag">Everyday</span></div>
+      </div>
+      <div class="model">
+        <div class="top"><b>DeepSeek R1 32B</b><span class="by">DeepSeek</span></div>
+        <p>Top local reasoning for big Macs.</p>
+        <div class="facts"><span class="fact">20 GB download</span><span class="fact ram">48 GB memory</span></div>
+        <div class="tags"><span class="tag">Reasoning</span><span class="tag">Strategy</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mgroup rv">
+    <h3>64 GB and up <span>as close to the frontier as local gets</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>Llama 3.3 70B</b><span class="by">Meta</span></div>
+        <p>Near top-tier quality. 64 GB+ only.</p>
+        <div class="facts"><span class="fact">43 GB download</span><span class="fact ram">64 GB memory</span></div>
+        <div class="tags"><span class="tag">Everyday</span><span class="tag">Strategy</span><span class="tag">Writing</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mgroup rv">
+    <h3>96 GB and up <span>a seriously specified Mac Studio</span></h3>
+    <div class="models">
+      <div class="model">
+        <div class="top"><b>GPT-OSS 120B</b><span class="by">OpenAI</span></div>
+        <p>Largest open OpenAI model. 96 GB+ only.</p>
+        <div class="facts"><span class="fact">65 GB download</span><span class="fact ram">96 GB memory</span></div>
+        <div class="tags"><span class="tag">Reasoning</span><span class="tag">Strategy</span><span class="tag">Research</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="small faint rv" style="margin-top:28px;max-width:76ch">Download sizes are for the 4-bit versions ForgeAI picks by default. “Memory” is what the computer should have for the model to run comfortably alongside everything else. All of these are free and open — you are downloading them from Hugging Face, not buying them.</p>
+</div></section>
+
+<section class="pad tight"><div class="wrap">
+  <div class="rv"><div class="frame"><div class="bar"><i></i><i></i><i></i><span>Models</span></div><img src="shots/models-dark.webp" width="1800" height="1191" alt="The Models page with the built-in assistant and the engines on this computer." loading="lazy"></div></div>
+  <div class="grid">
+    <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg></div><h3>One click, no terminal</h3><p>ForgeAI fetches the weights, picks a quantisation that fits your memory, and starts the engine itself. There is no separate app to install.</p></div>
+    <div class="card rv" style="--d:60ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8h14M5 16h14"/></svg></div><h3>It picks for you</h3><p>Leave it on Auto and it chooses the quickest model that can actually do the job — then tells you which it used and why.</p></div>
+    <div class="card rv" style="--d:120ms"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h3>Idle models sleep</h3><p>Anything unused is unloaded after a while so your memory comes back. The next question wakes it again.</p></div>
+    <div class="card rv" style="--d:180ms"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><h3>Graphics cards used automatically</h3><p>An NVIDIA card is detected and as many layers as fit are pushed onto it. Apple Silicon uses the whole machine.</p></div>
+    <div class="card rv" style="--d:240ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H8l-4 4z"/></svg></div><h3>Bring your own</h3><p>Already have a .gguf, a Hugging Face folder or a MLX model? Drop it in. It appears beside the rest and loads on demand.</p></div>
+    <div class="card rv" style="--d:300ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 1 4 4v3H8V7a4 4 0 0 1 4-4zM5 10h14v11H5z"/></svg></div><h3>Or use Claude and ChatGPT</h3><p>Paste a key and the hard questions can go there instead, with the running cost shown. Your key sits in the vault, not in a config file.</p></div>
+  </div>
+</div></section>
+
+<section class="pad tight"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">Training, in plain words</div><h2>What training actually does.</h2><p>It does not teach a model new facts the way a textbook would. It teaches it <em>how you answer</em> — your tone, your formats, your rules — so you stop re-explaining yourself in every prompt.</p></div>
+  <div class="ways">
+    <div class="way rv"><div class="lbl">Good for</div><div><h3>Tone, format and house rules</h3><p>“Always quote the trade list, never retail.” “Sign off as Ashton.” “Keep it under 120 words.” “Never promise a delivery date without checking.” After training you stop having to say any of it.</p></div></div>
+    <div class="way rv" style="--d:50ms"><div class="lbl">Not for</div><div><h3>Facts that change</h3><p>Prices, stock, this week's roster — those belong in Knowledge and Files, where the model reads them fresh each time. Training them in just bakes in something that will be wrong next month.</p></div></div>
+    <div class="way rv" style="--d:100ms"><div class="lbl">You need</div><div><h3>Thirty to a hundred examples</h3><p>Pairs of “what was asked” and “what you would reply”. ForgeAI can pull candidates out of chats you have already had, or you can paste them in, upload a .jsonl or a spreadsheet, or point it at pages on your own website.</p></div></div>
+    <div class="way rv" style="--d:150ms"><div class="lbl">It costs</div><div><h3>A few minutes, and nothing else</h3><p>A couple of hundred steps on an Apple Silicon Mac takes minutes, not hours. It is free, it happens locally, and you can stop it and carry on later from the same point.</p></div></div>
+    <div class="way rv" style="--d:200ms"><div class="lbl">You get</div><div><h3>An adapter you can copy</h3><p>A file of a few megabytes that clips onto the base model. Duplicate it, edit the examples and retrain, keep one per brand or per person — and move it to another computer by copying it across.</p></div></div>
+  </div>
+  <div class="warnbox rv"><b>One honest limitation</b>Training runs on Apple Silicon Macs only — it uses Apple's MLX, which has no Windows or Linux equivalent here. On a Windows PC you can still collect and keep examples, use models somebody else trained, and import a finished adapter; the training step itself has to happen on a Mac.</div>
+</div></section>
+
+<section class="pad tight"><div class="wrap">
+  <div class="rv"><div class="frame"><div class="bar"><i></i><i></i><i></i><span>Training</span></div><img src="shots/train.webp" width="1800" height="1191" alt="The training page with examples and a run in progress." loading="lazy"></div></div>
+</div></section>
+
+<section class="pad tight"><div class="wrap center">
+  <div class="sechead center rv"><h2>Get a model in about two minutes.</h2><p>The first one downloads while you are still setting up.</p></div>
+  <div class="cta rv" style="margin-top:30px">
+    <a class="btn primary big" href="download.html"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>Download ForgeAI</a>
+    <a class="btn big" href="business.html">See it run a business</a>
+  </div>
+</div></section>
+</main>
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div>
+      <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+      <p class="small" style="color:var(--fg-2);max-width:34ch">Private AI that runs on computers you own. Made in Hawke's Bay, New Zealand.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="what-is-it.html">What it is</a><a href="watch.html">Watch it work</a><a href="agents.html">Agents</a><a href="customers.html">Customers</a><a href="build.html">Websites &amp; apps</a><a href="models.html">Models &amp; training</a>
+    </div>
+    <div>
+      <h4>Get it</h4>
+      <a href="download.html">Download</a><a href="pricing.html">Pricing</a><a href="business.html">For business</a><a href="install.html">Install guide</a><a href="downloads/SHA256SUMS.txt">Checksums</a>
+    </div>
+    <div>
+      <h4>About</h4>
+      <a href="docs.html">Documentation</a><a href="index.html#private">Privacy</a><a href="index.html#what">What it does</a><a href="pricing.html#compare">How it compares</a>
+    </div>
+  </div>
+  <div class="base"><span>ForgeAI 2.28.0 · built 2 November 2026</span><span>No account. No subscription. No telemetry.</span></div>
+</div></footer>
+<script src="assets/site.js"></script>
+<script src="assets/seq.js"></script>
+<script src="assets/scenes2.js"></script>
+<script src="assets/models-page.js"></script>
+</body>
+</html>

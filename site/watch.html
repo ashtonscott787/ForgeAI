@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en" class="dark-page">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch ForgeAI work</title>
+<meta name="description" content="A real recording of ForgeAI being asked for a draft and writing it back, scrubbed by your scroll.">
+<link rel="icon" href="favicon.png">
+<meta property="og:title" content="Watch ForgeAI work">
+<meta property="og:description" content="A real recording of ForgeAI being asked for a draft and writing it back, scrubbed by your scroll.">
+<meta property="og:image" content="shots/chat-dark.webp">
+<meta name="theme-color" content="#07090d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>
+@import url('assets/seq.css');
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap nav">
+  <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+  <button class="menubtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="links">
+    <a class="lnk" href="what-is-it.html">What it is</a>
+    <a class="lnk" href="watch.html">Watch it work</a>
+    <a class="lnk" href="models.html">Models</a>
+    <a class="lnk" href="ways.html">Ways to use it</a>
+    <a class="lnk" href="updates.html">Updates</a>
+    <a class="lnk" href="docs.html">Docs</a>
+    <a class="lnk" href="business.html">For business</a>
+    <a class="lnk" href="pricing.html">Pricing</a>
+    <a class="btn primary" href="download.html">Download</a>
+  </nav>
+</div></header>
+<main>
+<section class="hero" style="padding-bottom:40px">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="wrap">
+    <span class="pill rv"><span class="dot"></span> Scroll to play · real recording</span>
+    <h1 class="mega rv" style="--d:70ms">Watch it put<br><span class="grad">itself together.</span></h1>
+    <p class="lede rv" style="--d:130ms">Every frame below came out of the actual app. Scroll and it plays: the question typed in, the model chosen, the answer written back word by word.</p>
+    <div style="display:flex;justify-content:center;margin-top:34px;color:var(--fg-3)">
+      <svg class="bob" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+    </div>
+  </div>
+</section>
+
+<section id="track" aria-label="ForgeAI answering a question">
+  <div class="seqwrap">
+    <canvas id="stage" aria-hidden="true"></canvas>
+    <div class="seq-vignette"></div><div class="seq-scrim"></div>
+    <div class="caps"><div class="inner"><div class="box">
+      <article class="cap" data-from="0" data-to="9">
+        <div class="eyebrow">A quiet start</div>
+        <h2>This is the whole app.</h2>
+        <p>Your work down the left, the conversation in the middle. Running on the computer in front of you.</p>
+      </article>
+      <article class="cap" data-from="10" data-to="46">
+        <div class="eyebrow">You ask</div>
+        <h2>Plain words. No prompt craft.</h2>
+        <p>“Draft a reply to the Johnson wine order — same trade prices as last time, delivery Thursday.”</p>
+      </article>
+      <article class="cap" data-from="47" data-to="59">
+        <div class="eyebrow">It picks a model</div>
+        <h2>And shows its working.</h2>
+        <p>Which model it chose, which computer it is running on, how long each step took — live, while it thinks.</p>
+      </article>
+      <article class="cap" data-from="60" data-to="80">
+        <div class="eyebrow">It writes</div>
+        <h2>The answer arrives word by word.</h2>
+        <p>A finished email, priced from your own March trade list — because that file is sitting on this machine.</p>
+      </article>
+      <article class="cap" data-from="81" data-to="999">
+        <div class="eyebrow">Done</div>
+        <h2>Five seconds. Nothing uploaded.</h2>
+        <p>Model, speed and token count underneath, so you always know exactly what answered you — and where.</p>
+      </article>
+    </div></div></div>
+    <div id="loader"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div>
+  </div>
+</section>
+
+<section class="pad"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">More of the same</div><h2>Three other things worth watching.</h2></div>
+  <div class="stories">
+    <a class="story rv" href="agents.html"><div class="thumb"><img src="shots/agents.webp" alt="" loading="lazy"></div>
+      <div class="meta"><div class="eyebrow">Agents</div><h3>A back office that runs itself</h3><p>Jobs handed between agents, work coming back, approvals waiting for you.</p><span class="go">Watch <svg viewBox="0 0 24 24"><path d="M5 12h14m0 0l-6-6m6 6l-6 6"/></svg></span></div></a>
+    <a class="story rv" href="customers.html" style="--d:70ms"><div class="thumb"><img src="shots/support.webp" alt="" loading="lazy"></div>
+      <div class="meta"><div class="eyebrow">Customers</div><h3>It answers the front door</h3><p>Website chat, iMessage and the phone — then the email that follows.</p><span class="go">Watch <svg viewBox="0 0 24 24"><path d="M5 12h14m0 0l-6-6m6 6l-6 6"/></svg></span></div></a>
+    <a class="story rv" href="build.html" style="--d:140ms"><div class="thumb"><img src="shots/sites.webp" alt="" loading="lazy"></div>
+      <div class="meta"><div class="eyebrow">Builds</div><h3>From a sentence to a live link</h3><p>A website built in front of you, published with a link you can send.</p><span class="go">Watch <svg viewBox="0 0 24 24"><path d="M5 12h14m0 0l-6-6m6 6l-6 6"/></svg></span></div></a>
+  </div>
+</div></section>
+
+<section class="pad tight"><div class="wrap center">
+  <div class="sechead center rv"><h2>Run that on your own machine.</h2><p>Free, local, no account.</p></div>
+  <div class="cta rv" style="margin-top:30px"><a class="btn primary big" href="download.html"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>Download ForgeAI</a></div>
+</div></section>
+</main>
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div>
+      <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+      <p class="small" style="color:var(--fg-2);max-width:34ch">Private AI that runs on computers you own. Made in Hawke's Bay, New Zealand.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="what-is-it.html">What it is</a><a href="watch.html">Watch it work</a><a href="agents.html">Agents</a><a href="customers.html">Customers</a><a href="build.html">Websites &amp; apps</a><a href="models.html">Models &amp; training</a>
+    </div>
+    <div>
+      <h4>Get it</h4>
+      <a href="download.html">Download</a><a href="pricing.html">Pricing</a><a href="business.html">For business</a><a href="install.html">Install guide</a><a href="downloads/SHA256SUMS.txt">Checksums</a>
+    </div>
+    <div>
+      <h4>About</h4>
+      <a href="docs.html">Documentation</a><a href="index.html#private">Privacy</a><a href="index.html#what">What it does</a><a href="pricing.html#compare">How it compares</a>
+    </div>
+  </div>
+  <div class="base"><span>ForgeAI 2.28.0 · built 2 November 2026</span><span>No account. No subscription. No telemetry.</span></div>
+</div></footer>
+<script src="assets/site.js"></script>
+<script src="assets/seq.js"></script>
+<script src="assets/watch-page.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+This folder must contain the installer zips before the download buttons work.
+
+ForgeAI 2.28.0 needs exactly two files, named exactly like this:
+
+    ForgeAI-Mac-AppleSilicon.zip     186 MB
+    ForgeAI-Windows.zip              265 MB
+
+SHA256SUMS.txt is already here and already matches those two files.
+
+The Intel Mac and Linux server builds are not part of 2.28.0, and the download
+page says so - there is nothing to put here for them.

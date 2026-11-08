@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" class="dark-page">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeAI for customers — phone, texts and website chat</title>
+<meta name="description" content="ForgeAI answers your phone line, replies on iMessage and handles your website's chat — from your own knowledge, in your tone, on your own computer.">
+<link rel="icon" href="favicon.png">
+<meta property="og:title" content="ForgeAI for customers — phone, texts and website chat">
+<meta property="og:description" content="ForgeAI answers your phone line, replies on iMessage and handles your website's chat — from your own knowledge, in your tone, on your own computer.">
+<meta property="og:image" content="shots/support.webp">
+<meta name="theme-color" content="#07090d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<style>
+@import url('assets/seq.css');
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap nav">
+  <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+  <button class="menubtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="links">
+    <a class="lnk" href="what-is-it.html">What it is</a>
+    <a class="lnk" href="watch.html">Watch it work</a>
+    <a class="lnk" href="models.html">Models</a>
+    <a class="lnk" href="ways.html">Ways to use it</a>
+    <a class="lnk" href="updates.html">Updates</a>
+    <a class="lnk" href="docs.html">Docs</a>
+    <a class="lnk" href="business.html">For business</a>
+    <a class="lnk" href="pricing.html">Pricing</a>
+    <a class="btn primary" href="download.html">Download</a>
+  </nav>
+</div></header>
+<main>
+<section class="hero" style="padding-bottom:40px">
+  <div class="glow a"></div><div class="glow b"></div>
+  <div class="wrap">
+    <span class="pill rv"><span class="dot"></span> Scroll to watch it answer</span>
+    <h1 class="mega rv" style="--d:70ms">It answers<br><span class="grad">the front door.</span></h1>
+    <p class="lede rv" style="--d:130ms">The phone, the texts and the little chat box on your website — all answered from the same knowledge, in your tone, by a model running on your own machine.</p>
+    <div style="display:flex;justify-content:center;margin-top:34px;color:var(--fg-3)">
+      <svg class="bob" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+    </div>
+  </div>
+</section>
+
+<section id="track" aria-label="ForgeAI answering customers">
+  <div class="seqwrap">
+    <canvas id="stage" aria-hidden="true"></canvas>
+    <div class="seq-vignette"></div><div class="seq-scrim"></div>
+    <div class="caps"><div class="inner"><div class="box">
+      <article class="cap" data-from="0" data-to="22">
+        <div class="eyebrow">Three doors</div>
+        <h2>However they reach you.</h2>
+        <p>A phone number, an iMessage thread and the chat box on your website. One ForgeAI behind all three.</p>
+      </article>
+      <article class="cap" data-from="23" data-to="52">
+        <div class="eyebrow">The phone</div>
+        <h2>It picks up on the second ring.</h2>
+        <p>Opening hours, prices, where to park, whether you ship — answered out loud from what you have told it, with the transcript kept.</p>
+      </article>
+      <article class="cap" data-from="53" data-to="90">
+        <div class="eyebrow">The texts</div>
+        <h2>It replies like a person would.</h2>
+        <p>A booking moved on iMessage, the calendar updated behind it, and a confirmation on its way — without you unlocking your phone.</p>
+      </article>
+      <article class="cap" data-from="91" data-to="118">
+        <div class="eyebrow">Your website</div>
+        <h2>The chat box that actually knows things.</h2>
+        <p>It answers from your own notes and never mentions what is behind it. When it does not know, it hands over to you instead of inventing.</p>
+      </article>
+      <article class="cap" data-from="119" data-to="999">
+        <div class="eyebrow">All of it</div>
+        <h2>Same brain. Same building.</h2>
+        <p>Every answer comes from material you gave it, on hardware you own. Nothing is uploaded to be stored or trained on elsewhere.</p>
+      </article>
+    </div></div></div>
+    <div id="loader"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div>
+  </div>
+</section>
+
+<section class="pad"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">In the app</div><h2>Set the chat up in an afternoon.</h2><p>Paste one line of script onto your site. Give it the knowledge it should answer from. Decide what it must never say.</p></div>
+  <div class="rv" style="margin-top:38px"><div class="frame"><div class="bar"><i></i><i></i><i></i><span>Website chat</span></div><img src="shots/support.webp" width="1800" height="1191" alt="The website chat page, where the widget is configured and previewed." loading="lazy"></div></div>
+  <div class="grid">
+    <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H8l-4 4z"/></svg></div><h3>It sounds like your place</h3><p>Natural typing delay, your tone, no “I am an AI assistant”. Visitors get an answer, not a disclaimer.</p></div>
+    <div class="card rv" style="--d:60ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 1 4 4v3H8V7a4 4 0 0 1 4-4zM5 10h14v11H5z"/></svg></div><h3>It will not leak its workings</h3><p>Visitors cannot talk it into revealing prompts, models or anything about how it is set up.</p></div>
+    <div class="card rv" style="--d:120ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg></div><h3>A real phone number</h3><p>Connect a number from a provider and it answers, listens and replies — with the transcript saved on your machine.</p></div>
+    <div class="card rv" style="--d:180ms"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4zM4 7l8 6 8-6"/></svg></div><h3>And the email that follows</h3><p>The confirmation, the quote, the follow-up — drafted in your voice and waiting in your drafts.</p></div>
+  </div>
+</div></section>
+
+<section class="pad tight"><div class="wrap">
+  <div class="sechead rv"><div class="eyebrow">Voice</div><h2>Including your own voice, if you want it.</h2><p>Record a few minutes of yourself and the phone line can answer in a voice that sounds like you, rather than a stock one.</p></div>
+  <div class="rv" style="margin-top:34px"><div class="frame"><div class="bar"><i></i><i></i><i></i><span>Voice &amp; phone</span></div><img src="shots/voice.webp" width="1800" height="1191" alt="The voice and phone page with voice options." loading="lazy"></div></div>
+</div></section>
+
+<section class="pad tight"><div class="wrap center">
+  <div class="sechead center rv"><h2>Let it take the calls.</h2><p>Free to try on your own computer first.</p></div>
+  <div class="cta rv" style="margin-top:30px">
+    <a class="btn primary big" href="download.html"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>Download ForgeAI</a>
+    <a class="btn big" href="pricing.html">What it costs</a>
+  </div>
+</div></section>
+</main>
+<footer class="site"><div class="wrap">
+  <div class="cols">
+    <div>
+      <a class="brand" href="index.html"><img class="mark orb-img" src="assets/orb.svg" alt="" width="31" height="31"> ForgeAI</a>
+      <p class="small" style="color:var(--fg-2);max-width:34ch">Private AI that runs on computers you own. Made in Hawke's Bay, New Zealand.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="what-is-it.html">What it is</a><a href="watch.html">Watch it work</a><a href="agents.html">Agents</a><a href="customers.html">Customers</a><a href="build.html">Websites &amp; apps</a><a href="models.html">Models &amp; training</a>
+    </div>
+    <div>
+      <h4>Get it</h4>
+      <a href="download.html">Download</a><a href="pricing.html">Pricing</a><a href="business.html">For business</a><a href="install.html">Install guide</a><a href="downloads/SHA256SUMS.txt">Checksums</a>
+    </div>
+    <div>
+      <h4>About</h4>
+      <a href="docs.html">Documentation</a><a href="index.html#private">Privacy</a><a href="index.html#what">What it does</a><a href="pricing.html#compare">How it compares</a>
+    </div>
+  </div>
+  <div class="base"><span>ForgeAI 2.28.0 · built 2 November 2026</span><span>No account. No subscription. No telemetry.</span></div>
+</div></footer>
+<script src="assets/site.js"></script>
+<script src="assets/seq.js"></script>
+<script src="assets/scenes.js"></script>
+<script src="assets/customers-page.js"></script>
+</body>
+</html>

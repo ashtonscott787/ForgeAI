@@ -73,6 +73,16 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
+      - name: Checksums
+        shell: bash
+        run: |
+          cd release
+          files=$(ls *.dmg *.zip *.exe 2>/dev/null || true)
+          [ -n "$files" ] || { echo "nothing was packaged"; exit 1; }
+          if command -v shasum >/dev/null; then shasum -a 256 $files > SHA256SUMS.txt
+          else sha256sum $files > SHA256SUMS.txt; fi
+          cat SHA256SUMS.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: forge-ai-${{ matrix.os }}
@@ -80,6 +90,7 @@ jobs:
             release/*.dmg
             release/*.zip
             release/*.exe
+            release/SHA256SUMS.txt
           if-no-files-found: error
 
       - name: Attach to the release
@@ -91,3 +102,4 @@ jobs:
             release/*.dmg
             release/*.zip
             release/*.exe
+            release/SHA256SUMS.txt

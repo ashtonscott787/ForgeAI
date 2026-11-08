@@ -11,6 +11,7 @@ import { listen as tauriListen } from "@tauri-apps/api/event";
 type Bridge = {
   invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   on: (event: string, cb: (payload: unknown) => void) => () => void;
+  pathForFile?: (file: File) => string;
 };
 const bridge: Bridge | undefined =
   typeof window !== "undefined" ? (window as unknown as { forge?: Bridge }).forge : undefined;
@@ -118,6 +119,12 @@ export interface Settings {
   threads: number | null;
   selected_model: string | null;
   experimental_cluster: boolean;
+  update_check?: boolean;
+  update_download?: boolean;
+  update_install?: boolean;
+  update_channel?: "stable" | "beta";
+  last_update_check?: number;
+  skipped_version?: string | null;
 }
 
 export interface EngineStatus {
@@ -135,6 +142,40 @@ export interface LinkReadiness {
   distributed_inference_enabled: boolean;
   explanation: string;
 }
+
+export interface Attachment {
+  name: string;
+  path: string;
+  bytes: number;
+  ext: string;
+  kind: "pdf" | "docx" | "pptx" | "xlsx" | "text" | "table" | "image" | "other";
+  pages: number | null;
+  text: string;
+  preview?: string | null;
+  readable: boolean;
+  note: string;
+}
+
+export interface ContextReport {
+  context: string;
+  report: { name: string; trimmed: boolean; chars: number }[];
+}
+
+export interface UpdateInfo {
+  available: boolean;
+  current: string;
+  version?: string;
+  notes?: string;
+  published_at?: string;
+  html_url?: string;
+  checked_at: number;
+  asset: { name: string; url: string; bytes: number } | null;
+  checksums_url: string | null;
+  installable?: boolean;
+  reason?: string;
+}
+
+export interface UpdateProgress { received: number; total: number }
 
 export interface DownloadProgress {
   model_id: string;
@@ -171,6 +212,16 @@ export const api = {
   stopEngine: () => invoke<void>("stop_engine"),
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
+  pickFiles: () => invoke<Attachment[]>("pick_files"),
+  readFiles: (paths: string[]) => invoke<Attachment[]>("read_files", { paths }),
+  buildContext: (files: { name: string; text: string }[], question: string, budget: number) =>
+    invoke<ContextReport>("build_context", { files, question, budget }),
+  checkUpdate: (channel: "stable" | "beta") => invoke<UpdateInfo>("check_update", { channel }),
+  downloadUpdate: (info: UpdateInfo) => invoke<{ file: string; version: string }>("download_update", { info }),
+  applyUpdate: (file: string) => invoke<{ restarting: boolean }>("apply_update", { file }),
+  publisherAvatar: (author: string) => invoke<{ avatar: string | null }>("publisher_avatar", { author }),
+  onUpdateProgress: (cb: (p: UpdateProgress) => void) =>
+    listen<UpdateProgress>("update://progress", (e) => cb(e.payload)),
   onDownloadProgress: (cb: (p: DownloadProgress) => void) =>
     listen<DownloadProgress>("download://progress", (e) => cb(e.payload)),
 };
@@ -185,6 +236,9 @@ export const fmtBytes = (b: number) => {
   if (b >= 1024 ** 2) return `${Math.round(b / 1024 ** 2)} MB`;
   return `${Math.round(b / 1024)} KB`;
 };
+/** Drag-and-drop gives a File; the shell needs its path. Empty when unavailable. */
+export const pathForFile = (file: File): string => bridge?.pathForFile?.(file) ?? "";
+
 export const CAP_LABEL: Record<string, string> = {
   chat: "Chat",
   code: "Coding",

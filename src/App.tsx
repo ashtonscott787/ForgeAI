@@ -13,12 +13,15 @@ import {
   type EngineStatus,
   type Health,
   type InstalledModel,
+  type UpdateInfo,
+  type UpdateProgress,
   type MachineCapability,
   type Settings,
 } from "./lib/ipc";
 import type { LocalModel, ModelConfiguration } from "./lib/models";
 import { describeInstalled, type InstalledEntry } from "./lib/library";
-import { Globe } from "./components/Globe";
+import { Orb } from "./components/Orb";
+import { UpdateCard } from "./components/UpdateCard";
 import { markFor } from "./components/Marks";
 import "./styles.css";
 
@@ -75,6 +78,15 @@ export default function App() {
   const [value, setValue] = useState("auto");
   const [installedFiles, setInstalledFiles] = useState<InstalledModel[]>([]);
   const [configurations, setConfigurations] = useState<Record<string, ModelConfiguration>>({});
+
+  // updates
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [uPhase, setUPhase] = useState<"idle" | "downloading" | "verifying" | "ready" | "installing">("idle");
+  const [uProgress, setUProgress] = useState<UpdateProgress | null>(null);
+  const [uFile, setUFile] = useState<string | null>(null);
+  const [uError, setUError] = useState<string | null>(null);
+  const [uDismissed, setUDismissed] = useState(false);
 
   // theme
   const applyTheme = useCallback((pref: Settings["theme"]) => {
@@ -163,6 +175,82 @@ export default function App() {
   const installed = useMemo(() => describeInstalled(installedFiles), [installedFiles]);
   const models = useMemo(() => selectorRows(installed), [installed]);
 
+  const runCheck = useCallback(
+    async (manual: boolean) => {
+      if (!inTauri) return;
+      setChecking(true);
+      setUError(null);
+      try {
+        const info = await api.checkUpdate(settings.update_channel ?? "stable");
+        setUpdate(info);
+        if (manual) setUDismissed(false);
+        const next = { ...settings, last_update_check: Date.now() };
+        setSettings(next);
+        void api.setSettings(next).catch(() => undefined);
+      } catch (e) {
+        setUError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setChecking(false);
+      }
+    },
+    [settings],
+  );
+
+  const downloadUpdate = useCallback(async () => {
+    if (!update?.installable) return;
+    setUPhase("downloading");
+    setUError(null);
+    try {
+      const r = await api.downloadUpdate(update);
+      setUPhase("verifying");
+      setUFile(r.file);
+      setUPhase("ready");
+      return r.file;
+    } catch (e) {
+      setUPhase("idle");
+      setUError(e instanceof Error ? e.message : String(e));
+      return null;
+    }
+  }, [update]);
+
+  const installUpdate = useCallback(
+    async (file: string) => {
+      setUPhase("installing");
+      try {
+        await api.applyUpdate(file);
+      } catch (e) {
+        setUPhase("ready");
+        setUError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [],
+  );
+
+  // Check on launch and every six hours, unless the user turned it off.
+  useEffect(() => {
+    if (!inTauri || settings.update_check === false) return;
+    const t = setTimeout(() => void runCheck(false), 4000);
+    const i = setInterval(() => void runCheck(false), 6 * 60 * 60 * 1000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
+    // Re-running on every settings change would re-check constantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.update_check, settings.update_channel]);
+
+  // Fetch in the background when asked to.
+  useEffect(() => {
+    if (!update?.available || !update.installable) return;
+    if (settings.update_download !== true || uPhase !== "idle" || uFile) return;
+    void downloadUpdate();
+  }, [update, settings.update_download, uPhase, uFile, downloadUpdate]);
+
+  useEffect(() => {
+    const off = api.onUpdateProgress(setUProgress);
+    return () => void off.then((f) => f()).catch(() => undefined);
+  }, []);
+
   // Keep the chosen model persisted so a restart lands where you left off.
   useEffect(() => {
     if (!inTauri || !value || value === settings.selected_model) return;
@@ -175,7 +263,7 @@ export default function App() {
     <div className="app">
       <div className="titlebar" data-tauri-drag-region>
         <div className="brand">
-          <Globe size={20} spin={engine.running} />
+          <Orb size={20} spin={engine.running} />
           Forge AI
         </div>
         <div className="tb-spacer" />
@@ -255,6 +343,30 @@ export default function App() {
             </div>
           )}
 
+          {update?.available && !uDismissed && settings.skipped_version !== update.version && (
+            <div className="updateslot">
+              <UpdateCard
+                info={update}
+                progress={uProgress}
+                phase={uPhase}
+                error={uError}
+                onUpdate={() => {
+                  void (async () => {
+                    const file = uFile ?? (await downloadUpdate());
+                    if (file) await installUpdate(file);
+                  })();
+                }}
+                onLater={() => setUDismissed(true)}
+                onSkip={() => {
+                  const next = { ...settings, skipped_version: update.version ?? null };
+                  setSettings(next);
+                  void api.setSettings(next).catch(() => undefined);
+                }}
+              />
+            </div>
+          )}
+
+          <div className="views">
           <section className={`view${view === "chat" ? " active" : ""}`}>
             <Chat
               models={models}
@@ -268,6 +380,7 @@ export default function App() {
               onModelChange={setValue}
               onConfigurationChange={(v, c) => setConfigurations((p) => ({ ...p, [v]: c }))}
               onGoto={setView}
+              contextSize={settings.context_size}
               messages={active.messages}
               onMessages={setActiveMessages}
             />
@@ -294,8 +407,16 @@ export default function App() {
           </section>
 
           <section className={`view${view === "settings" ? " active" : ""}`}>
-            <SettingsView settings={settings} onChange={setSettings} />
+            <SettingsView
+              settings={settings}
+              onChange={setSettings}
+              version={health?.app_version ?? "—"}
+              update={update}
+              checking={checking}
+              onCheck={() => void runCheck(true)}
+            />
           </section>
+          </div>
         </main>
       </div>
     </div>

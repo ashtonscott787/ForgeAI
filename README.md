@@ -14,12 +14,26 @@ Neither build is code-signed, so each system warns you once on first launch: on
 macOS right-click the app and choose Open, on Windows choose More info then Run
 anyway. `web/index.html` is a download page with the same links.
 
-> **Status: 0.3.0, early.** Everything listed under *What works* has been built
+> **Status: 0.4.0, early.** Everything listed under *What works* has been built
 > and exercised; everything under *Not built yet* is absent rather than stubbed.
 > Where something has not been verified, it says so.
 
 ## What works
 
+- **Updates itself.** Checks this repository's releases, shows what changed and
+  how large the download is, verifies it against the release's SHA256SUMS.txt,
+  and replaces the application in place. Integrity is checked, not authorship —
+  neither build is signed, so anyone who can publish a release here can publish
+  an update. Needs the repository (or a releases mirror) to be public; no token
+  is embedded in the app.
+- **Attachments.** PDF, DOCX, PPTX, XLSX, CSV, JSON, Markdown, HTML and source
+  files are parsed and handed to the model. Office formats are unpacked without
+  a dependency; PDFs go through pdf.js. A file that cannot be read says so
+  rather than appearing to have been read. Documents larger than the context
+  window are reduced by keyword relevance, not truncated from the top.
+- **Measured response timing** under every answer: total from pressing Send,
+  plus model loading, time to first token, tokens and tokens per second when
+  expanded. Nothing on that panel is estimated.
 - **Chat** with streaming replies, saved conversations, light and dark themes.
 - **Local inference** through a bundled `llama-server` (llama.cpp `b12180`),
   bound to loopback on a free port. Metal on Apple Silicon; CPU on Windows.
@@ -71,7 +85,8 @@ machine. The planner refuses to split a model that already fits.
 | `electron/` | Desktop shell: IPC, engine supervision, downloads, Hugging Face resolution |
 | `core/` | Rust: hardware profiling, placement planner, catalogue validation (unit-tested) |
 | `src-tauri/` | Earlier Tauri shell, kept for the Rust core and the icons |
-| `.github/workflows/` | CI and the installer builds |
+| `site/` | The marketing and download site, published to GitHub Pages |
+| `.github/workflows/` | CI, the installer builds, and the site |
 
 ## Building
 
