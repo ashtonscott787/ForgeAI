@@ -7,7 +7,7 @@ no cloud inference, no data leaving the machine. macOS and Windows.
 
 | | |
 | --- | --- |
-| **macOS** (Apple Silicon) | [Forge-AI-macOS-arm64.dmg](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-macOS-arm64.dmg) |
+| **macOS** (Apple Silicon) | [Forge-AI-macOS-arm64.zip](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-macOS-arm64.zip) |
 | **Windows** (64-bit) | [Forge-AI-Windows-Setup.exe](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-Windows-Setup.exe) |
 
 Neither build is code-signed, so each system warns you once on first launch: on
