@@ -56,23 +56,58 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Cache the inference engine
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: engine
+          key: engine-${{ runner.os }}-${{ env.LLAMA_TAG }}-v2
+
+      # Fast path: the prebuilt release asset. If that is unavailable — the
+      # release CDN does return 504s — the engine is built from the same tag
+      # instead, so a release never depends on one host being healthy.
       - name: Fetch the inference engine
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        id: fetch
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p engine _dl
           url="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/${{ matrix.asset }}"
-          # The release CDN returns the occasional 504; one gateway hiccup
-          # should not fail a ten-minute build.
-          curl -sSfL --retry 6 --retry-delay 8 --retry-all-errors --connect-timeout 20 \
+          curl -sSfL --retry 5 --retry-delay 6 --retry-all-errors --connect-timeout 20 \
             "$url" -o "_dl/${{ matrix.asset }}"
           case "${{ matrix.asset }}" in
             *.tar.gz) tar xzf "_dl/${{ matrix.asset }}" -C _dl ;;
             *.zip)    unzip -q "_dl/${{ matrix.asset }}" -d _dl ;;
           esac
-          # Keep llama-server plus the libraries it loads; drop the other tools.
           find _dl -type f \( -name 'llama-server' -o -name 'llama-server.exe' \
             -o -name '*.dylib' -o -name '*.dll' -o -name 'LICENSE*' \) -exec cp {} engine/ \;
+          test -f engine/llama-server -o -f engine/llama-server.exe
+
+      - name: Build the inference engine from source
+        if: steps.engine-cache.outputs.cache-hit != 'true' && steps.fetch.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf engine && mkdir -p engine
+          git clone --depth 1 --branch "${LLAMA_TAG}" https://github.com/ggml-org/llama.cpp _src
+          EXTRA=""
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            EXTRA="-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DCMAKE_OSX_ARCHITECTURES=arm64"
+          fi
+          cmake -S _src -B _b -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_RPC=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON $EXTRA
+          cmake --build _b --config Release --target llama-server
+          find _b -type f \( -name 'llama-server' -o -name 'llama-server.exe' \) -exec cp {} engine/ \;
+          cp _src/LICENSE engine/LICENSE-llama.cpp || true
+          test -f engine/llama-server -o -f engine/llama-server.exe
+
+      - name: Check the engine is present
+        shell: bash
+        run: |
+          set -euo pipefail
           test -f engine/llama-server -o -f engine/llama-server.exe
           chmod +x engine/llama-server 2>/dev/null || true
           ls -l engine
