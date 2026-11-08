@@ -82,7 +82,27 @@ export interface Resolved {
   available_quants: string[];
 }
 
-export interface HubHit { repo: string; downloads: number; likes: number; license: string }
+export interface HubHit {
+  repo: string;
+  author: string;
+  downloads: number;
+  likes: number;
+  updated: string;
+  license: string;
+  tags: string[];
+}
+
+export interface RepoFile {
+  path: string;
+  file_name: string;
+  bytes: number;
+  sha256: string;
+  quant: string;
+  split: boolean;
+  url: string;
+}
+
+export type HubSort = "downloads" | "likes" | "lastModified" | "trendingScore";
 
 export interface Health {
   runtime_available: boolean;
@@ -140,7 +160,9 @@ export const api = {
   ensureEngine: (modelFile: string) => invoke<EngineStatus>("ensure_engine", { modelFile }),
   resolveArtifact: (repo: string, quant: string) =>
     invoke<Resolved>("resolve_artifact", { repo, quant }),
-  searchHub: (query: string) => invoke<HubHit[]>("search_hub", { query }),
+  searchHub: (opts: { query: string; sort?: HubSort; author?: string; limit?: number }) =>
+    invoke<HubHit[]>("search_hub", opts),
+  listRepoFiles: (repo: string) => invoke<{ repo: string; files: RepoFile[] }>("list_repo_files", { repo }),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
   previewInBrowser: (html: string, name: string) =>
     invoke<string>("preview_in_browser", { html, name }),

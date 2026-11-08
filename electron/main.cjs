@@ -139,14 +139,50 @@ async function resolveArtifact({ repo, quant }) {
 }
 const size = (f) => (f.lfs && f.lfs.size) || f.size || 0;
 
-async function searchHub(query) {
-  const q = encodeURIComponent(String(query || "").trim());
-  if (!q) return [];
-  const list = await getJSON(`https://huggingface.co/api/models?search=${q}&filter=gguf&limit=24&sort=downloads&direction=-1`);
-  return (Array.isArray(list) ? list : []).map((r) => ({
-    repo: r.modelId || r.id, downloads: r.downloads || 0, likes: r.likes || 0,
-    license: (r.tags || []).find((t) => t.startsWith("license:"))?.slice(8) || "",
-  }));
+async function searchHub({ query, sort, author, limit }) {
+  const q = String(query || "").trim();
+  const params = new URLSearchParams();
+  if (q) params.set("search", q);
+  if (author) params.set("author", String(author));
+  params.set("filter", "gguf");
+  params.set("sort", ["downloads", "likes", "lastModified", "trendingScore"].includes(sort) ? sort : "downloads");
+  params.set("direction", "-1");
+  params.set("limit", String(Math.min(Number(limit) || 30, 60)));
+  const list = await getJSON(`https://huggingface.co/api/models?${params.toString()}`);
+  return (Array.isArray(list) ? list : []).map((r) => {
+    const id = r.modelId || r.id || "";
+    const tags = Array.isArray(r.tags) ? r.tags : [];
+    return {
+      repo: id,
+      author: id.split("/")[0] || "",
+      downloads: r.downloads || 0,
+      likes: r.likes || 0,
+      updated: r.lastModified || "",
+      license: (tags.find((t) => t.startsWith("license:")) || "").slice(8),
+      tags: tags.filter((t) => !t.includes(":")).slice(0, 8),
+    };
+  });
+}
+
+/** Every GGUF in a repository, so the user picks the exact file and size. */
+async function listRepoFiles({ repo }) {
+  const clean = String(repo || "").trim().replace(/^https?:\/\/huggingface\.co\//, "").replace(/\/+$/, "");
+  if (!/^[\w.-]+\/[\w.-]+$/.test(clean)) throw new Error("expected a repository in the form owner/name");
+  const tree = await getJSON(`https://huggingface.co/api/models/${clean}/tree/main?recursive=1`);
+  const files = (Array.isArray(tree) ? tree : [])
+    .filter((f) => f.type === "file" && /\.gguf$/i.test(f.path))
+    .map((f) => ({
+      path: f.path,
+      file_name: f.path.split("/").pop(),
+      bytes: size(f),
+      sha256: f.lfs && typeof f.lfs.oid === "string" && f.lfs.oid.length === 64 ? f.lfs.oid : "",
+      quant: (f.path.match(/(IQ\d[\w]*|Q\d[_\w]*|BF16|F16|F32)/i) || ["GGUF"])[0].toUpperCase(),
+      split: /-\d{5}-of-\d{5}\./.test(f.path),
+      url: `https://huggingface.co/${clean}/resolve/main/${encodeURI(f.path)}?download=true`,
+    }))
+    .sort((a, b) => a.bytes - b.bytes);
+  if (!files.length) throw new Error(`no GGUF files in ${clean} — that repository may hold the original weights rather than a GGUF conversion`);
+  return { repo: clean, files };
 }
 
 // ── engine ──────────────────────────────────────────────────
@@ -212,7 +248,8 @@ function register(win) {
   h("start_engine", startEngine);
   h("ensure_engine", ensureEngine);
   h("resolve_artifact", resolveArtifact);
-  h("search_hub", ({ query }) => searchHub(query));
+  h("search_hub", (a) => searchHub(a || {}));
+  h("list_repo_files", (a) => listRepoFiles(a || {}));
   h("open_external", ({ url }) => {
     if (!/^https?:\/\//.test(String(url))) throw new Error("only http(s) links can be opened");
     return shell.openExternal(url);

@@ -19,6 +19,7 @@ import {
 import type { LocalModel, ModelConfiguration } from "./lib/models";
 import { describeInstalled, type InstalledEntry } from "./lib/library";
 import { Globe } from "./components/Globe";
+import { markFor } from "./components/Marks";
 import "./styles.css";
 
 type View = "chat" | "models" | "setup" | "settings";
@@ -57,14 +58,6 @@ function selectorRows(installed: InstalledEntry[]): LocalModel[] {
     bytes: m.bytes,
   }));
   return installed.length ? [auto, ...rows] : rows;
-}
-
-function markFor(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes("qwen")) return "qwen";
-  if (n.includes("llama") || n.includes("meta")) return "meta";
-  if (n.includes("deepseek")) return "ds";
-  return "generic";
 }
 
 export default function App() {

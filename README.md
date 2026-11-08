@@ -3,7 +3,18 @@
 A desktop app that runs open-weight AI models on your own computer. No account,
 no cloud inference, no data leaving the machine. macOS and Windows.
 
-> **Status: 0.2.0, early.** Everything listed under *What works* has been built
+## Download
+
+| | |
+| --- | --- |
+| **macOS** (Apple Silicon) | [Forge-AI-macOS-arm64.dmg](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-macOS-arm64.dmg) |
+| **Windows** (64-bit) | [Forge-AI-Windows-Setup.exe](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-Windows-Setup.exe) |
+
+Neither build is code-signed, so each system warns you once on first launch: on
+macOS right-click the app and choose Open, on Windows choose More info then Run
+anyway. `web/index.html` is a download page with the same links.
+
+> **Status: 0.3.0, early.** Everything listed under *What works* has been built
 > and exercised; everything under *Not built yet* is absent rather than stubbed.
 > Where something has not been verified, it says so.
 
@@ -12,8 +23,11 @@ no cloud inference, no data leaving the machine. macOS and Windows.
 - **Chat** with streaming replies, saved conversations, light and dark themes.
 - **Local inference** through a bundled `llama-server` (llama.cpp `b12180`),
   bound to loopback on a free port. Metal on Apple Silicon; CPU on Windows.
-- **Model library** across Qwen, Llama, Gemma, DeepSeek, Mistral, Phi, Granite
-  and SmolLM. Each download link is resolved from the Hugging Face repository at
+- **Every GGUF model on Hugging Face.** The library has two tabs: a curated set
+  across Qwen, Llama, Gemma, DeepSeek, Mistral, Phi, Granite and SmolLM, and a
+  search over the whole of Hugging Face, filtered to repositories that publish
+  GGUF files. Open any repository to see each quantization it offers with its
+  real size and whether it fits your machine. Each download link is resolved from the Hugging Face repository at
   the moment you click Download, so a renamed upload cannot become a dead link.
   Downloads resume, check their SHA-256 when the repository publishes one, and
   refuse to start without the disk space.

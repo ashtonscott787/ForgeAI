@@ -11,7 +11,9 @@ import {
   type InstalledModel,
   type MachineCapability,
 } from "../lib/ipc";
-import { describeInstalled, forgetInstall, recordFor, recordInstall } from "../lib/library";
+import { describeInstalled, forgetInstall, recordFor, recordInstall, type LibraryRecord } from "../lib/library";
+import { Mark, markFor } from "../components/Marks";
+import type { HubHit, HubSort, RepoFile } from "../lib/ipc";
 
 interface Props {
   self: MachineCapability | null;
@@ -35,6 +37,9 @@ function fitFor(bytes: number, usable: number): Fit {
   return { kind: "good", label: "Recommended" };
 }
 
+const compact = (n: number) =>
+  n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n);
+
 const pct = (p: DownloadProgress) => (p.total > 0 ? Math.min(100, (p.received / p.total) * 100) : 0);
 
 export function Models(props: Props) {
@@ -48,6 +53,13 @@ export function Models(props: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [customUrl, setCustomUrl] = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [tab, setTab] = useState<"curated" | "hub">("curated");
+  const [hubQuery, setHubQuery] = useState("");
+  const [hubSort, setHubSort] = useState<HubSort>("downloads");
+  const [hubHits, setHubHits] = useState<HubHit[] | null>(null);
+  const [hubBusy, setHubBusy] = useState(false);
+  const [openRepo, setOpenRepo] = useState<string | null>(null);
+  const [repoFiles, setRepoFiles] = useState<RepoFile[] | null>(null);
 
   useEffect(() => {
     const off = api.onDownloadProgress((p) => {
@@ -152,6 +164,80 @@ export function Models(props: Props) {
     }
   }
 
+  async function searchHub() {
+    setHubBusy(true);
+    setError(null);
+    setRepoFiles(null);
+    setOpenRepo(null);
+    try {
+      setHubHits(await api.searchHub({ query: hubQuery, sort: hubSort, limit: 36 }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setHubHits([]);
+    } finally {
+      setHubBusy(false);
+    }
+  }
+
+  async function openFiles(repo: string) {
+    if (openRepo === repo) {
+      setOpenRepo(null);
+      return;
+    }
+    setOpenRepo(repo);
+    setRepoFiles(null);
+    setError(null);
+    try {
+      const r = await api.listRepoFiles(repo);
+      setRepoFiles(r.files);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setOpenRepo(null);
+    }
+  }
+
+  /** Download a specific GGUF chosen from a repository listing. */
+  async function downloadFile(repo: string, f: RepoFile) {
+    const id = `${repo}:${f.file_name}`;
+    setError(null);
+    setBusy((b) => ({ ...b, [id]: "Starting…" }));
+    setProgress((p) => ({
+      ...p,
+      [id]: { model_id: id, received: 0, total: f.bytes, bytes_per_sec: 0, done: false },
+    }));
+    try {
+      await api.downloadModel(id, f.url, f.file_name, f.sha256);
+      const rec: LibraryRecord = {
+        file_name: f.file_name,
+        model_id: id,
+        name: repo.split("/")[1] ?? f.file_name,
+        family: repo.split("/")[0] ?? "",
+        developer: repo.split("/")[0] ?? "Hugging Face",
+        params_b: 0,
+        max_context: 0,
+        caps: [],
+        quant: f.quant,
+        bytes: f.bytes,
+        added: Date.now(),
+      };
+      recordInstall(rec);
+      props.onInstalledChange();
+    } catch (e) {
+      setError(`${f.file_name}: ${e instanceof Error ? e.message : String(e)}`);
+      setProgress((p) => {
+        const copy = { ...p };
+        delete copy[id];
+        return copy;
+      });
+    } finally {
+      setBusy((b) => {
+        const copy = { ...b };
+        delete copy[id];
+        return copy;
+      });
+    }
+  }
+
   async function remove(fileName: string) {
     try {
       await api.deleteModel(fileName);
@@ -227,31 +313,43 @@ export function Models(props: Props) {
         </>
       )}
 
-      <h3 className="secthead">Available</h3>
-      <div className="filters">
-        <input
-          className="inp search"
-          placeholder="Search models, makers or capabilities"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <div className="chiprow">
-          {families.map((f) => (
-            <button key={f} className={`fchip${family === f ? " on" : ""}`} onClick={() => setFamily(f)}>
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="chiprow">
-          {caps.map((c) => (
-            <button key={c} className={`fchip${cap === c ? " on" : ""}`} onClick={() => setCap(c)}>
-              {c === "All" ? "All capabilities" : (CAP_LABEL[c] ?? c)}
-            </button>
-          ))}
+      <div className="secthead-row">
+        <h3 className="secthead">Available</h3>
+        <div className="segtabs">
+          <button className={`tabbtn${tab === "curated" ? " on" : ""}`} onClick={() => setTab("curated")}>
+            Picked for you
+          </button>
+          <button className={`tabbtn${tab === "hub" ? " on" : ""}`} onClick={() => setTab("hub")}>
+            All of Hugging Face
+          </button>
         </div>
       </div>
 
-      <div className="grid">
+      {tab === "curated" ? (
+        <>
+          <div className="filters">
+            <input
+              className="inp search"
+              placeholder="Search models, makers or capabilities"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <div className="chiprow">
+              {families.map((f) => (
+                <button key={f} className={`fchip${family === f ? " on" : ""}`} onClick={() => setFamily(f)}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            <div className="chiprow">
+              {caps.map((c) => (
+                <button key={c} className={`fchip${cap === c ? " on" : ""}`} onClick={() => setCap(c)}>
+                  {c === "All" ? "All capabilities" : (CAP_LABEL[c] ?? c)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid">
         {shown.map((e) => {
           const q = quant[e.id] ?? "Q4_K_M";
           const bytes = e.est_bytes[q] ?? 0;
@@ -261,10 +359,13 @@ export function Models(props: Props) {
           return (
             <div key={e.id} className="mcard">
               <div className="mcard-top">
-                <div>
+                <div className="mcard-id">
+                  <Mark kind={markFor(`${e.family} ${e.developer}`)} />
+                  <div>
                   <div className="mcard-name">{e.name}</div>
                   <div className="mcard-sub">
                     {e.developer} · {e.params_b}B · {Math.round(e.max_context / 1024)}K context
+                  </div>
                   </div>
                 </div>
                 <span className={`pill fit-${fit.kind}`}>{fit.label}</span>
@@ -318,8 +419,96 @@ export function Models(props: Props) {
             </div>
           );
         })}
-      </div>
-      {shown.length === 0 && <p className="sub">Nothing matches that search.</p>}
+          </div>
+          {shown.length === 0 && <p className="sub">Nothing matches that search.</p>}
+        </>
+      ) : (
+        <>
+          <div className="hubbar">
+            <input
+              className="inp search"
+              placeholder="Search every GGUF model on Hugging Face — try qwen3, kimi, mistral"
+              value={hubQuery}
+              onChange={(e) => setHubQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void searchHub();
+              }}
+            />
+            <select className="qsel" value={hubSort} onChange={(e) => setHubSort(e.target.value as HubSort)}>
+              <option value="downloads">Most downloaded</option>
+              <option value="likes">Most liked</option>
+              <option value="trendingScore">Trending</option>
+              <option value="lastModified">Recently updated</option>
+            </select>
+            <button className="primary" disabled={hubBusy} onClick={() => void searchHub()}>
+              {hubBusy ? "Searching…" : "Search"}
+            </button>
+          </div>
+          <p className="sub">
+            Only repositories that publish GGUF files appear here, because those are the ones this app
+            can run. Pick a repository to see every quantization it offers.
+          </p>
+
+          {hubHits !== null && hubHits.length === 0 && !hubBusy && (
+            <p className="sub">Nothing matched. Try a shorter word, or the maker&rsquo;s name.</p>
+          )}
+
+          <div className="hublist">
+            {(hubHits ?? []).map((h) => (
+              <div key={h.repo} className="hubitem">
+                <div className="hubrow">
+                  <Mark kind={markFor(h.repo)} />
+                  <div className="hubtext">
+                    <div className="mcard-name">{h.repo.split("/")[1] ?? h.repo}</div>
+                    <div className="mcard-sub">
+                      {h.author} · {compact(h.downloads)} downloads · {compact(h.likes)} likes
+                      {h.license ? ` · ${h.license}` : ""}
+                    </div>
+                  </div>
+                  <button className="ghostbtn" onClick={() => void openFiles(h.repo)}>
+                    {openRepo === h.repo ? "Hide files" : "Choose file"}
+                  </button>
+                </div>
+
+                {openRepo === h.repo && (
+                  <div className="filelist">
+                    {repoFiles === null ? (
+                      <div className="sub">Reading the repository…</div>
+                    ) : (
+                      repoFiles.map((f) => {
+                        const fFit = fitFor(f.bytes, usable);
+                        const id = `${h.repo}:${f.file_name}`;
+                        const fp = progress[id];
+                        return (
+                          <div key={f.path} className="filerow">
+                            <span className="fq num">{f.quant}</span>
+                            <span className="fn">{f.file_name}</span>
+                            <span className="num fsz">{fmtBytes(f.bytes)}</span>
+                            <span className={`pill fit-${fFit.kind}`}>{fFit.label}</span>
+                            {fp ? (
+                              <span className="num fsz">{Math.round(pct(fp))}%</span>
+                            ) : f.split ? (
+                              <span className="sub">split upload — not supported</span>
+                            ) : (
+                              <button
+                                className="ghostbtn"
+                                disabled={!!busy[id] || fFit.kind === "no"}
+                                onClick={() => void downloadFile(h.repo, f)}
+                              >
+                                {busy[id] ?? "Download"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

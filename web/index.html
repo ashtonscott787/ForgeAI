@@ -1,283 +1,112 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Download Forge AI</title>
-<meta name="description" content="Local-first AI for macOS and Windows. Your models, your hardware, your control.">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-[data-theme="dark"]{--page:#08080a;--surface:#101013;--raised:#17171b;--line:rgba(255,255,255,.08);
-  --line-s:rgba(255,255,255,.14);--fg:#f4f4f5;--fg2:#a1a1aa;--fg3:#6b6b74;--hover:rgba(255,255,255,.05);
-  --ember:#ff7a1a;--on-ember:#140800;--ember-soft:rgba(255,122,26,.12);--ember-line:rgba(255,122,26,.3);
-  --ember-fg:#ffb074;--warn-soft:rgba(255,197,61,.08);--warn-fg:#f0cd72;--glow:rgba(255,122,26,.1)}
-[data-theme="light"]{--page:#f4f4f2;--surface:#fdfdfc;--raised:#fff;--line:rgba(16,16,20,.09);
-  --line-s:rgba(16,16,20,.16);--fg:#18181b;--fg2:#52525b;--fg3:#8b8b94;--hover:rgba(16,16,20,.045);
-  --ember:#e2620a;--on-ember:#fff6ef;--ember-soft:rgba(226,98,10,.08);--ember-line:rgba(226,98,10,.25);
-  --ember-fg:#b44c05;--warn-soft:rgba(201,138,0,.08);--warn-fg:#8f6200;--glow:rgba(226,98,10,.08)}
-:root{--ease:cubic-bezier(.2,.8,.2,1);--t:220ms var(--ease);
-  --font:"Inter var","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-  --mono:"SF Mono",ui-monospace,Menlo,monospace}
-body{background:var(--page);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.6;
-  letter-spacing:-.006em;-webkit-font-smoothing:antialiased;
-  font-feature-settings:"cv11","ss01";transition:background 300ms var(--ease),color 300ms var(--ease)}
-.num{font-variant-numeric:tabular-nums}
-a{color:inherit}
-button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-
-header{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);
-  background:color-mix(in srgb,var(--page) 82%,transparent);border-bottom:1px solid var(--line)}
-.hwrap{max-width:1040px;margin:0 auto;padding:0 28px;height:58px;display:flex;align-items:center;gap:10px}
-.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:-.015em;font-size:15px}
-.brand svg{width:17px;height:17px;color:var(--ember)}
-.hspace{flex:1}
-.ghost{height:32px;padding:0 13px;border:1px solid var(--line-s);border-radius:9px;font-size:13.5px;
-  font-weight:500;transition:all var(--t);display:inline-flex;align-items:center;gap:7px;text-decoration:none}
-.ghost:hover{background:var(--hover)}
-.themebtn{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);border-radius:9px;
-  color:var(--fg3);transition:all var(--t)}
-.themebtn:hover{color:var(--fg);background:var(--hover)}
-.themebtn svg{width:15px;height:15px}
-
-main{max-width:1040px;margin:0 auto;padding:0 28px}
-.hero{padding:84px 0 56px;text-align:center;position:relative}
-.hero::before{content:"";position:absolute;top:0;left:50%;width:720px;height:420px;transform:translateX(-50%);
-  background:radial-gradient(ellipse at center,var(--glow),transparent 70%);filter:blur(10px);pointer-events:none}
-.pill{position:relative;display:inline-flex;align-items:center;gap:7px;height:27px;padding:0 11px;
-  border:1px solid var(--ember-line);background:var(--ember-soft);color:var(--ember-fg);border-radius:999px;
-  font-size:12px;font-weight:600;letter-spacing:.01em;margin-bottom:22px}
-h1{position:relative;font-size:clamp(34px,5.2vw,52px);font-weight:600;letter-spacing:-.034em;line-height:1.08}
-.sub{position:relative;margin:16px auto 0;max-width:580px;font-size:17px;color:var(--fg2);letter-spacing:-.01em}
-
-.dl{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:720px;margin:40px auto 0;position:relative}
-@media(max-width:700px){.dl{grid-template-columns:1fr}}
-.card{background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:22px;text-align:left;
-  transition:border-color var(--t),transform var(--t)}
-.card:hover{border-color:var(--line-s);transform:translateY(-2px)}
-.card.rec{border-color:var(--ember-line)}
-.os{display:flex;align-items:center;gap:10px}
-.os svg{width:21px;height:21px;color:var(--fg2)}
-.os .n{font-size:17px;font-weight:600;letter-spacing:-.018em}
-.os .r{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-  padding:3px 7px;border-radius:5px;background:var(--ember-soft);color:var(--ember-fg)}
-.req{margin-top:5px;font-size:12.5px;color:var(--fg3)}
-.btns{margin-top:17px;display:flex;flex-direction:column;gap:8px}
-.btn{height:40px;border-radius:10px;font-size:14px;font-weight:600;display:flex;align-items:center;
-  justify-content:center;gap:8px;text-decoration:none;transition:all var(--t)}
-.btn.p{background:var(--ember);color:var(--on-ember)}
-.btn.p:hover{filter:brightness(1.08)}
-.btn.s{border:1px solid var(--line-s);color:var(--fg2)}
-.btn.s:hover{background:var(--hover);color:var(--fg)}
-.btn svg{width:15px;height:15px}
-.note{margin-top:13px;font-size:12px;color:var(--fg3);line-height:1.5}
-
-.strip{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;
-  overflow:hidden;margin:56px 0 0}
-@media(max-width:760px){.strip{flex-direction:column}}
-.cell{flex:1;background:var(--surface);padding:19px 20px}
-.cell .k{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg3)}
-.cell .v{margin-top:6px;font-size:14px;line-height:1.55;color:var(--fg2)}
-.cell .v b{color:var(--fg);font-weight:600}
-
-section.block{padding:56px 0 0}
-h2{font-size:25px;font-weight:600;letter-spacing:-.026em}
-.lede{margin-top:9px;color:var(--fg2);max-width:660px}
-ol.steps{margin:22px 0 0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:2px}
-ol.steps li{counter-increment:s;position:relative;padding:13px 16px 13px 50px;background:var(--surface);
-  border:1px solid var(--line);font-size:14px}
-ol.steps li:first-child{border-radius:12px 12px 0 0}
-ol.steps li:last-child{border-radius:0 0 12px 12px}
-ol.steps li+li{border-top:none}
-ol.steps li::before{content:counter(s);position:absolute;left:16px;top:13px;width:21px;height:21px;
-  border-radius:50%;background:var(--ember-soft);color:var(--ember-fg);font-size:11.5px;font-weight:700;
-  display:grid;place-items:center}
-ol.steps b{font-weight:600}
-code{font:500 12.5px/1.4 var(--mono);background:var(--hover);padding:2px 5px;border-radius:5px}
-
-.honest{margin:24px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.honest .hh{padding:14px 18px;border-bottom:1px solid var(--line);background:var(--warn-soft);
-  font-size:13.5px;font-weight:600;color:var(--warn-fg)}
-table{width:100%;border-collapse:collapse;font-size:13.5px}
-th,td{text-align:left;padding:11px 18px;border-top:1px solid var(--line)}
-th{font-size:10.5px;font-weight:700;letter-spacing:.055em;text-transform:uppercase;color:var(--fg3);border-top:none}
-td:first-child{font-weight:550}
-.yes{color:var(--ember-fg);font-weight:600}
-.no{color:var(--fg3)}
-
-footer{margin-top:72px;border-top:1px solid var(--line);padding:26px 0 56px;font-size:12.5px;color:var(--fg3)}
-footer a{color:var(--fg2);text-decoration:none}
-footer a:hover{color:var(--ember)}
+  :root{--bg:#08080a;--card:#101013;--line:rgba(255,255,255,.1);--fg:#f4f4f5;--fg2:#a1a1aa;--fg3:#6b6b74;--ember:#ff7a1a}
+  @media (prefers-color-scheme:light){
+    :root{--bg:#f4f4f2;--card:#fff;--line:rgba(16,16,20,.1);--fg:#18181b;--fg2:#52525b;--fg3:#8b8b94;--ember:#e2620a}
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    display:flex;justify-content:center;padding:56px 20px 80px}
+  .wrap{width:100%;max-width:760px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:34px}
+  h1{font-size:30px;letter-spacing:-.025em;font-weight:650}
+  .lede{color:var(--fg2);margin:10px 0 34px;font-size:16px;max-width:60ch}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card h2{font-size:17px;font-weight:620;margin-bottom:4px}
+  .card p{color:var(--fg3);font-size:13px;margin-bottom:16px}
+  a.btn{display:block;text-align:center;background:var(--ember);color:#140800;text-decoration:none;
+    font-weight:650;font-size:14px;padding:11px;border-radius:11px;margin-bottom:8px}
+  a.alt{background:transparent;color:var(--fg2);border:1px solid var(--line);font-weight:550}
+  ol{margin:10px 0 0 18px;color:var(--fg2);font-size:13.5px}
+  ol li{margin-bottom:5px}
+  section{margin-top:40px}
+  section h3{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);margin-bottom:12px}
+  .note{border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--fg2);font-size:13.5px}
+  footer{margin-top:44px;color:var(--fg3);font-size:12.5px}
+  a{color:var(--ember)}
 </style>
 </head>
 <body>
+<div class="wrap">
+  <header>
+    <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <radialGradient id="s" cx="34%" cy="27%" r="80%">
+          <stop offset="0%" stop-color="#9dc0ff"/><stop offset="34%" stop-color="#6d7cf2"/>
+          <stop offset="66%" stop-color="#b06ae0"/><stop offset="100%" stop-color="#e8835f"/>
+        </radialGradient>
+        <clipPath id="c"><circle cx="32" cy="32" r="27"/></clipPath>
+      </defs>
+      <circle cx="32" cy="32" r="27" fill="url(#s)"/>
+      <g clip-path="url(#c)" fill="none" stroke="rgba(255,255,255,.34)" stroke-width="1.2">
+        <ellipse cx="32" cy="32" rx="27" ry="10"/><ellipse cx="32" cy="32" rx="27" ry="19"/>
+        <ellipse cx="32" cy="32" rx="10" ry="27"/><ellipse cx="32" cy="32" rx="19" ry="27"/>
+        <line x1="5" y1="32" x2="59" y2="32"/>
+      </g>
+    </svg>
+    <h1>Forge AI</h1>
+  </header>
 
-<header><div class="hwrap">
-  <div class="brand">
-    <svg viewBox="0 0 24 24"><path d="M14 2l-2 7h6l-8 13 2-9H6z" fill="currentColor"/></svg>
-    Forge AI
-  </div>
-  <div class="hspace"></div>
-  <a class="ghost" id="repo" href="#">
-    <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.6v-2.2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18.6 3.4 19.6 3.7 19.6 3.7c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 23.5 12A11.5 11.5 0 0 0 12 .5z"/></svg>
-    Source
-  </a>
-  <button class="themebtn" id="theme" title="Switch theme">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5z"/></svg>
-  </button>
-</div></header>
+  <p class="lede">
+    Open-weight AI models, running on your own computer. Download a model once and chat offline —
+    no account, no subscription, nothing sent to a server.
+  </p>
 
-<main>
-  <div class="hero">
-    <div class="pill"><span>Version <span id="ver">0.1.0</span> · early release</span></div>
-    <h1>Your AI. Your hardware.<br>Your control.</h1>
-    <p class="sub">A desktop AI app that downloads models and runs them on your own machine.
-       No account, no API key, no data leaving your computer.</p>
+  <div class="cards">
+    <div class="card">
+      <h2>macOS</h2>
+      <p>Apple Silicon (M1 or later) · runs on the GPU via Metal</p>
+      <a class="btn" href="https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-macOS-arm64.dmg">Download for Mac</a>
+      <a class="btn alt" href="https://github.com/ashtonscott787/ForgeAI/releases/latest">All versions</a>
+      <ol>
+        <li>Open the .dmg and drag Forge AI to Applications.</li>
+        <li>First launch: right-click the app and choose Open, then Open again.</li>
+        <li>Go to Models, download one, and start chatting.</li>
+      </ol>
+    </div>
 
-    <div class="dl">
-      <div class="card rec" id="mac-card">
-        <div class="os">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-1.9-1.6-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.9 1.2 1.9 2.6 3.2 2.5 1.3 0 1.8-.8 3.4-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5.6-.9.9-1.4 1.3-2.4-3.4-1.3-3.9-5.6-2.9-6.1zM14.3 5.2c.7-.8 1.1-2 1-3.2-1.1.1-2.3.7-3 1.6-.6.7-1.1 1.9-1 3 1.2.1 2.4-.6 3-1.4z"/></svg>
-          <span class="n">macOS</span>
-          <span class="r" id="mac-rec" hidden>Your system</span>
-        </div>
-        <div class="req">macOS 12 Monterey or later · Apple Silicon or Intel</div>
-        <div class="btns">
-          <a class="btn p" id="mac-arm" href="#">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg>
-            Apple Silicon (M1–M4)
-          </a>
-          <a class="btn s" id="mac-x64" href="#">Intel Mac</a>
-        </div>
-        <p class="note">Unsigned build: on first open, right-click the app and choose
-           <b>Open</b>, then confirm. One time only.</p>
-      </div>
-
-      <div class="card" id="win-card">
-        <div class="os">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.6l7.2-1v7.1H3zM3 18.4l7.2 1v-7h-7.2zM11.4 4.4L21 3v8.7h-9.6zM11.4 12.9H21V21l-9.6-1.4z"/></svg>
-          <span class="n">Windows</span>
-          <span class="r" id="win-rec" hidden>Your system</span>
-        </div>
-        <div class="req">Windows 10 or 11 · 64-bit</div>
-        <div class="btns">
-          <a class="btn p" id="win-exe" href="#">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg>
-            Installer (.exe)
-          </a>
-          <a class="btn s" id="win-msi" href="#">MSI package</a>
-        </div>
-        <p class="note">Unsigned build: Windows may show “unrecognised app”. Choose
-           <b>More info → Run anyway</b>. One time only.</p>
-      </div>
+    <div class="card">
+      <h2>Windows</h2>
+      <p>64-bit Windows 10 or 11 · runs on the processor</p>
+      <a class="btn" href="https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-Windows-Setup.exe">Download for Windows</a>
+      <a class="btn alt" href="https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-Windows-Portable.exe">Portable version</a>
+      <ol>
+        <li>Run the installer. If SmartScreen appears: More info, then Run anyway.</li>
+        <li>Launch Forge AI from the Start menu.</li>
+        <li>Go to Models, download one, and start chatting.</li>
+      </ol>
     </div>
   </div>
 
-  <div class="strip">
-    <div class="cell"><div class="k">Nothing else to install</div>
-      <div class="v">No Python, Node, Docker, Ollama or terminal. The inference engine is
-        <b>inside the installer</b>.</div></div>
-    <div class="cell"><div class="k">Models</div>
-      <div class="v">Browse, download and delete from inside the app. Every file is
-        <b>checksum-verified</b> before it loads.</div></div>
-    <div class="cell"><div class="k">Private by construction</div>
-      <div class="v">The engine binds to <b>localhost only</b>. There is no server to talk to.</div></div>
-  </div>
-
-  <section class="block">
-    <h2>Installing</h2>
-    <p class="lede">Four steps, about five minutes, most of which is the model download.</p>
-    <ol class="steps">
-      <li><b>Download</b> the file for your system above.</li>
-      <li><b>macOS:</b> open the <code>.dmg</code>, drag Forge AI to Applications, then right-click it
-          and choose Open.<br><b>Windows:</b> run the <code>.exe</code> and follow the installer.</li>
-      <li><b>Open Forge AI.</b> It reads your hardware and tells you what it found. Nothing is sent anywhere.</li>
-      <li>Go to <b>Models</b>, download <b>Qwen2.5 1.5B</b> (about 1.1 GB — the fastest way to a first
-          answer), press <b>Load</b>, and start chatting.</li>
-    </ol>
+  <section>
+    <h3>Why the security warnings</h3>
+    <div class="note">
+      Forge AI is not code-signed. Signing certificates cost money each year, and this is a free
+      project. Both operating systems therefore warn you the first time you open it. The steps above
+      are the normal way past that warning. If you would rather check for yourself, the whole source
+      is in this repository and the installers are built from it by GitHub, not uploaded by hand.
+    </div>
   </section>
 
-  <section class="block">
-    <h2>What works in 0.1, and what doesn't</h2>
-    <p class="lede">0.1 is deliberately small. Everything listed as working has been built and run;
-       everything else says so plainly rather than appearing as a button that does nothing.</p>
-    <div class="honest">
-      <div class="hh">Honest status</div>
-      <table>
-        <tr><th>Feature</th><th>Status</th></tr>
-        <tr><td>Chat with a local model, streaming</td><td class="yes">Works</td></tr>
-        <tr><td>Model catalogue, download, delete</td><td class="yes">Works</td></tr>
-        <tr><td>Checksum verification, resumable downloads</td><td class="yes">Works</td></tr>
-        <tr><td>Hardware detection, memory budget</td><td class="yes">Works</td></tr>
-        <tr><td>Settings: context, GPU layers, threads</td><td class="yes">Works</td></tr>
-        <tr><td>Light / dark / follow-system themes</td><td class="yes">Works</td></tr>
-        <tr><td>Model selector with search and configuration</td><td class="yes">Works</td></tr>
-        <tr><td>GPU acceleration on macOS (Metal)</td><td class="yes">Works</td></tr>
-        <tr><td>GPU acceleration on Windows</td><td class="no">Not yet — Windows builds are CPU-only</td></tr>
-        <tr><td>Running one model across several computers</td><td class="no">Off. Designed and unit-tested, never run on two real machines</td></tr>
-        <tr><td>Vision and document models</td><td class="no">Not in 0.1</td></tr>
-        <tr><td>Agents, tools, memory</td><td class="no">Not in 0.1</td></tr>
-      </table>
+  <section>
+    <h3>What you need</h3>
+    <div class="note">
+      About 1 GB of disk for the app, plus the model you choose — the smallest useful one is around
+      1 GB and the better ones are 4 to 9 GB. 8 GB of memory runs small models comfortably; 16 GB
+      and up opens the larger ones. Forge AI reads your hardware and labels every model
+      Recommended, Compatible, May be slow or Not enough memory before you download it.
     </div>
   </section>
 
   <footer>
-    <p>Forge AI is MIT licensed. Bundled llama.cpp is MIT. Model weights keep their own
-       licences — the app shows each one before you download.</p>
-    <p style="margin-top:8px">
-      <a id="f-releases" href="#">All releases</a> ·
-      <a id="f-install" href="#">Install guide</a> ·
-      <a id="f-issues" href="#">Report a problem</a>
-    </p>
+    MIT licensed. Each model carries its own licence, shown before you download it.
   </footer>
-</main>
-
-<script>
-/* ── Point this at your repository. Everything else is derived from it. ── */
-const REPO = "YOUR-GITHUB-USERNAME/forge-ai";
-const VERSION = "0.1.0";
-
-const base = `https://github.com/${REPO}/releases/download/v${VERSION}`;
-const set = (id, href) => { const el = document.getElementById(id); if (el) el.href = href; };
-
-document.getElementById("ver").textContent = VERSION;
-set("repo", `https://github.com/${REPO}`);
-set("f-releases", `https://github.com/${REPO}/releases`);
-set("f-install", `https://github.com/${REPO}/blob/main/docs/INSTALL.md`);
-set("f-issues", `https://github.com/${REPO}/issues/new`);
-
-/* Asset names as tauri-action publishes them. Verify against your first
-   release and adjust if your tauri version names them differently. */
-set("mac-arm", `${base}/Forge.AI_${VERSION}_aarch64.dmg`);
-set("mac-x64", `${base}/Forge.AI_${VERSION}_x64.dmg`);
-set("win-exe", `${base}/Forge.AI_${VERSION}_x64-setup.exe`);
-set("win-msi", `${base}/Forge.AI_${VERSION}_x64_en-US.msi`);
-
-/* Highlight the visitor's platform. Recommendation only — both stay available. */
-const ua = navigator.userAgent;
-const isMac = /Mac/i.test(ua);
-const isWin = /Win/i.test(ua);
-if (isWin) {
-  document.getElementById("win-rec").hidden = false;
-  document.getElementById("win-card").classList.add("rec");
-  document.getElementById("mac-card").classList.remove("rec");
-} else if (isMac) {
-  document.getElementById("mac-rec").hidden = false;
-}
-
-/* Theme: follow the OS, remember an explicit choice. */
-const root = document.documentElement;
-const mq = matchMedia("(prefers-color-scheme: light)");
-let pref = null;
-try { pref = localStorage.getItem("forge-site-theme"); } catch {}
-const apply = () => root.dataset.theme = pref ?? (mq.matches ? "light" : "dark");
-apply();
-mq.addEventListener("change", () => { if (!pref) apply(); });
-document.getElementById("theme").onclick = () => {
-  pref = root.dataset.theme === "dark" ? "light" : "dark";
-  try { localStorage.setItem("forge-site-theme", pref); } catch {}
-  apply();
-};
-</script>
+</div>
 </body>
 </html>
