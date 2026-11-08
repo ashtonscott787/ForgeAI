@@ -43,7 +43,9 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/canvas/**",
+      "!node_modules/**/*.map"
     ],
     "extraResources": [
       {
@@ -80,6 +82,7 @@
     },
     "asarUnpack": [
       "node_modules/pdfjs-dist/**"
-    ]
+    ],
+    "npmRebuild": false
   }
 }
