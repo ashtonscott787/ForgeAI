@@ -84,5 +84,11 @@
       "node_modules/pdfjs-dist/**"
     ],
     "npmRebuild": false
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
   }
 }
