@@ -82,6 +82,27 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
+      # Apple Silicon refuses to launch a Mach-O with no signature at all, and
+      # reports it as "damaged" rather than unsigned. electron-builder skips
+      # signing when there is no certificate, so the bundle is ad-hoc signed
+      # here and the archives are rebuilt from the signed copy. This is not
+      # notarization: Gatekeeper still warns once, and right-click → Open still
+      # applies. It is the difference between a warning and a dead app.
+      - name: Ad-hoc sign and repackage (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP=$(find release -maxdepth 3 -name "Forge AI.app" -type d | head -1)
+          [ -n "$APP" ] || { echo "no .app was produced"; exit 1; }
+          xattr -cr "$APP"
+          codesign --force --deep --sign - --timestamp=none "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          rm -f release/Forge-AI-macOS-arm64.zip release/Forge-AI-macOS-arm64.dmg
+          ditto -c -k --sequesterRsrc --keepParent "$APP" release/Forge-AI-macOS-arm64.zip
+          hdiutil create -volname "Forge AI" -srcfolder "$APP" -ov -format UDZO release/Forge-AI-macOS-arm64.dmg
+          ls -lh release
+
       - uses: actions/upload-artifact@v4
         with:
           name: forge-ai-${{ matrix.os }}
