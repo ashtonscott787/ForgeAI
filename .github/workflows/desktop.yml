@@ -112,7 +112,29 @@ jobs:
           chmod +x engine/llama-server 2>/dev/null || true
           ls -l engine
 
-      - run: pnpm install --frozen-lockfile
+      - name: Cache the Electron download
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~\AppData\Local\electron\Cache
+          key: electron-${{ runner.os }}-38.0.0
+
+      # Electron's postinstall pulls its binary from the same release host that
+      # has been intermittently returning 504, so one refusal must not sink the
+      # build. The cache above means a success is reused next time.
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if pnpm install --frozen-lockfile; then exit 0; fi
+            echo "attempt $attempt failed; waiting before retry"
+            sleep 25
+          done
+          echo "dependencies could not be installed after four attempts"
+          exit 1
+
       - run: pnpm build
 
       - name: Package
