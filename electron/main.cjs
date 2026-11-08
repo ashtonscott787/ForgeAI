@@ -12,6 +12,11 @@ const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { readAttachment, selectRelevant } = require("./extract.cjs");
 const updater = require("./updater.cjs");
+const reminders = require("./reminders.cjs");
+const memory = require("./memory.cjs");
+const secrets = require("./secrets.cjs");
+const research = require("./research.cjs");
+const { parseWhen } = require("./when.cjs");
 
 const RUNTIME_ID = "llamacpp-b12180";
 const IDLE_UNLOAD_MS = 20 * 60 * 1000;
@@ -280,6 +285,75 @@ function register(win) {
     return { context: parts.join("\n\n"), report };
   });
 
+  // ── reminders ─────────────────────────────────────────────
+  h("parse_when", ({ text }) => parseWhen(text));
+  h("reminders_list", () => reminders.list());
+  h("reminder_create", ({ text, when, at, repeat }) => {
+    if (Number.isFinite(at)) return reminders.create({ text, at, repeat: repeat ?? null });
+    const parsed = parseWhen(when ?? text);
+    if ("error" in parsed) throw new Error(parsed.error);
+    return reminders.create({ text, at: parsed.at, repeat: parsed.repeat });
+  });
+  h("reminder_update", (patch) => reminders.update(patch || {}));
+  h("reminder_delete", ({ id }) => reminders.remove(id));
+  h("reminder_snooze", ({ id, minutes }) => reminders.snooze(id, minutes));
+
+  // ── memory ────────────────────────────────────────────────
+  h("memory_list", () => memory.list());
+  h("memory_add", (m) => memory.add(m || {}));
+  h("memory_update", (m) => memory.update(m || {}));
+  h("memory_delete", ({ id }) => memory.remove(id));
+  h("memory_for_prompt", ({ project } = {}) => memory.forPrompt({ project }));
+  h("memory_export", async () => {
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("downloads"), "forge-ai-memory.json"),
+    });
+    if (canceled || !filePath) return null;
+    fs.writeFileSync(filePath, JSON.stringify(memory.exportAll(), null, 2));
+    return filePath;
+  });
+  h("memory_import", async ({ replace } = {}) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ["openFile"],
+      filters: [{ name: "Memory export", extensions: ["json"] }],
+    });
+    if (canceled || !filePaths[0]) return null;
+    return memory.importAll(JSON.parse(fs.readFileSync(filePaths[0], "utf8")), { replace });
+  });
+
+  // ── integrations ──────────────────────────────────────────
+  h("secret_status", () => ({ available: secrets.available(), providers: secrets.status() }));
+  h("secret_clear", ({ provider }) => secrets.set(provider, ""));
+  /** Saves a key only after a real call to that provider accepts it. */
+  h("secret_connect", async ({ provider, key }) => {
+    const value = String(key || "").trim();
+    if (!value) throw new Error("paste a key first");
+    const result = await research.verify(provider, value);
+    secrets.set(provider, value);
+    secrets.markVerified(provider, true, result.detail);
+    return { connected: true, detail: result.detail };
+  });
+
+  // ── web research ──────────────────────────────────────────
+  h("research_run", async ({ query, provider }) => {
+    const want = provider && provider !== "auto" ? provider : null;
+    const px = secrets.get("perplexity");
+    const fc = secrets.get("firecrawl");
+    const chosen = want ?? (px ? "perplexity" : fc ? "firecrawl" : null);
+    if (!chosen) throw new Error("No research provider is connected. Add a Perplexity or Firecrawl key in Settings → Integrations.");
+    const key = chosen === "perplexity" ? px : fc;
+    if (!key) throw new Error(`${chosen} is not connected.`);
+    return chosen === "perplexity"
+      ? research.perplexity({ key, query })
+      : research.firecrawlSearch({ key, query });
+  });
+  h("research_scrape", ({ url }) => {
+    const key = secrets.get("firecrawl");
+    if (!key) throw new Error("Reading a page needs a Firecrawl key, added in Settings → Integrations.");
+    if (!/^https?:\/\//.test(String(url))) throw new Error("that is not a web address");
+    return research.firecrawlScrape({ key, url });
+  });
+
   // ── updates ───────────────────────────────────────────────
   h("check_update", (a) => updater.checkForUpdate(a || {}));
   h("download_update", async ({ info }) => {
@@ -358,6 +432,8 @@ function createWindow() {
 app.whenReady().then(() => {
   settings = loadSettings();
   updater.cleanupOldBundles();
+  secrets.load(root());
+  memory.load(root());
   // The renderer is a file:// page; let it read the loopback engine's streamed replies.
   session.defaultSession.webRequest.onHeadersReceived({ urls: ["http://127.0.0.1/*"] }, (d, cb) => {
     const h = d.responseHeaders || {};
@@ -367,7 +443,15 @@ app.whenReady().then(() => {
   });
   const win = createWindow();
   register(win);
+  reminders.load(root(), (r, late) => {
+    try {
+      win.webContents.send("reminder://fired", { reminder: r, late });
+    } catch {
+      /* the window may be gone; the notification already fired */
+    }
+  });
+  reminders.schedule();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on("window-all-closed", () => { stopEngine(); app.quit(); });
+app.on("window-all-closed", () => { stopEngine(); reminders.stop(); app.quit(); });
 app.on("before-quit", stopEngine);

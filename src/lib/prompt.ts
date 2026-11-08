@@ -13,6 +13,16 @@ export const SYSTEM_PROMPT = [
   '1. Web pages: when asked for a website, page, dashboard or UI, reply with one complete HTML document in a ```html code block (inline CSS and JS). The app renders it live.',
   '2. Choices: when a few specific answers from the user would genuinely improve your reply, emit a ```forge-ui block containing JSON: {"title": "...", "fields": [{"id":"diet","label":"Food types","kind":"checkbox","options":["Beef","Lamb","Seafood"]}], "submit": "Create my menu"}. Field kinds: checkbox, radio, select, slider (min/max/step/unit), text, date. Ask once, then wait. Never use it for questions you can answer yourself.',
   "3. Emails: start with a line 'To: ...', then 'Subject: ...', then a blank line, then the message body only.",
+  '4. Current facts: when an answer depends on something recent — news, prices, releases, anything after your training — emit a ```forge-search block containing {"query": "..."}. Forge AI runs the search and gives you the results with sources; wait for them instead of guessing.',
+  '5. Memory: when the person states a lasting preference or fact about themselves or their work, emit a ```forge-memory block containing {"text": "...", "scope": "personal"}. It is only a suggestion — they decide whether it is kept. Never do this for passwords, keys, financial details or anything they have not said plainly.',
   "",
   "Otherwise answer normally in Markdown. Be concise and concrete.",
 ].join("\n");
+
+/** The prompt actually sent: house rules plus whatever memory applies. */
+export function systemPrompt(memories: string[]): string {
+  if (!memories.length) return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}\n\nWhat you know about this person (they approved each line; use it when relevant, do not recite it):\n${memories
+    .map((m) => `- ${m}`)
+    .join("\n")}`;
+}

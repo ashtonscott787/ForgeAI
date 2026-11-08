@@ -8,7 +8,7 @@ import type { Attachment, EngineStatus, Health, MachineCapability } from "../lib
 import { api, pathForFile } from "../lib/ipc";
 import type { InstalledEntry } from "../lib/library";
 import type { LocalModel, ModelConfiguration } from "../lib/models";
-import { SYSTEM_PROMPT } from "../lib/prompt";
+import { systemPrompt } from "../lib/prompt";
 import { choose } from "../lib/router";
 
 interface Props {
@@ -39,6 +39,8 @@ export function Chat(props: Props) {
   const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const handleRef = useRef<StreamHandle | null>(null);
+  // One automatic follow-up per search, so a model that keeps asking cannot loop.
+  const researched = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -164,6 +166,7 @@ export function Chat(props: Props) {
         return;
       }
     }
+    const memories = await api.memoryForPrompt().catch(() => [] as string[]);
     const loadMs = engine === props.engine ? 0 : performance.now() - loadStarted;
     setStatus(null);
 
@@ -174,7 +177,7 @@ export function Chat(props: Props) {
 
     handleRef.current = streamChat(
       engine.base_url,
-      [{ role: "system", content: SYSTEM_PROMPT }, ...outbound],
+      [{ role: "system", content: systemPrompt(memories) }, ...outbound],
       {
         onToken: (piece) => {
           if (!firstTokenAt) firstTokenAt = performance.now();
@@ -259,6 +262,19 @@ export function Chat(props: Props) {
                       content={m.content}
                       streaming={streaming && i === messages.length - 1}
                       onSend={(t) => void send(t)}
+                      // Only the newest turn may run a search, and only once:
+                      // reopening an old conversation must not re-run paid
+                      // lookups, and a repeated query must not loop.
+                      onResearch={
+                        i === messages.length - 1 && props.health?.runtime_available
+                          ? (t) => {
+                              const key = t.slice(0, 120);
+                              if (researched.current.has(key)) return;
+                              researched.current.add(key);
+                              void send(t);
+                            }
+                          : undefined
+                      }
                     />
                   ) : streaming && i === messages.length - 1 ? (
                     <span className="caret-blink" />

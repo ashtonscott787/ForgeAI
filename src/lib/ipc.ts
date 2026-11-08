@@ -177,6 +177,41 @@ export interface UpdateInfo {
 
 export interface UpdateProgress { received: number; total: number }
 
+export interface Reminder {
+  id: string;
+  text: string;
+  at: number;
+  repeat: { kind: "daily" | "weekly" | "weekdays" | "monthly"; day?: number } | null;
+  state: "pending" | "done";
+  created: number;
+  late?: boolean;
+  last_fired?: number;
+  history?: { fired: number; late: boolean }[];
+}
+
+export interface Memory {
+  id: string;
+  text: string;
+  scope: "personal" | "project";
+  project: string;
+  pinned: boolean;
+  expires: number | null;
+  source: string;
+  created: number;
+}
+
+export interface SecretStatus {
+  available: boolean;
+  providers: Record<string, { saved: number; hint: string; verified: boolean | null; verified_at: number | null }>;
+}
+
+export interface ResearchResult {
+  provider: string;
+  answer: string;
+  sources: { url: string; title: string; date: string }[];
+  fetched_at: number;
+}
+
 export interface DownloadProgress {
   model_id: string;
   received: number;
@@ -212,6 +247,33 @@ export const api = {
   stopEngine: () => invoke<void>("stop_engine"),
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
+  parseWhen: (text: string) =>
+    invoke<{ at: number; repeat: Reminder["repeat"]; text: string } | { error: string }>("parse_when", { text }),
+  remindersList: () => invoke<Reminder[]>("reminders_list"),
+  reminderCreate: (text: string, when: string) => invoke<Reminder>("reminder_create", { text, when }),
+  reminderUpdate: (patch: Partial<Reminder> & { id: string }) => invoke<Reminder>("reminder_update", patch),
+  reminderDelete: (id: string) => invoke<void>("reminder_delete", { id }),
+  reminderSnooze: (id: string, minutes: number) => invoke<Reminder>("reminder_snooze", { id, minutes }),
+  onReminderFired: (cb: (p: { reminder: Reminder; late: boolean }) => void) =>
+    listen<{ reminder: Reminder; late: boolean }>("reminder://fired", (e) => cb(e.payload)),
+
+  memoryList: () => invoke<Memory[]>("memory_list"),
+  memoryAdd: (m: { text: string; scope?: string; project?: string; pinned?: boolean; expires?: number | null; source?: string }) =>
+    invoke<Memory>("memory_add", m),
+  memoryUpdate: (m: Partial<Memory> & { id: string }) => invoke<Memory>("memory_update", m),
+  memoryDelete: (id: string) => invoke<void>("memory_delete", { id }),
+  memoryForPrompt: (project?: string) => invoke<string[]>("memory_for_prompt", { project }),
+  memoryExport: () => invoke<string | null>("memory_export"),
+  memoryImport: (replace: boolean) => invoke<{ added: number; total: number } | null>("memory_import", { replace }),
+
+  secretStatus: () => invoke<SecretStatus>("secret_status"),
+  secretConnect: (provider: string, key: string) =>
+    invoke<{ connected: boolean; detail: string }>("secret_connect", { provider, key }),
+  secretClear: (provider: string) => invoke<void>("secret_clear", { provider }),
+
+  research: (query: string, provider?: string) => invoke<ResearchResult>("research_run", { query, provider }),
+  researchScrape: (url: string) => invoke<ResearchResult>("research_scrape", { url }),
+
   pickFiles: () => invoke<Attachment[]>("pick_files"),
   readFiles: (paths: string[]) => invoke<Attachment[]>("read_files", { paths }),
   buildContext: (files: { name: string; text: string }[], question: string, budget: number) =>

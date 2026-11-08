@@ -28,12 +28,17 @@ export interface EmailParts {
   body: string;
 }
 
+export interface SearchAsk { query: string }
+export interface MemoryAsk { text: string; scope: "personal" | "project"; project?: string }
+
 export type Segment =
   | { kind: "text"; text: string }
   | { kind: "code"; lang: string; code: string }
   | { kind: "html"; code: string }
   | { kind: "ui"; spec: UiSpec }
-  | { kind: "email"; email: EmailParts };
+  | { kind: "email"; email: EmailParts }
+  | { kind: "search"; ask: SearchAsk }
+  | { kind: "memory"; ask: MemoryAsk };
 
 const FENCE = /```([A-Za-z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g;
 
@@ -46,7 +51,13 @@ export function parseSegments(content: string): Segment[] {
     if (at > last) pushText(out, content.slice(last, at));
     last = at + whole.length;
     const lang = rawLang.toLowerCase();
-    if (lang === "forge-ui") {
+    if (lang === "forge-search") {
+      const ask = parseSearch(code);
+      out.push(ask ? { kind: "search", ask } : { kind: "code", lang: "json", code: code.trimEnd() });
+    } else if (lang === "forge-memory") {
+      const ask = parseMemory(code);
+      out.push(ask ? { kind: "memory", ask } : { kind: "code", lang: "json", code: code.trimEnd() });
+    } else if (lang === "forge-ui") {
       const spec = parseUi(code);
       out.push(spec ? { kind: "ui", spec } : { kind: "code", lang: "json", code: code.trimEnd() });
     } else if (lang === "html" && /<[a-z!]/i.test(code)) {
@@ -160,6 +171,31 @@ export function parseUi(raw: string): UiSpec | null {
     fields,
     submit: str(d.submit) || "Continue",
   };
+}
+
+/** A request from the model to look something up on the live web. */
+export function parseSearch(raw: string): SearchAsk | null {
+  try {
+    const d = JSON.parse(raw) as Record<string, unknown>;
+    const query = str(d.query).trim();
+    return query.length >= 3 && query.length <= 400 ? { query } : null;
+  } catch {
+    const query = raw.trim();
+    return query.length >= 3 && query.length <= 400 && !query.startsWith("{") ? { query } : null;
+  }
+}
+
+/** A memory the model suggests keeping. Saved only if the person says so. */
+export function parseMemory(raw: string): MemoryAsk | null {
+  try {
+    const d = JSON.parse(raw) as Record<string, unknown>;
+    const text = str(d.text).trim();
+    if (!text || text.length > 600) return null;
+    const scope = str(d.scope) === "project" ? "project" : "personal";
+    return { text, scope, project: str(d.project).trim() || undefined };
+  } catch {
+    return null;
+  }
 }
 
 /** What gets sent back to the model when the form is submitted. */

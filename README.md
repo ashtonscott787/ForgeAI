@@ -14,12 +14,25 @@ Neither build is code-signed, so each system warns you once on first launch: on
 macOS right-click the app and choose Open, on Windows choose More info then Run
 anyway. `web/index.html` is a download page with the same links.
 
-> **Status: 0.4.0, early.** Everything listed under *What works* has been built
+> **Status: 0.5.0, early.** Everything listed under *What works* has been built
 > and exercised; everything under *Not built yet* is absent rather than stubbed.
 > Where something has not been verified, it says so.
 
 ## What works
 
+- **Reminders** in plain language — "at 7pm", "in two hours", "every Friday at
+  9am" — with native notifications, recurring schedules and snooze. A reminder
+  due while the app is closed fires at the next launch and is marked late; the
+  app cannot wake a sleeping machine and does not pretend otherwise.
+- **Memory** the person controls. The model may propose a memory; only a person
+  saves one. Pin, edit, forget, export and import. Pinned and recent memories
+  go into the prompt, not the whole list.
+- **Live web research** through Perplexity or Firecrawl with your own key. The
+  model asks for a lookup mid-answer and gets back real results with sources,
+  dates and a fetch time. No provider, no search — never an invented one.
+- **Encrypted credentials.** Keys go into the OS key store via safeStorage; if
+  that is unavailable the key is not saved at all. An integration reads
+  Connected only after a real authenticated call has succeeded.
 - **Updates itself.** Checks this repository's releases, shows what changed and
   how large the download is, verifies it against the release's SHA256SUMS.txt,
   and replaces the application in place. Integrity is checked, not authorship —
@@ -67,6 +80,10 @@ anyway. `web/index.html` is a download page with the same links.
 
 ## Not built yet
 
+Email and calendar (next, over IMAP and CalDAV with an app-specific password, so
+no OAuth application is needed), Google Workspace, Higgsfield, Zapier, agent
+mode, computer control and terminal execution.
+
 Machine clustering, invitation links, lightweight remote compute workers and
 distributed inference. The planner and capability model for placement exist in
 `core/` with unit tests, and the app detects a Tailscale-style mesh address, but
@@ -82,7 +99,7 @@ machine. The planner refuses to split a model that already fits.
 | Path | What it is |
 | --- | --- |
 | `src/` | React + TypeScript frontend |
-| `electron/` | Desktop shell: IPC, engine supervision, downloads, Hugging Face resolution |
+| `electron/` | Desktop shell: IPC, engine supervision, downloads, reminders, memory, secrets, research |
 | `core/` | Rust: hardware profiling, placement planner, catalogue validation (unit-tested) |
 | `src-tauri/` | Earlier Tauri shell, kept for the Rust core and the icons |
 | `site/` | The marketing and download site, published to GitHub Pages |

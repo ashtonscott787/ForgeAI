@@ -2,7 +2,10 @@ import { loadConversations, newConversation, saveConversations, titleFrom, type 
 import type { ChatMessage } from "./lib/chat";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chat } from "./views/Chat";
+import { Integrations } from "./views/Integrations";
+import { MemoryView } from "./views/MemoryView";
 import { Models } from "./views/Models";
+import { Reminders } from "./views/Reminders";
 import { Setup } from "./views/Setup";
 import { SettingsView } from "./views/SettingsView";
 import {
@@ -25,7 +28,7 @@ import { UpdateCard } from "./components/UpdateCard";
 import { markFor } from "./components/Marks";
 import "./styles.css";
 
-type View = "chat" | "models" | "setup" | "settings";
+type View = "chat" | "models" | "reminders" | "memory" | "integrations" | "setup" | "settings";
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -316,6 +319,9 @@ export default function App() {
               [
                 ["chat", "Chat"],
                 ["models", "Models"],
+                ["reminders", "Reminders"],
+                ["memory", "Memory"],
+                ["integrations", "Integrations"],
                 ["setup", "Hardware"],
                 ["settings", "Settings"],
               ] as const
@@ -400,6 +406,18 @@ export default function App() {
                 setView("chat");
               }}
             />
+          </section>
+
+          <section className={`view${view === "reminders" ? " active" : ""}`}>
+            <Reminders />
+          </section>
+
+          <section className={`view${view === "memory" ? " active" : ""}`}>
+            <MemoryView />
+          </section>
+
+          <section className={`view${view === "integrations" ? " active" : ""}`}>
+            <Integrations />
           </section>
 
           <section className={`view${view === "setup" ? " active" : ""}`}>

@@ -587,3 +587,33 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .toggle.on .knob{transform:translateX(17px)}
 .rowbtns{display:flex;gap:7px}
 @media (max-width:900px){.updateslot{padding:10px 20px 0}}
+
+/* ───────── reminders, memory, integrations, research ───────── */
+.remform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.remform .inp{flex:1;min-width:200px}
+.remform .inp.narrow{flex:0 0 160px;min-width:0}
+.remlist{display:flex;flex-direction:column;gap:7px}
+.remrow,.memrow{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line);
+  border-radius:var(--r-lg);background:var(--raised)}
+.remrow.past{opacity:.6}
+.memrow.pinned{border-color:var(--ember-line);background:var(--ember-soft)}
+.remmain,.memmain{flex:1;min-width:0}
+.remtext,.memtext{font-size:13.5px;line-height:1.45}
+.remrow .ghostbtn,.memrow .ghostbtn{height:28px;padding:0 10px;font-size:11.5px;flex:none}
+.mcard.planned{opacity:.72;gap:6px}
+
+.researchcard{border:1px solid var(--line-strong);border-radius:var(--r-lg);background:var(--raised-2);
+  padding:13px;margin:10px 0;display:flex;flex-direction:column;gap:9px}
+.rhead{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.rlabel{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ember-fg);
+  background:var(--ember-soft);padding:3px 7px;border-radius:5px}
+.rquery{font-size:12.5px;color:var(--fg-2)}
+.ranswer{font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow:auto}
+.rsources{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--fg-3)}
+.rsources .linkbtn{text-align:left}
+
+.memask{border:1px solid var(--ember-line);background:var(--ember-soft);border-radius:var(--r-lg);
+  padding:12px 13px;margin:10px 0;display:flex;flex-direction:column;gap:9px}
+.memask.done{color:var(--fg-3);font-size:12.5px;background:var(--raised-2);border-color:var(--line)}
+.maskhead{font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-3)}
+.masktext{font-size:13.5px;line-height:1.5}
