@@ -62,7 +62,10 @@ jobs:
           set -euo pipefail
           mkdir -p engine _dl
           url="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/${{ matrix.asset }}"
-          curl -sSfL "$url" -o "_dl/${{ matrix.asset }}"
+          # The release CDN returns the occasional 504; one gateway hiccup
+          # should not fail a ten-minute build.
+          curl -sSfL --retry 6 --retry-delay 8 --retry-all-errors --connect-timeout 20 \
+            "$url" -o "_dl/${{ matrix.asset }}"
           case "${{ matrix.asset }}" in
             *.tar.gz) tar xzf "_dl/${{ matrix.asset }}" -C _dl ;;
             *.zip)    unzip -q "_dl/${{ matrix.asset }}" -d _dl ;;
