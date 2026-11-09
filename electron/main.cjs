@@ -23,6 +23,7 @@ const skills = require("./skills.cjs");
 const { isTrustedSender } = require("./trust.cjs");
 const providers = require("./providers.cjs");
 const { openEngineLog } = require("./engine-log.cjs");
+const openWeb = require("./open-web.cjs");
 const providerState = require("./provider-state.cjs");
 const connectors = require("./connectors.cjs");
 const secrets = require("./secrets.cjs");
@@ -456,6 +457,20 @@ function register(win) {
   h("memory_update", (m) => memory.update(m || {}));
   h("memory_delete", ({ id }) => memory.remove(id));
   h("memory_for_prompt", ({ project } = {}) => memory.forPrompt({ project }));
+  // Saves a PNG from the built-in browser to a place the person chooses.
+  h("save_screenshot", async ({ dataUrl }) => {
+    const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
+    if (!m) throw new Error("That is not a PNG image.");
+    const buf = Buffer.from(m[1], "base64");
+    if (buf.length > 25 * 1024 * 1024) throw new Error("That screenshot is too large to save.");
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("pictures"), "forge-screenshot.png"),
+      filters: [{ name: "PNG image", extensions: ["png"] }],
+    });
+    if (canceled || !filePath) return null;
+    fs.writeFileSync(filePath, buf);
+    return filePath;
+  });
   h("memory_export", async () => {
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       defaultPath: path.join(app.getPath("downloads"), "forge-ai-memory.json"),
@@ -492,13 +507,17 @@ function register(win) {
     const px = secrets.get("perplexity");
     const fc = secrets.get("firecrawl");
     const chosen = want ?? (px ? "perplexity" : fc ? "firecrawl" : null);
-    if (!chosen) throw new Error("No research provider is connected. Add a Perplexity or Firecrawl key in Settings → Integrations.");
+    // No key saved: answer from open sources instead of failing, and say so in the result.
+    if (!chosen) return openWeb.wikipediaSearch(query);
     const key = chosen === "perplexity" ? px : fc;
     if (!key) throw new Error(`${chosen} is not connected.`);
     return chosen === "perplexity"
       ? research.perplexity({ key, query })
       : research.firecrawlSearch({ key, query });
   });
+  // Keyless lookups: Wikipedia's public API. No key, and every result carries its source URL.
+  h("web_search", ({ query }) => openWeb.wikipediaSearch(query));
+  h("web_article", ({ title }) => openWeb.wikipediaSummary(title));
   h("research_scrape", ({ url }) => {
     const key = secrets.get("firecrawl");
     if (!key) throw new Error("Reading a page needs a Firecrawl key, added in Settings → Integrations.");
@@ -608,13 +627,42 @@ function createWindow() {
   const win = new BrowserWindow({
     width, height, minWidth: 820, minHeight: 560, center: true, show: false,
     title: "Forge AI", backgroundColor: "#f6f5f3",
-    webPreferences: { preload: path.join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: { preload: path.join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true },
   });
   win.once("ready-to-show", () => win.show());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: "deny" }; });
   win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
   return win;
 }
+
+// The built-in browser runs web pages in <webview> guests. Each guest is locked down before
+// it loads: no preload script, no Node, sandboxed, a separate storage partition, https only,
+// and no popups. A page cannot change these settings from its own code.
+app.on("web-contents-created", (_event, contents) => {
+  if (contents.getType() !== "webview") return;
+  contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  const onlyPublicHttps = (event, url) => {
+    try { openWeb.checkPageUrl(url); } catch { event.preventDefault(); }
+  };
+  contents.on("will-navigate", onlyPublicHttps);
+  contents.on("will-redirect", onlyPublicHttps);
+});
+app.on("web-contents-created", (_event, contents) => {
+  if (!contents || contents.getType() !== "window") return;
+  contents.on("will-attach-webview", (event, webPreferences, params) => {
+    // Strip anything the renderer asked for, and enforce the guest settings.
+    delete webPreferences.preload;
+    delete webPreferences.preloadURL;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+    webPreferences.partition = "persist:forge-browser";
+    try { openWeb.checkPageUrl(params.src || ""); } catch { event.preventDefault(); }
+  });
+});
 
 app.whenReady().then(() => {
   protocol.handle(preview.SCHEME, (req) => {

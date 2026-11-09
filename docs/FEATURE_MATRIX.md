@@ -55,6 +55,20 @@ stand-in bridge (see `tests/ui/harness.cjs`); it does not exercise Electron itse
 | Packaged desktop build | **Untested here** | `desktop.yml` builds on CI; no artefact produced in this session. |
 | Code signing / notarisation | **Blocked externally** | No Developer ID or Windows certificate here. |
 
+## Built-in browser and open-source lookup
+
+| Feature | Status | Evidence / gap |
+| --- | --- | --- |
+| Built-in browser (tabs, address bar, back/forward/reload) | **Working (Chromium stand-in)** | UI: "address bar opens https", "search opens a result in a new tab". Real `<webview>` behaviour needs Electron: **Untested here**. |
+| Pages run isolated | **Working (main process, unit-tested policy)** | Guests get no preload, no Node, sandbox on, a separate partition (`persist:forge-browser`), https only, popups denied. The guest settings are enforced in `main.cjs` and the URL rule is tested (`open-web.test.cjs`). Not run inside Electron. |
+| Keyless search (Wikipedia public API) | **Working (fixtures)** | U: `open-web.test.cjs` (sources with URLs, markup removed, redirects, malformed replies, timeouts). Live Wikipedia **Blocked externally** in this sandbox. Used when no Perplexity or Firecrawl key is saved. |
+| Send page text to chat | **Working (stand-in)** | UI: text lands in the composer unsent. Text extraction from a live page needs Electron. |
+| Screenshot of a page | **Partial** | Saves a PNG through a save dialog (`save_screenshot`). Not run in Electron. |
+| Model analysis of screenshots | **Missing** | The local engine takes text only. A vision model and its projector file are needed; none is wired in. |
+| Official search engines (Google, Bing) | **Not built (deliberate)** | Scraping their results breaks their terms. |
+| Default browser setting | **Not built** | The operating system only lets the person set it. Forge AI does not change it silently. |
+| Lookalike branding of other companies | **Not built (deliberate)** | Forge AI uses its own design. |
+
 ## Skills and connectors
 
 | Feature | Status | Evidence / gap |

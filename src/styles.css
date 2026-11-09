@@ -635,3 +635,24 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .cloudmodels ul { margin: 6px 0; padding-left: 18px; }
 .cloudmodels li { margin: 3px 0; }
 .ghostbtn.danger { color: #e5534b; }
+
+/* Built-in browser */
+.browser { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.browser-tabs { display: flex; gap: 6px; align-items: center; padding: 8px 10px 0; overflow-x: auto; }
+.browser-tab { display: flex; align-items: center; border-radius: 10px 10px 0 0; background: rgba(127,127,127,.12); max-width: 220px; }
+.browser-tab.on { background: rgba(127,127,127,.28); }
+.browser-tab-btn { background: none; border: 0; padding: 7px 10px; color: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.browser-tab-x, .browser-tab-new { background: none; border: 0; color: inherit; cursor: pointer; padding: 4px 8px; opacity: .7; }
+.browser-bar { display: flex; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid rgba(127,127,127,.2); flex-wrap: wrap; }
+.browser-nav { background: none; border: 1px solid rgba(127,127,127,.25); border-radius: 8px; width: 32px; height: 30px; cursor: pointer; color: inherit; }
+.browser-nav:disabled, .browser-action:disabled { opacity: .4; cursor: default; }
+.browser-address { flex: 1; min-width: 200px; height: 30px; border-radius: 8px; border: 1px solid rgba(127,127,127,.3); padding: 0 10px; background: transparent; color: inherit; }
+.browser-go, .browser-action { height: 30px; border-radius: 8px; padding: 0 12px; border: 1px solid rgba(127,127,127,.3); background: transparent; color: inherit; cursor: pointer; }
+.browser-go { background: #e0641f; border-color: #e0641f; color: #fff; }
+.browser-notice { margin: 8px 10px; font-size: 13px; color: #d99a2b; }
+.browser-page { flex: 1; width: 100%; min-height: 0; border: 0; }
+.browser-start { padding: 24px; max-width: 680px; margin: 0 auto; width: 100%; }
+.browser-search { display: flex; gap: 8px; margin: 12px 0; }
+.browser-search input { flex: 1; height: 36px; border-radius: 10px; border: 1px solid rgba(127,127,127,.3); padding: 0 12px; background: transparent; color: inherit; }
+.browser-search button { height: 36px; border-radius: 10px; padding: 0 14px; background: #e0641f; color: #fff; border: 0; cursor: pointer; }
+.browser-results { padding-left: 20px; display: grid; gap: 12px; }

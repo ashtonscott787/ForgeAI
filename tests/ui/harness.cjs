@@ -82,6 +82,12 @@ const BRIDGE = `(() => {
     skills_for_prompt: () => [],
     engine_status: () => ({ running: false, port: 0, model_file: null, base_url: "" }),
     read_files: () => [],
+    // Keyless search is tested in the main process (tests/open-web.test.cjs). The stand-in returns a
+    // fixed answer shaped like the real one, so the view can be exercised here.
+    web_search: ({ query }) => ({ provider: "wikipedia", query, fetched_at: 0, answer: "", sources: [
+      { title: "Forge AI", url: "https://en.wikipedia.org/wiki/Forge_AI", snippet: "A desktop app." },
+    ] }),
+    save_screenshot: ({ dataUrl }) => (dataUrl.startsWith("data:image/png;base64,") ? "/tmp/forge-shot.png" : null),
     // Stand-in for the forge-preview scheme, which only Electron serves.
     // The page cannot call Node modules, so registration goes to the harness server, which stores
     // the page with the real electron/preview.cjs module.

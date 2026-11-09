@@ -138,7 +138,15 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
     props.onSubmit({ model: selected, configuration: cfgOf(selected.value), prompt });
   };
 
-  if (!selected) return null;
+  // With no model to choose, the composer stays visible but disabled, and says how to get one.
+  if (!selected) {
+    return (
+      <div className="composer composer-empty">
+        <textarea rows={1} disabled aria-describedby="no-model-hint" placeholder="Connect a cloud model or install a local one to start chatting." value={prompt} onChange={() => undefined} />
+        <div className="hint" id="no-model-hint">Add a key under Settings → Cloud models, or install a model from Models.</div>
+      </div>
+    );
+  }
 
   const selCfg = cfgOf(selected.value);
 

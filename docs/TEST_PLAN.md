@@ -16,7 +16,7 @@ Playwright's Chromium with `playwright install --with-deps`.
 
 To run the UI suite locally with a Chromium you already have, set `FORGE_CHROMIUM=/path/to/chromium`.
 
-## Unit and integration (`tests/*.test.cjs`)
+## Unit and integration (`tests/*.test.cjs`), 62 tests
 
 | File | Tests | What it proves |
 | --- | --- | --- |
@@ -27,6 +27,7 @@ To run the UI suite locally with a Chromium you already have, set `FORGE_CHROMIU
 | `providers-cloud.test.cjs` | 17 | Model listing with pagination and filtering; 401 with key redaction; malformed lists and responses; redirects; timeouts; model-ID validation; oversized requests; usage reported or null; malformed frames; error events; two concurrent streams; cancelling one leaves the other. |
 | `provider-state.test.cjs` | 4 | Verified vs failed states; manual IDs; state file contains no key material; unknown providers refused. |
 | `engine-log.test.cjs` | 4 | Reproduces `ERR_STREAM_WRITE_AFTER_END`; guarded log ignores late writes; second engine on the same path; destroyed log. |
+| `open-web.test.cjs` | 9 | Keyless search: sources and URLs, markup and entities, redirects, malformed replies, timeouts; page text extraction; public https page rule. |
 | `preview.test.cjs` | 7 | App policy blocks inline/eval script; frames limited to previews; preview policy has no network; unknown and oversized pages refused; bounded store; index.html policy equals code. |
 
 ## End-to-end UI (`tests/ui/cloud-ui.cjs`)

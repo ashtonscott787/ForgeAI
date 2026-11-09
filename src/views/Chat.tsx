@@ -28,6 +28,9 @@ interface Props {
   contextSize: number;
   /** The conversation on screen. Every request writes to the conversation it started in. */
   conversationId: string;
+  /** Text to place in the composer, from another view. Not sent automatically. */
+  prefill?: string | null;
+  onPrefillUsed?: () => void;
   messages: ChatMessage[];
   onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 }
@@ -71,6 +74,12 @@ export function Chat(props: Props) {
   // One automatic follow-up per search, so a model that keeps asking cannot loop.
   const researched = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!props.prefill) return;
+    setPrompt(props.prefill);
+    props.onPrefillUsed?.();
+  }, [props.prefill]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });

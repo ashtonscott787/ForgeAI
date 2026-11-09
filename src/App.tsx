@@ -1,3 +1,4 @@
+import { Browser } from "./views/Browser";
 import { cloudRows } from "./lib/cloud";
 import { loadConversations, newConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
 import type { ChatMessage } from "./lib/chat";
@@ -30,7 +31,7 @@ import { UpdateCard } from "./components/UpdateCard";
 import { markFor } from "./components/Marks";
 import "./styles.css";
 
-type View = "chat" | "models" | "reminders" | "memory" | "integrations" | "setup" | "settings";
+type View = "chat" | "browser" | "models" | "reminders" | "memory" | "integrations" | "setup" | "settings";
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -84,6 +85,8 @@ export default function App() {
   const [installedFiles, setInstalledFiles] = useState<InstalledModel[]>([]);
   const [configurations, setConfigurations] = useState<Record<string, ModelConfiguration>>({});
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  // Text handed over from the browser. The chat puts it in the composer; the person sends it.
+  const [prefill, setPrefill] = useState<string | null>(null);
   useEffect(() => {
     if (!inTauri) return;
     void api.providerStatus().then(setProviders).catch(() => undefined);
@@ -327,6 +330,7 @@ export default function App() {
             {(
               [
                 ["chat", "Chat"],
+                ["browser", "Browser"],
                 ["models", "Models"],
                 ["reminders", "Reminders"],
                 ["memory", "Memory"],
@@ -399,8 +403,19 @@ export default function App() {
               contextSize={settings.context_size}
               messages={active.messages}
               conversationId={activeId}
+              prefill={prefill}
+              onPrefillUsed={() => setPrefill(null)}
               providers={providers}
               onMessagesFor={setMessagesFor}
+            />
+          </section>
+
+          <section className={`view${view === "browser" ? " active" : ""}`}>
+            <Browser
+              onSendToChat={(text) => {
+                setPrefill(text);
+                setView("chat");
+              }}
             />
           </section>
 

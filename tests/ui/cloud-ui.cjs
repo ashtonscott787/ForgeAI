@@ -238,6 +238,47 @@ async function sendInChat(page, text) {
     assert.equal(src, "allow-scripts", "the frame stays sandboxed to scripts only");
   }, { local: true, engineBase });
 
+  await scenario("the browser searches open sources and opens a result in a new tab", server, async (page) => {
+    await page.getByRole("button", { name: "Browser", exact: true }).click();
+    await page.getByLabel("Search open sources").fill("Forge AI");
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await page.getByRole("button", { name: "Forge AI", exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Forge AI", exact: true }).click();
+    const src = await page.locator("webview").first().getAttribute("src");
+    assert.equal(src, "https://en.wikipedia.org/wiki/Forge_AI", "the result opened as a page");
+    assert.equal(await page.locator(".browser-tab").count(), 2, "a new tab was added");
+  });
+
+  await scenario("the address bar opens https addresses and never loads plain http", server, async (page) => {
+    await page.getByRole("button", { name: "Browser", exact: true }).click();
+    const bar = page.getByLabel("Address or search");
+    await bar.fill("example.com");
+    await page.getByRole("button", { name: "Go", exact: true }).click();
+    assert.equal(await page.locator("webview").first().getAttribute("src"), "https://example.com");
+    await bar.fill("http://insecure.example");
+    await page.getByRole("button", { name: "Go", exact: true }).click();
+    assert.equal(await page.locator("webview").first().getAttribute("src"), "https://insecure.example", "http is upgraded to https");
+  });
+
+  await scenario("send page to chat puts the text in the composer, unsent", server, async (page) => {
+    await connectAnthropic(page);
+    // The guest page's methods exist only in Electron. Stand them in here with the same shapes.
+    // Applied to the running page: an init script would arrive after this page has loaded.
+    await page.evaluate(() => {
+      const el = HTMLElement.prototype;
+      el.executeJavaScript = function () { return Promise.resolve("Forge AI is a private assistant. It runs models on your computer."); };
+      el.getURL = function () { return this.getAttribute("src"); };
+    });
+    await page.getByRole("button", { name: "Browser", exact: true }).click();
+    await page.getByLabel("Address or search").fill("example.com");
+    await page.getByRole("button", { name: "Go", exact: true }).click();
+    await page.getByRole("button", { name: "Send page to chat", exact: true }).click();
+    // Wait for the hand-off to land in the composer, rather than reading it too early.
+    await page.waitForFunction(() => Array.from(document.querySelectorAll("textarea")).some((t) => t.value.includes("Forge AI is a private assistant")), null, { timeout: 5000 });
+    assert.equal(await page.locator('textarea[placeholder^="Ask anything"]').inputValue().then((v) => v.includes("Forge AI is a private assistant")), true, "the page text is in the composer");
+    assert.equal((await calls(page, "provider_stream")).length, 0, "nothing was sent automatically");
+  });
+
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} UI scenarios passed`);
   server.close();

@@ -257,6 +257,13 @@ export interface ConnectorInput {
   token?: string;
 }
 
+export interface WebResult {
+  provider: string;
+  query: string;
+  sources: { title: string; url: string; snippet: string }[];
+  answer: string;
+  fetched_at: number;
+}
 export type ProviderId = "anthropic" | "openai";
 export interface ProviderModel {
   id: string;
@@ -376,6 +383,10 @@ export const api = {
   publisherAvatar: (author: string) => invoke<{ avatar: string | null }>("publisher_avatar", { author }),
   onUpdateProgress: (cb: (p: UpdateProgress) => void) =>
     listen<UpdateProgress>("update://progress", (e) => cb(e.payload)),
+  webSearch: (query: string) => invoke<WebResult>("web_search", { query }),
+  webArticle: (title: string) => invoke<{ title: string; text: string; url: string }>("web_article", { title }),
+  /** Saves a PNG the person chose a place for. Returns the path, or null if cancelled. */
+  saveScreenshot: (dataUrl: string) => invoke<string | null>("save_screenshot", { dataUrl }),
   previewRegister: (html: string) => invoke<{ id: string; url: string }>("preview_register", { html }),
   previewForget: (id: string) => invoke<null>("preview_forget", { id }),
   providerStatus: () => invoke<ProviderStatus[]>("provider_status"),

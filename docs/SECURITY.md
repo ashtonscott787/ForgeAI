@@ -33,6 +33,12 @@
 - Cloud chats leave this computer. The UI says so in the Cloud models panel. Local models do not send data out.
 - The engine log is written through a guard that cannot write to an ended stream (tested).
 
+**Built-in browser**
+- Page content runs in `<webview>` guests with no preload and no Node access, in their own storage partition.
+  The main process enforces these settings on every guest before it loads, and refuses non-https navigation.
+- Popups are denied. Local and private addresses cannot be opened in the browser.
+- Reading a page runs a fixed script in the page and sends only the visible text, when the person presses the button.
+
 ## Known gaps (not fixed)
 
 1. **`style-src 'unsafe-inline'`** is required by the React app's inline styles. Scripts are not
