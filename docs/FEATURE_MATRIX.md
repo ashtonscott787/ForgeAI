@@ -34,6 +34,9 @@ on the basis of code presence alone.
 | Phone companion | **Missing** | Not built. |
 | Memory, reminders, web research, attachments | **Untested** | Code present in `electron/`; no tests. |
 | Tailscale / remote host | **Blocked externally** | Requires a tailnet and two machines. Mesh sidecar not verified. |
-| Cloud API providers (Claude, OpenAI) | **Missing** | Not implemented; only local llama-server. |
+| Cloud API providers: Anthropic, OpenAI adapters | **Partial (tested, no UI)** | `electron/providers.cjs`: streaming, cancellation, typed errors, https-only. 7 tests against fixture servers (`tests/providers.test.cjs`). IPC `provider_stream` / `provider_cancel` / key storage wired. No model picker or settings UI for cloud models yet. Not tested against live vendor APIs (no keys). |
+| Stop for cloud requests | **Partial (tested at adapter level)** | `AbortController` per request id; test shows no tokens after abort. |
+| IPC sender validation | **Working (tested)** | Every `forge:*` handler refuses messages not from the app page (`electron/trust.cjs`, 2 tests). |
+| Provider-neutral model interface (local + cloud) | **Missing** | Local path still calls llama-server directly from `chat.ts`; cloud path is separate. Not unified. |
 | Packaged desktop build (macOS, Windows) | **Untested here** | `desktop.yml` builds on CI runners; no artefact was produced or inspected in this session. |
 | Code signing / notarisation | **Blocked externally** | No Developer ID or Windows certificate in this environment. |

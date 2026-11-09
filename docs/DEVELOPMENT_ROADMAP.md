@@ -6,8 +6,8 @@ Ordered by dependency. Status reflects `FEATURE_MATRIX.md`.
 - [x] Confirm branch, commits, active shell (Electron).
 - [x] Feature matrix and architecture docs.
 - [x] CI runs typecheck, build, syntax checks and tests.
-- [ ] Repair CSP without breaking the HTML preview (needs a design decision: separate origin for previews).
-- [ ] IPC sender validation on every `forge:*` handler.
+- [ ] Repair CSP without breaking the HTML preview (needs a design decision: separate origin for previews). Not done: a CSP applies to srcdoc frames too.
+- [x] IPC sender validation on every `forge:*` handler (tested).
 - [ ] Remove or isolate the legacy Tauri fallback in `src/lib/ipc.ts`.
 - [ ] Reproduce `ERR_STREAM_WRITE_AFTER_END`, or prove it no longer occurs, with a test.
 
@@ -19,7 +19,9 @@ Ordered by dependency. Status reflects `FEATURE_MATRIX.md`.
 
 ## Phase 2 — AI foundations
 - [ ] Provider-neutral inference interface.
-- [ ] Anthropic and OpenAI adapters, with keys in the keychain.
+- [x] Anthropic and OpenAI streaming adapters, keys in the keychain, IPC wired (tested against fixtures).
+- [ ] Settings and model-picker UI for cloud models; live API verification with real keys.
+- [ ] Unify local and cloud behind one renderer-side interface (today local goes straight to llama-server).
 - [ ] Catalogue filters and licensed provider logos.
 
 ## Phase 3 — MCP and skills

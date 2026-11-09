@@ -16,6 +16,8 @@ const { downloadModel } = require("./transfer.cjs");
 const reminders = require("./reminders.cjs");
 const memory = require("./memory.cjs");
 const skills = require("./skills.cjs");
+const { isTrustedSender } = require("./trust.cjs");
+const providers = require("./providers.cjs");
 const connectors = require("./connectors.cjs");
 const secrets = require("./secrets.cjs");
 const research = require("./research.cjs");
@@ -280,7 +282,9 @@ async function startEngine({ modelFile }) {
 
 // ── IPC ─────────────────────────────────────────────────────
 function register(win) {
-  const h = (name, fn) => ipcMain.handle("forge:" + name, async (_e, a) => {
+  const h = (name, fn) => ipcMain.handle("forge:" + name, async (e, a) => {
+    // Every command comes from the app page itself, or it is refused.
+    if (!isTrustedSender(e, path.join(__dirname, "..", "dist", "index.html"))) throw new Error("refused: this message did not come from the Forge AI window");
     try { return await fn(a || {}); } catch (e) { throw new Error(e?.message || String(e)); }
   });
   h("health", () => ({ runtime_available: fs.existsSync(serverBin()), runtime_id: RUNTIME_ID, models_dir: modelsDir(), app_version: app.getVersion() }));
@@ -337,6 +341,42 @@ function register(win) {
   h("reminder_update", (patch) => reminders.update(patch || {}));
   h("reminder_delete", ({ id }) => reminders.remove(id));
   h("reminder_snooze", ({ id, minutes }) => reminders.snooze(id, minutes));
+
+  // ── cloud providers ───────────────────────────────────────
+  // Keys live in the keychain. Each streamed request has its own id and
+  // AbortController, so a Stop affects only that request.
+  const PROVIDERS = ["anthropic", "openai"];
+  const providerKey = (p) => { if (!PROVIDERS.includes(p)) throw new Error("unknown provider"); return "provider:" + p; };
+  h("provider_key_set", ({ provider, key }) => { secrets.set(providerKey(provider), String(key || "").trim()); return secrets.status(); });
+  h("provider_key_status", () => PROVIDERS.map((p) => ({ provider: p, saved: Boolean(secrets.get(providerKey(p))) })));
+  const providerRuns = new Map();
+  h("provider_stream", async ({ requestId, provider, model, system, messages }) => {
+    if (!/^[\w-]{1,64}$/.test(String(requestId || ""))) throw new Error("invalid request id");
+    if (providerRuns.has(requestId)) throw new Error("that request is already running");
+    if (typeof model !== "string" || !model || model.length > 200) throw new Error("invalid model");
+    if (!Array.isArray(messages) || messages.length > 500) throw new Error("invalid messages");
+    const clean = messages.map((m) => {
+      if (!["user", "assistant"].includes(m?.role) || typeof m.content !== "string") throw new Error("invalid message");
+      return { role: m.role, content: m.content.slice(0, 200_000) };
+    });
+    const ac = new AbortController();
+    providerRuns.set(requestId, ac);
+    const wc = BrowserWindow.getAllWindows()[0]?.webContents;
+    try {
+      const result = await providers.stream(provider, {
+        apiKey: secrets.get(providerKey(provider)), model, system: typeof system === "string" ? system.slice(0, 20_000) : undefined,
+        messages: clean, signal: ac.signal,
+        onToken: (text) => { if (!ac.signal.aborted) wc?.send("provider://token", { requestId, text }); },
+      });
+      return { ...result, cancelled: false };
+    } catch (e) {
+      if (e.kind === "cancelled") return { tokens: 0, stopReason: "cancelled", cancelled: true };
+      throw new Error(e.message);
+    } finally {
+      providerRuns.delete(requestId);
+    }
+  });
+  h("provider_cancel", ({ requestId }) => { const ac = providerRuns.get(requestId); if (ac) ac.abort(); return { cancelled: Boolean(ac) }; });
 
   // ── skills ────────────────────────────────────────────────
   h("skills_list", () => skills.list());
