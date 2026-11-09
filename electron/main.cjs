@@ -15,6 +15,8 @@ const updater = require("./updater.cjs");
 const { downloadModel } = require("./transfer.cjs");
 const reminders = require("./reminders.cjs");
 const memory = require("./memory.cjs");
+const skills = require("./skills.cjs");
+const connectors = require("./connectors.cjs");
 const secrets = require("./secrets.cjs");
 const research = require("./research.cjs");
 const { parseWhen } = require("./when.cjs");
@@ -336,6 +338,36 @@ function register(win) {
   h("reminder_delete", ({ id }) => reminders.remove(id));
   h("reminder_snooze", ({ id, minutes }) => reminders.snooze(id, minutes));
 
+  // ── skills ────────────────────────────────────────────────
+  h("skills_list", () => skills.list());
+  h("skills_add", (s) => skills.add(s || {}));
+  h("skills_update", (s) => skills.update(s || {}));
+  h("skills_delete", ({ id }) => skills.remove(id));
+  h("skills_for_prompt", () => skills.forPrompt());
+  h("skills_export", async () => {
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("downloads"), "forge-ai-skills.json"),
+    });
+    if (canceled || !filePath) return null;
+    fs.writeFileSync(filePath, JSON.stringify(skills.exportAll(), null, 2));
+    return filePath;
+  });
+  h("skills_import", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [{ name: "JSON", extensions: ["json"] }] });
+    if (canceled || !filePaths[0]) return null;
+    const stat = fs.statSync(filePaths[0]);
+    if (stat.size > 2 * 1024 * 1024) throw new Error("That file is too large to be a skills file.");
+    return skills.importAll(JSON.parse(fs.readFileSync(filePaths[0], "utf8")));
+  });
+
+  // ── connectors ────────────────────────────────────────────
+  // The token is written to the keychain and never sent back to the renderer.
+  h("connectors_list", () => connectors.list());
+  h("connectors_add", (c) => connectors.add(c || {}));
+  h("connectors_update", (c) => connectors.update(c || {}));
+  h("connectors_delete", ({ id }) => connectors.remove(id));
+  h("connectors_call", ({ id, path: p, method, body }) => connectors.call(id, { path: p, method, body }));
+
   // ── memory ────────────────────────────────────────────────
   h("memory_list", () => memory.list());
   h("memory_add", (m) => memory.add(m || {}));
@@ -507,6 +539,8 @@ app.whenReady().then(() => {
   updater.cleanupOldBundles();
   secrets.load(root());
   memory.load(root());
+  skills.load(root());
+  connectors.load(root());
   // The renderer is a file:// page; let it read the loopback engine's streamed replies.
   session.defaultSession.webRequest.onHeadersReceived({ urls: ["http://127.0.0.1/*"] }, (d, cb) => {
     const h = d.responseHeaders || {};

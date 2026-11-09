@@ -1,3 +1,4 @@
+import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
 import { useEffect, useState } from "react";
 import { api, type Settings, type UpdateInfo } from "../lib/ipc";
 
@@ -38,6 +39,8 @@ export function SettingsView({
       </div>
       <div className="scroll">
         <div className="pbody">
+          <SkillsPanel />
+          <ConnectorsPanel />
           <div className="panel">
             <div className="panel-h"><span className="t">Updates</span></div>
             <div className="panel-b">

@@ -206,6 +206,7 @@ export function Chat(props: Props) {
       }
     }
     const memories = await api.memoryForPrompt().catch(() => [] as string[]);
+    const enabledSkills = await api.skillsForPrompt().catch(() => []);
     if (run.stopped) return;
     const loadMs = engine === props.engine ? 0 : performance.now() - loadStarted;
     setStatus(null);
@@ -218,7 +219,7 @@ export function Chat(props: Props) {
 
     run.handle = streamChat(
       engine.base_url,
-      [{ role: "system", content: systemPrompt(memories) }, ...outbound],
+      [{ role: "system", content: systemPrompt(memories, enabledSkills) }, ...outbound],
       {
         onToken: (piece) => {
           if (run.stopped) return;

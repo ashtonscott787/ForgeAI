@@ -224,6 +224,39 @@ export interface DownloadProgress {
   done: boolean;
 }
 
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  enabled: boolean;
+  created: number;
+  updated: number;
+}
+export interface SkillInput {
+  name: string;
+  description?: string;
+  instructions: string;
+  enabled?: boolean;
+}
+export interface Connector {
+  id: string;
+  name: string;
+  description: string;
+  base_url: string;
+  auth_header: string;
+  has_token: boolean;
+  created: number;
+}
+export interface ConnectorInput {
+  name: string;
+  description?: string;
+  base_url: string;
+  auth_header?: string;
+  /** Written to the OS keychain; never returned to the app. */
+  token?: string;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -274,6 +307,19 @@ export const api = {
   onReminderFired: (cb: (p: { reminder: Reminder; late: boolean }) => void) =>
     listen<{ reminder: Reminder; late: boolean }>("reminder://fired", (e) => cb(e.payload)),
 
+  skillsList: () => invoke<Skill[]>("skills_list"),
+  skillAdd: (s: SkillInput) => invoke<Skill>("skills_add", { ...s }),
+  skillUpdate: (s: Partial<SkillInput> & { id: string }) => invoke<Skill>("skills_update", { ...s }),
+  skillDelete: (id: string) => invoke<void>("skills_delete", { id }),
+  skillsForPrompt: () => invoke<{ name: string; instructions: string }[]>("skills_for_prompt"),
+  skillsExport: () => invoke<string | null>("skills_export"),
+  skillsImport: () => invoke<{ added: number } | null>("skills_import"),
+  connectorsList: () => invoke<Connector[]>("connectors_list"),
+  connectorAdd: (c: ConnectorInput) => invoke<Connector>("connectors_add", { ...c }),
+  connectorUpdate: (c: Partial<ConnectorInput> & { id: string }) => invoke<Connector>("connectors_update", { ...c }),
+  connectorDelete: (id: string) => invoke<void>("connectors_delete", { id }),
+  connectorCall: (id: string, path: string, method: "GET" | "POST", body?: string) =>
+    invoke<{ status: number; body: string; truncated: boolean }>("connectors_call", { id, path, method, body }),
   memoryList: () => invoke<Memory[]>("memory_list"),
   memoryAdd: (m: { text: string; scope?: string; project?: string; pinned?: boolean; expires?: number | null; source?: string }) =>
     invoke<Memory>("memory_add", m),

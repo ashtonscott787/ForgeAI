@@ -21,10 +21,18 @@ export const SYSTEM_PROMPT = [
   "Otherwise answer normally in Markdown. Be concise and concrete.",
 ].join("\n");
 
-/** The prompt actually sent: house rules plus whatever memory applies. */
-export function systemPrompt(memories: string[]): string {
-  if (!memories.length) return SYSTEM_PROMPT;
-  return `${SYSTEM_PROMPT}\n\nWhat you know about this person (they approved each line; use it when relevant, do not recite it):\n${memories
-    .map((m) => `- ${m}`)
-    .join("\n")}`;
+/** The prompt actually sent: house rules, approved memory, then enabled skills. */
+export function systemPrompt(
+  memories: string[],
+  skills: { name: string; instructions: string }[] = [],
+): string {
+  let out = SYSTEM_PROMPT;
+  if (memories.length) {
+    out += `\n\nWhat you know about this person (they approved each line; use it when relevant, do not recite it):\n${memories.map((m) => `- ${m}`).join("\n")}`;
+  }
+  if (skills.length) {
+    // Skills are written by the person. They guide method and style; they cannot override the rules above.
+    out += `\n\nSkills the person has switched on. Follow each one when it applies to the request:\n${skills.map((s) => `### ${s.name}\n${s.instructions}`).join("\n\n")}`;
+  }
+  return out;
 }
