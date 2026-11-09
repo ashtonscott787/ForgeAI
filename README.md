@@ -10,13 +10,22 @@ no cloud inference, no data leaving the machine. macOS and Windows.
 | **macOS** (Apple Silicon) | [Forge-AI-macOS-arm64.zip](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-macOS-arm64.zip) |
 | **Windows** (64-bit) | [Forge-AI-Windows-Setup.exe](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-Windows-Setup.exe) |
 
-Neither build is code-signed, so each system warns you once on first launch: on
-macOS right-click the app and choose Open, on Windows choose More info then Run
-anyway. `web/index.html` is a download page with the same links.
+> **The macOS build in release 0.5.2 is broken.** Its engine is missing 104
+> library links, so the model will not start (you will see "tried:" with a
+> temporary path). Do not use it until a corrected release (0.5.3 or later) is
+> published. The Windows build is unaffected by this.
 
-> **Status: 0.5.0, early.** Everything listed under *What works* has been built
-> and exercised; everything under *Not built yet* is absent rather than stubbed.
-> Where something has not been verified, it says so.
+Neither build is code-signed, so each system warns you once on first launch: on
+macOS, move the app into Applications first, then right-click it and choose Open.
+Running it from the downloads folder or a disk image makes macOS run a temporary
+copy, and Forge AI cannot update or find itself in that copy. On Windows choose
+More info then Run anyway. `site/download.html` is a download page with the same
+links.
+
+> **Status: 0.5.2 release, not yet verified on macOS.** Everything listed under
+> *What works* has been built and exercised on the development machine; the
+> macOS and Windows installers have not yet run the model end to end on those
+> systems. Everything under *Not built yet* is absent rather than stubbed.
 
 ## What works
 
