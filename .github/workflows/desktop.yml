@@ -264,11 +264,27 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: forge-ai-*
           merge-multiple: true
+
+      # Release safeguard. v0.5.2 shipped a macOS engine with 104 missing library
+      # links because the release ran from a branch that lacked the link check.
+      # Nothing that is about to be uploaded is trusted on the build's word alone:
+      # the exact zip is unpacked here and must pass the same check the build uses.
+      - name: Refuse to publish a macOS build whose engine cannot load
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/Forge-AI-macOS-arm64.zip || { echo "no macOS zip to publish"; exit 1; }
+          rm -rf "$RUNNER_TEMP/publish-check" && mkdir -p "$RUNNER_TEMP/publish-check"
+          unzip -q dist/Forge-AI-macOS-arm64.zip -d "$RUNNER_TEMP/publish-check"
+          node scripts/engine-links.cjs --check "$RUNNER_TEMP/publish-check/Forge AI.app/Contents/Resources/engine"
+          echo "macOS engine libraries verified in the exact zip being published"
 
       - name: Checksums
         run: |
