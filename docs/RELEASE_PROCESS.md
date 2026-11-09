@@ -41,3 +41,23 @@ After `node scripts/engine-links.cjs <engine folder>` on a copy: all present.
 The release workflow now adds the links before packaging and checks the packaged app. The app checks
 the engine before every start and names what is missing. A new macOS build is required; the v0.5.2
 macOS build should be withdrawn or replaced. Nothing has been published from this branch.
+
+## Test build of the macOS app (no release, no Developer ID needed)
+
+Trigger: GitHub → Actions → "Desktop installers" → Run workflow. Choose branch
+`claude/epic-turing-bfqx3r`. Leave "version" blank: nothing is published.
+
+The macOS job then, in order:
+1. Packages the app (`electron-builder --mac`), ad-hoc signs it, and rebuilds the zip and dmg.
+2. Checks every engine library in the signed app (`scripts/engine-links.cjs --check`).
+3. Unzips the released zip and checks its engine, then runs `llama-server --version` (which loads every library).
+4. Copies the app into /Applications and checks it again from there.
+5. Downloads SmolVLM 256M and Gemma 2 2B Q4_K_M, and runs `scripts/smoke-engine.sh` on each: the engine must
+   start, become ready, and return a non-empty reply.
+6. Uploads the dmg, zip and exe as the run's artifact "forge-ai-macos-latest" (kept 30 days).
+
+Not covered by this job: launching the Electron window on macOS, clicking through the UI, the in-app
+download, Gatekeeper behaviour for a browser-downloaded app, notarisation. Those still need a person on a Mac.
+
+Status: implemented on this branch. Not yet run by GitHub Actions. Nothing here is verified until a run
+completes green.

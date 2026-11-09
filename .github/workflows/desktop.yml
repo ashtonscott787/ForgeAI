@@ -191,6 +191,59 @@ jobs:
           hdiutil create -volname "Forge AI" -srcfolder "$APP" -ov -format UDZO release/Forge-AI-macOS-arm64.dmg
           ls -lh release
 
+      # Every check below runs AFTER signing and repackaging, on the exact bytes that would be
+      # downloaded: the signed app, the released zip, and a copy installed into /Applications.
+      - name: Verify every engine library in the signed app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP=$(find release -maxdepth 3 -name "Forge AI.app" -type d | head -1)
+          node scripts/engine-links.cjs --check "$APP/Contents/Resources/engine"
+          codesign --verify --deep --strict "$APP"
+
+      - name: Verify the released zip contains a loadable engine
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/zipcheck" && mkdir -p "$RUNNER_TEMP/zipcheck"
+          ditto -x -k release/Forge-AI-macOS-arm64.zip "$RUNNER_TEMP/zipcheck"
+          node scripts/engine-links.cjs --check "$RUNNER_TEMP/zipcheck/Forge AI.app/Contents/Resources/engine"
+          "$RUNNER_TEMP/zipcheck/Forge AI.app/Contents/Resources/engine/llama-server" --version
+
+      # Installed the way a user would: copied out of the download into Applications, then run from there.
+      - name: Install the app into Applications (test install)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf "/Applications/Forge AI.app"
+          sudo ditto "$RUNNER_TEMP/zipcheck/Forge AI.app" "/Applications/Forge AI.app"
+          codesign --verify --deep --strict "/Applications/Forge AI.app"
+          node scripts/engine-links.cjs --check "/Applications/Forge AI.app/Contents/Resources/engine"
+
+      - name: Download the test models (SmolVLM 256M, Gemma 2 2B Q4_K_M)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/smolvlm.gguf" \
+            "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf?download=true"
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/gemma.gguf" \
+            "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf?download=true"
+          test "$(stat -f %z "$RUNNER_TEMP/gemma.gguf")" = "1708582752"
+
+      - name: "Smoke test: the installed engine loads and generates (SmolVLM)"
+        if: runner.os == 'macOS'
+        shell: bash
+        run: scripts/smoke-engine.sh "/Applications/Forge AI.app/Contents/Resources/engine" "$RUNNER_TEMP/smolvlm.gguf" 18765
+
+      - name: "Smoke test: the installed engine loads and generates (Gemma 2 2B Q4_K_M)"
+        if: runner.os == 'macOS'
+        shell: bash
+        run: scripts/smoke-engine.sh "/Applications/Forge AI.app/Contents/Resources/engine" "$RUNNER_TEMP/gemma.gguf" 18766
+
       - uses: actions/upload-artifact@v4
         with:
           name: forge-ai-${{ matrix.os }}
@@ -199,6 +252,7 @@ jobs:
             release/*.zip
             release/*.exe
           if-no-files-found: error
+          retention-days: 30
 
   # One checksum file covering every platform, written after both builds finish.
   # Splitting it per job would leave each upload overwriting the other's, and an
