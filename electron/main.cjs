@@ -28,7 +28,21 @@ const engineDir = () => app.isPackaged ? path.join(process.resourcesPath, "engin
 const serverBin = () => path.join(engineDir(), process.platform === "win32" ? "llama-server.exe" : "llama-server");
 
 // ── settings ────────────────────────────────────────────────
-const DEFAULTS = { theme: "system", context_size: 8192, gpu_layers: 999, threads: null, selected_model: null, experimental_cluster: false };
+const DEFAULTS = {
+  theme: "system",
+  context_size: 8192,
+  gpu_layers: 999,
+  threads: null,
+  selected_model: null,
+  experimental_cluster: false,
+  // How the weights are run: "gpu" offloads everything it can, "cpu" keeps
+  // them off the GPU entirely, "split" offloads a chosen number of layers.
+  run_mode: "gpu",
+  split_layers: 20,
+  // Memory-mapped weights stay on disk and page in; loading them into RAM is
+  // faster per token but needs the whole model resident.
+  load_into_memory: false,
+};
 function loadSettings() { try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) }; } catch { return { ...DEFAULTS }; } }
 function saveSettings(s) { const t = settingsFile() + ".tmp"; fs.writeFileSync(t, JSON.stringify(s, null, 2)); fs.renameSync(t, settingsFile()); }
 let settings;
@@ -213,11 +227,34 @@ async function startEngine({ modelFile }) {
   if (!fs.existsSync(model)) throw new Error("model file not found — download it first");
   if (!fs.existsSync(serverBin())) throw new Error("AI engine missing from this copy of Forge AI");
   const port = await freePort();
-  const args = ["--model", model, "--ctx-size", String(settings.context_size), "--port", String(port), "--host", "127.0.0.1", "--n-gpu-layers", String(settings.gpu_layers)];
+  const layers =
+    settings.run_mode === "cpu" ? 0 : settings.run_mode === "split" ? Math.max(0, Number(settings.split_layers) || 0) : Number(settings.gpu_layers) || 999;
+  const args = [
+    "--model", model,
+    "--ctx-size", String(settings.context_size),
+    "--port", String(port),
+    "--host", "127.0.0.1",
+    "--n-gpu-layers", String(layers),
+  ];
   if (settings.threads) args.push("--threads", String(settings.threads));
+  // --no-mmap reads the whole file into RAM instead of paging it from disk.
+  if (settings.load_into_memory) args.push("--no-mmap");
   const log = fs.createWriteStream(logFile(), { flags: "w" });
+  log.on("error", () => {
+    /* a log that cannot be written must never take the app down */
+  });
   const proc = spawn(serverBin(), args, { cwd: engineDir(), windowsHide: true, env: { ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH } });
-  proc.stdout.pipe(log); proc.stderr.pipe(log);
+  // Two streams into one file: neither may close it, or whichever finishes
+  // second writes to an ended stream and crashes the main process.
+  proc.stdout.pipe(log, { end: false });
+  proc.stderr.pipe(log, { end: false });
+  proc.once("close", () => {
+    try {
+      log.end();
+    } catch {
+      /* already closed */
+    }
+  });
   let exited = null;
   proc.on("exit", (code) => { exited = code; if (engine.proc === proc) engine = { proc: null, port: 0, model_file: null }; });
   proc.on("error", (e) => { exited = String(e); });
@@ -361,6 +398,7 @@ function register(win) {
     return r;
   });
   h("apply_update", ({ file }) => updater.applyUpdate({ file }));
+  h("reveal_update", ({ file }) => updater.revealUpdate(file));
 
   // ── publisher avatars ─────────────────────────────────────
   // Shown from Hugging Face at display time; nothing is copied into the app.

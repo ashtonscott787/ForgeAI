@@ -362,6 +362,7 @@ export default function App() {
                     if (file) await installUpdate(file);
                   })();
                 }}
+                onReveal={uFile ? () => void api.revealUpdate(uFile).catch(() => undefined) : undefined}
                 onLater={() => setUDismissed(true)}
                 onSkip={() => {
                   const next = { ...settings, skipped_version: update.version ?? null };

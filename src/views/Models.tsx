@@ -12,7 +12,7 @@ import {
   type MachineCapability,
 } from "../lib/ipc";
 import { describeInstalled, forgetInstall, recordFor, recordInstall, type LibraryRecord } from "../lib/library";
-import { Mark, markFor } from "../components/Marks";
+import { Logo } from "../components/Logo";
 import type { HubHit, HubSort, RepoFile } from "../lib/ipc";
 
 interface Props {
@@ -255,7 +255,7 @@ export function Models(props: Props) {
         <div>
           <h2>Model library</h2>
           <p className="sub">
-            Models run on this computer. Downloads come straight from Hugging Face and stay local.
+            Models run on this computer. Downloads go straight to your machine and stay there.
           </p>
         </div>
         <button className="ghostbtn" onClick={() => setShowCustom((v) => !v)}>
@@ -273,7 +273,7 @@ export function Models(props: Props) {
         <div className="customrow">
           <input
             className="inp"
-            placeholder="https://huggingface.co/…/model-Q4_K_M.gguf"
+            placeholder="Direct link to a .gguf model file"
             value={customUrl}
             onChange={(e) => setCustomUrl(e.target.value)}
           />
@@ -320,7 +320,7 @@ export function Models(props: Props) {
             Picked for you
           </button>
           <button className={`tabbtn${tab === "hub" ? " on" : ""}`} onClick={() => setTab("hub")}>
-            All of Hugging Face
+            Browse all models
           </button>
         </div>
       </div>
@@ -360,7 +360,7 @@ export function Models(props: Props) {
             <div key={e.id} className="mcard">
               <div className="mcard-top">
                 <div className="mcard-id">
-                  <Mark kind={markFor(`${e.family} ${e.developer}`)} />
+                  <Logo author={e.repo.split("/")[0] ?? e.developer} name={`${e.family} ${e.developer}`} />
                   <div>
                   <div className="mcard-name">{e.name}</div>
                   <div className="mcard-sub">
@@ -427,7 +427,7 @@ export function Models(props: Props) {
           <div className="hubbar">
             <input
               className="inp search"
-              placeholder="Search every GGUF model on Hugging Face — try qwen3, kimi, mistral"
+              placeholder="Search every available model — try qwen3, kimi, mistral, gemma"
               value={hubQuery}
               onChange={(e) => setHubQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -445,8 +445,8 @@ export function Models(props: Props) {
             </button>
           </div>
           <p className="sub">
-            Only repositories that publish GGUF files appear here, because those are the ones this app
-            can run. Pick a repository to see every quantization it offers.
+            Only models published in a format this app can run appear here. Pick one to see every
+            size and quantization it offers, with what each needs from your machine.
           </p>
 
           {hubHits !== null && hubHits.length === 0 && !hubBusy && (
@@ -457,7 +457,7 @@ export function Models(props: Props) {
             {(hubHits ?? []).map((h) => (
               <div key={h.repo} className="hubitem">
                 <div className="hubrow">
-                  <Mark kind={markFor(h.repo)} />
+                  <Logo author={h.author} name={h.repo} />
                   <div className="hubtext">
                     <div className="mcard-name">{h.repo.split("/")[1] ?? h.repo}</div>
                     <div className="mcard-sub">

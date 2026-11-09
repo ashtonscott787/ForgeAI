@@ -119,6 +119,9 @@ export interface Settings {
   threads: number | null;
   selected_model: string | null;
   experimental_cluster: boolean;
+  run_mode?: "gpu" | "cpu" | "split";
+  split_layers?: number;
+  load_into_memory?: boolean;
   update_check?: boolean;
   update_download?: boolean;
   update_install?: boolean;
@@ -281,6 +284,7 @@ export const api = {
   checkUpdate: (channel: "stable" | "beta") => invoke<UpdateInfo>("check_update", { channel }),
   downloadUpdate: (info: UpdateInfo) => invoke<{ file: string; version: string }>("download_update", { info }),
   applyUpdate: (file: string) => invoke<{ restarting: boolean }>("apply_update", { file }),
+  revealUpdate: (file: string) => invoke<{ revealed: boolean }>("reveal_update", { file }),
   publisherAvatar: (author: string) => invoke<{ avatar: string | null }>("publisher_avatar", { author }),
   onUpdateProgress: (cb: (p: UpdateProgress) => void) =>
     listen<UpdateProgress>("update://progress", (e) => cb(e.payload)),

@@ -188,7 +188,17 @@ async function applyUpdate({ file }) {
   if (process.platform === "darwin") {
     const bundle = appBundlePath();
     if (!bundle) throw new Error("cannot find the application bundle to replace");
-    const staging = fs.mkdtempSync(path.join(os.tmpdir(), "forge-update-"));
+    // Staged beside the app, not in /tmp: a rename across volumes fails with
+    // EXDEV, and the swap has to be a rename to be atomic.
+    const parent = path.dirname(bundle);
+    let staging;
+    try {
+      staging = fs.mkdtempSync(path.join(parent, ".forge-update-"));
+    } catch (e) {
+      throw new Error(
+        `Forge AI cannot write next to itself in ${parent} (${e.code ?? e.message}). Move Forge AI to your Applications folder and try again.`,
+      );
+    }
     await new Promise((resolve, reject) =>
       execFile("ditto", ["-x", "-k", file, staging], (e) => (e ? reject(new Error(`could not unpack the update: ${e.message}`)) : resolve())),
     );
@@ -198,13 +208,22 @@ async function applyUpdate({ file }) {
     if (!fs.existsSync(path.join(next, "Contents", "MacOS"))) throw new Error("the update looks damaged");
 
     const parked = `${bundle}.old-${Date.now()}`;
-    fs.renameSync(bundle, parked);
+    try {
+      fs.renameSync(bundle, parked);
+    } catch (e) {
+      fs.rmSync(staging, { recursive: true, force: true });
+      throw new Error(
+        `Forge AI could not move its own application aside (${e.code ?? e.message}). If it is running from a disk image or a read-only folder, move it to Applications first.`,
+      );
+    }
     try {
       fs.renameSync(next, bundle);
     } catch (e) {
       fs.renameSync(parked, bundle); // put it back rather than leave nothing
-      throw new Error(`could not install the update: ${e.message}`);
+      fs.rmSync(staging, { recursive: true, force: true });
+      throw new Error(`could not install the update: ${e.code ?? e.message}`);
     }
+    fs.rmSync(staging, { recursive: true, force: true });
     spawn("open", ["-n", bundle], { detached: true, stdio: "ignore" }).unref();
     setTimeout(() => app.exit(0), 400);
     return { restarting: true };
@@ -228,11 +247,19 @@ function cleanupOldBundles() {
     const dir = path.dirname(bundle);
     const base = path.basename(bundle);
     for (const name of fs.readdirSync(dir)) {
-      if (name.startsWith(`${base}.old-`)) fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+      if (name.startsWith(`${base}.old-`) || name.startsWith(".forge-update-")) {
+        fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+      }
     }
   } catch {
     /* tidying is never worth failing a launch over */
   }
 }
 
-module.exports = { checkForUpdate, fetchUpdate, applyUpdate, cleanupOldBundles, compareVersions: cmp, OWNER, REPO };
+/** Last resort: show the verified download so it can be installed by hand. */
+function revealUpdate(file) {
+  shell.showItemInFolder(file);
+  return { revealed: true };
+}
+
+module.exports = { checkForUpdate, fetchUpdate, applyUpdate, revealUpdate, cleanupOldBundles, compareVersions: cmp, OWNER, REPO };

@@ -106,15 +106,38 @@ export function SettingsView({
               </Field>
 
               <Field
-                label="GPU layers"
-                hint="How many layers to offload to the GPU. 999 means all of them; 0 is CPU only."
+                label="Where the model runs"
+                hint="Graphics card is fastest where there is one. Processor only avoids the GPU entirely — slower, but it works when video memory is short. Split puts some layers on each."
               >
-                <input
-                  type="number"
-                  min={0}
-                  max={999}
-                  value={settings.gpu_layers}
-                  onChange={(e) => save({ gpu_layers: Number(e.target.value) })}
+                <select
+                  value={settings.run_mode ?? "gpu"}
+                  onChange={(e) => save({ run_mode: e.target.value as "gpu" | "cpu" | "split" })}
+                >
+                  <option value="gpu">Graphics card</option>
+                  <option value="cpu">Processor only</option>
+                  <option value="split">Split between both</option>
+                </select>
+              </Field>
+
+              {(settings.run_mode ?? "gpu") === "split" && (
+                <Field label="Layers on the graphics card" hint="The rest stay on the processor.">
+                  <input
+                    type="number"
+                    min={0}
+                    max={999}
+                    value={settings.split_layers ?? 20}
+                    onChange={(e) => save({ split_layers: Number(e.target.value) })}
+                  />
+                </Field>
+              )}
+
+              <Field
+                label="Hold the model in memory"
+                hint="On, the whole model is read into RAM before answering: faster, but it must fit. Off, it stays on disk and is paged in as needed."
+              >
+                <Toggle
+                  on={settings.load_into_memory === true}
+                  onChange={(v) => save({ load_into_memory: v })}
                 />
               </Field>
 

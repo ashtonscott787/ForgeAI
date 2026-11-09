@@ -13,6 +13,7 @@ export function UpdateCard({
   onUpdate,
   onLater,
   onSkip,
+  onReveal,
 }: {
   info: UpdateInfo;
   progress: UpdateProgress | null;
@@ -21,6 +22,7 @@ export function UpdateCard({
   onUpdate: () => void;
   onLater: () => void;
   onSkip: () => void;
+  onReveal?: () => void;
 }) {
   const pct = progress && progress.total > 0 ? Math.min(100, (progress.received / progress.total) * 100) : 0;
 
@@ -44,7 +46,18 @@ export function UpdateCard({
       {info.notes && <div className="unotes">{info.notes.slice(0, 900)}</div>}
 
       {!info.installable && info.reason && <div className="banner warn">{info.reason}</div>}
-      {error && <div className="banner err">{error}</div>}
+      {error && (
+        <div className="banner err">
+          {error}
+          {onReveal && (
+            <div className="uactions" style={{ marginTop: 8 }}>
+              <button className="ghostbtn" onClick={onReveal}>
+                Show me the download
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {phase === "downloading" && (
         <div className="dlwrap">
