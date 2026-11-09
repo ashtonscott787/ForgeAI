@@ -1,5 +1,6 @@
 import { parseSegments } from "../lib/blocks";
 import { MemoryAskCard } from "./MemoryAskCard";
+import { ReminderAskCard } from "./ReminderAskCard";
 import { ResearchCard } from "./ResearchCard";
 import { api } from "../lib/ipc";
 import { CopyButton } from "./Copy";
@@ -32,6 +33,7 @@ export function AssistantMessage({
         if (s.kind === "ui") return <GenUI key={i} spec={s.spec} disabled={streaming} onSubmit={onSend} />;
         if (s.kind === "email") return <EmailCard key={i} email={s.email} />;
         if (s.kind === "memory") return <MemoryAskCard key={i} ask={s.ask} />;
+        if (s.kind === "reminder") return <ReminderAskCard key={i} ask={s.ask} />;
         if (s.kind === "search")
           return (
             <ResearchCard

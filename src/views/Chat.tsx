@@ -38,6 +38,7 @@ export function Chat(props: Props) {
   const [files, setFiles] = useState<Attachment[]>([]);
   const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [loadNote, setLoadNote] = useState<string | null>(null);
   const handleRef = useRef<StreamHandle | null>(null);
   // One automatic follow-up per search, so a model that keeps asking cannot loop.
   const researched = useRef<Set<string>>(new Set());
@@ -46,6 +47,14 @@ export function Chat(props: Props) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming, status]);
+
+  // A big model on a slow disk can take minutes; silence reads as a hang.
+  useEffect(() => {
+    const off = api.onEngineLoading(({ seconds, tail }) =>
+      setLoadNote(`${seconds}s — ${tail.split("\n").pop()?.slice(0, 90) ?? "loading"}`),
+    );
+    return () => void off.then((f) => f()).catch(() => undefined);
+  }, []);
 
   const hasModels = props.installed.length > 0;
 
@@ -159,16 +168,16 @@ export function Chat(props: Props) {
       } catch (e) {
         setStreaming(false);
         setStatus(null);
+        setLoadNote(null);
         setMessages((prev) => prev.slice(0, -1));
-        setError(
-          `${picked.label} did not start. ${e instanceof Error ? e.message : String(e)}`,
-        );
+        setError(`${picked.label} did not start. ${e instanceof Error ? e.message : String(e)}`);
         return;
       }
     }
     const memories = await api.memoryForPrompt().catch(() => [] as string[]);
     const loadMs = engine === props.engine ? 0 : performance.now() - loadStarted;
     setStatus(null);
+    setLoadNote(null);
 
     const outbound: ChatMessage[] = next.map((m, i) =>
       i === next.length - 1 ? { role: "user", content: sendContent } : { role: m.role, content: m.content },
@@ -291,7 +300,12 @@ export function Chat(props: Props) {
               {m.perf && <PerfLine perf={m.perf} />}
             </div>
           ))}
-          {status && <div className="runstats loading">{status}</div>}
+          {status && (
+            <div className="runstats loading">
+              {status}
+              {loadNote ? ` · ${loadNote}` : ""}
+            </div>
+          )}
           <div ref={endRef} />
         </div>
       )}
@@ -322,7 +336,14 @@ export function Chat(props: Props) {
               </button>
             </div>
           )}
-          {error && <div className="banner err">{error}</div>}
+          {error && (
+            <div className="banner err">
+              <div className="errtext">{error}</div>
+              <button className="ghostbtn" onClick={() => void api.openEngineLog().catch(() => undefined)}>
+                Show the engine log
+              </button>
+            </div>
+          )}
 
           <Attachments files={files} reading={reading} onRemove={(n) => setFiles((p) => p.filter((f) => f.name !== n))} />
 

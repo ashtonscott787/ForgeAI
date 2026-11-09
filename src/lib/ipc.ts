@@ -122,6 +122,7 @@ export interface Settings {
   run_mode?: "gpu" | "cpu" | "split";
   split_layers?: number;
   load_into_memory?: boolean;
+  memory_budget_bytes?: number | null;
   update_check?: boolean;
   update_download?: boolean;
   update_install?: boolean;
@@ -248,6 +249,19 @@ export const api = {
   saveTextFile: (suggestedName: string, content: string) =>
     invoke<string | null>("save_text_file", { suggestedName, content }),
   stopEngine: () => invoke<void>("stop_engine"),
+  engineLog: () => invoke<string>("engine_log"),
+  openEngineLog: () => invoke<void>("open_engine_log"),
+  environment: () =>
+    invoke<{
+      translocated: boolean;
+      app_path: string;
+      in_applications: boolean;
+      models_dir: string;
+      free_disk_bytes: number;
+      total_memory_bytes: number;
+    }>("environment"),
+  onEngineLoading: (cb: (p: { seconds: number; tail: string }) => void) =>
+    listen<{ seconds: number; tail: string }>("engine://loading", (e) => cb(e.payload)),
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   parseWhen: (text: string) =>

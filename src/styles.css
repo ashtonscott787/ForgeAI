@@ -618,3 +618,8 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .maskhead{font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-3)}
 .masktext{font-size:13.5px;line-height:1.5}
 .mark.logo img{border-radius:7px;object-fit:cover;display:block}
+.sizerow{display:flex;align-items:center;gap:12px;max-width:420px}
+.sizerow input[type=range]{flex:1;accent-color:var(--ember)}
+.budget{display:flex;align-items:center;gap:10px}
+.budget input[type=range]{accent-color:var(--ember);width:160px}
+.errtext{white-space:pre-wrap;font-size:12.5px;margin-bottom:8px;max-height:220px;overflow:auto}

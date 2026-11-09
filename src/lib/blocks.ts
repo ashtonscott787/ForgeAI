@@ -30,6 +30,7 @@ export interface EmailParts {
 
 export interface SearchAsk { query: string }
 export interface MemoryAsk { text: string; scope: "personal" | "project"; project?: string }
+export interface ReminderAsk { text: string; when: string }
 
 export type Segment =
   | { kind: "text"; text: string }
@@ -38,7 +39,8 @@ export type Segment =
   | { kind: "ui"; spec: UiSpec }
   | { kind: "email"; email: EmailParts }
   | { kind: "search"; ask: SearchAsk }
-  | { kind: "memory"; ask: MemoryAsk };
+  | { kind: "memory"; ask: MemoryAsk }
+  | { kind: "reminder"; ask: ReminderAsk };
 
 const FENCE = /```([A-Za-z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g;
 
@@ -57,6 +59,9 @@ export function parseSegments(content: string): Segment[] {
     } else if (lang === "forge-memory") {
       const ask = parseMemory(code);
       out.push(ask ? { kind: "memory", ask } : { kind: "code", lang: "json", code: code.trimEnd() });
+    } else if (lang === "forge-reminder") {
+      const ask = parseReminder(code);
+      out.push(ask ? { kind: "reminder", ask } : { kind: "code", lang: "json", code: code.trimEnd() });
     } else if (lang === "forge-ui") {
       const spec = parseUi(code);
       out.push(spec ? { kind: "ui", spec } : { kind: "code", lang: "json", code: code.trimEnd() });
@@ -193,6 +198,18 @@ export function parseMemory(raw: string): MemoryAsk | null {
     if (!text || text.length > 600) return null;
     const scope = str(d.scope) === "project" ? "project" : "personal";
     return { text, scope, project: str(d.project).trim() || undefined };
+  } catch {
+    return null;
+  }
+}
+
+/** A reminder the model offers to set. Created only when the person says yes. */
+export function parseReminder(raw: string): ReminderAsk | null {
+  try {
+    const d = JSON.parse(raw) as Record<string, unknown>;
+    const text = str(d.text).trim();
+    const when = str(d.when).trim();
+    return text && when && text.length <= 300 ? { text, when } : null;
   } catch {
     return null;
   }

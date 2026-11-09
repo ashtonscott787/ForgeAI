@@ -46,6 +46,7 @@ export function Models(props: Props) {
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState("All");
   const [cap, setCap] = useState("All");
+  const [maxParams, setMaxParams] = useState(70);
   const [quant, setQuant] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<Record<string, DownloadProgress>>({});
   const [busy, setBusy] = useState<Record<string, string>>({});
@@ -93,6 +94,7 @@ export function Models(props: Props) {
   const shown = entries.filter((e) => {
     if (family !== "All" && e.family !== family) return false;
     if (cap !== "All" && !e.caps.includes(cap as never)) return false;
+    if (maxParams < 70 && e.params_b > maxParams) return false;
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     return (
@@ -340,6 +342,20 @@ export function Models(props: Props) {
                   {f}
                 </button>
               ))}
+            </div>
+            <div className="sizerow">
+              <label className="glabel" htmlFor="sizecap">
+                Size up to <b className="num">{maxParams >= 70 ? "any" : `${maxParams}B`}</b> parameters
+              </label>
+              <input
+                id="sizecap"
+                type="range"
+                min={1}
+                max={70}
+                step={1}
+                value={maxParams}
+                onChange={(e) => setMaxParams(Number(e.target.value))}
+              />
             </div>
             <div className="chiprow">
               {caps.map((c) => (

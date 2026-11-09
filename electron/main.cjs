@@ -28,6 +28,14 @@ const engineDir = () => app.isPackaged ? path.join(process.resourcesPath, "engin
 const serverBin = () => path.join(engineDir(), process.platform === "win32" ? "llama-server.exe" : "llama-server");
 
 // ── settings ────────────────────────────────────────────────
+/**
+ * macOS runs a quarantined app from a read-only copy ("app translocation")
+ * until it is moved to Applications. Nothing can write next to the bundle in
+ * that state, so updating is impossible and the only honest answer is to say
+ * so and tell the person what to do.
+ */
+const translocated = () => process.platform === "darwin" && process.execPath.includes("/AppTranslocation/");
+
 const DEFAULTS = {
   theme: "system",
   context_size: 8192,
@@ -42,6 +50,8 @@ const DEFAULTS = {
   // Memory-mapped weights stay on disk and page in; loading them into RAM is
   // faster per token but needs the whole model resident.
   load_into_memory: false,
+  /** Ceiling on how much of this machine's memory models may use, in bytes. */
+  memory_budget_bytes: null,
 };
 function loadSettings() { try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) }; } catch { return { ...DEFAULTS }; } }
 function saveSettings(s) { const t = settingsFile() + ".tmp"; fs.writeFileSync(t, JSON.stringify(s, null, 2)); fs.renameSync(t, settingsFile()); }
@@ -62,7 +72,11 @@ function hardware() {
   return {
     schema: 1, id: 1, name: os.hostname(), os: process.platform === "win32" ? "windows" : process.platform,
     backend, trust: "selfhost", ram_bytes: ram, vram_bytes: 0, unified_memory: mac,
-    usable_model_bytes: usableBytes(ram, 0, mac), runtimes: [RUNTIME_ID], links: [], load: 0, online: true,
+    usable_model_bytes: Math.min(
+      usableBytes(ram, 0, mac),
+      Number(settings?.memory_budget_bytes) > 0 ? Number(settings.memory_budget_bytes) : Infinity,
+    ),
+    memory_budget_bytes: Number(settings?.memory_budget_bytes) || null, runtimes: [RUNTIME_ID], links: [], load: 0, online: true,
   };
 }
 const cpuLabel = () => `${os.cpus()[0]?.model?.trim() ?? "CPU"} · ${os.cpus().length} threads`;
@@ -212,6 +226,13 @@ const status = () => ({ running: !!engine.proc, port: engine.port, model_file: e
 const freePort = () => new Promise((r, j) => { const s = net.createServer(); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => r(p)); }); s.on("error", j); });
 function stopEngine() { if (engine.proc) { try { engine.proc.kill(); } catch {} } engine = { proc: null, port: 0, model_file: null }; }
 const logFile = () => path.join(root(), "engine.log");
+const logTail = (lines = 12) => {
+  try {
+    return fs.readFileSync(logFile(), "utf8").split("\n").filter(Boolean).slice(-lines).join("\n");
+  } catch {
+    return "(the engine wrote nothing to its log)";
+  }
+};
 let idleTimer = null;
 function touchEngine() {
   if (idleTimer) clearTimeout(idleTimer);
@@ -221,11 +242,19 @@ async function ensureEngine({ modelFile }) {
   if (engine.proc && engine.model_file === modelFile) { touchEngine(); return status(); }
   return startEngine({ modelFile });
 }
+let win = null;
 async function startEngine({ modelFile }) {
   stopEngine();
   const model = path.join(modelsDir(), safeName(modelFile));
   if (!fs.existsSync(model)) throw new Error("model file not found — download it first");
-  if (!fs.existsSync(serverBin())) throw new Error("AI engine missing from this copy of Forge AI");
+  if (!fs.existsSync(serverBin())) throw new Error("The AI engine is missing from this copy of Forge AI.");
+  try {
+    fs.accessSync(serverBin(), fs.constants.X_OK);
+  } catch {
+    throw new Error("The AI engine is not marked executable. Re-download Forge AI, or move it to your Applications folder and open it again.");
+  }
+  const size = fs.statSync(model).size;
+  if (size < 1024 * 1024) throw new Error("That model file is far too small to be a model — the download was probably cut short. Delete it and download it again.");
   const port = await freePort();
   const layers =
     settings.run_mode === "cpu" ? 0 : settings.run_mode === "split" ? Math.max(0, Number(settings.split_layers) || 0) : Number(settings.gpu_layers) || 999;
@@ -259,20 +288,27 @@ async function startEngine({ modelFile }) {
   proc.on("exit", (code) => { exited = code; if (engine.proc === proc) engine = { proc: null, port: 0, model_file: null }; });
   proc.on("error", (e) => { exited = String(e); });
   engine = { proc, port, model_file: modelFile };
-  const deadline = Date.now() + 180000;
+  const started = Date.now();
+  const deadline = started + 600_000; // a large model on a busy disk is slow
   while (Date.now() < deadline) {
     if (exited !== null) {
-      const tail = (() => { try { return fs.readFileSync(logFile(), "utf8").split("\n").slice(-8).join("\n"); } catch { return ""; } })();
-      throw new Error(`the AI engine stopped while loading (${exited}).\n${tail}`);
+      throw new Error(`the AI engine stopped while loading (${exited}).\n${logTail()}`);
     }
     try {
       const ok = await new Promise((r) => http.get(`http://127.0.0.1:${port}/health`, (res) => { res.resume(); r(res.statusCode === 200); }).on("error", () => r(false)));
       if (ok) { touchEngine(); return status(); }
-    } catch {}
-    await new Promise((r) => setTimeout(r, 400));
+    } catch {
+      /* not listening yet */
+    }
+    try {
+      win?.webContents.send("engine://loading", { seconds: Math.round((Date.now() - started) / 1000), tail: logTail(2) });
+    } catch {
+      /* the window may be gone */
+    }
+    await new Promise((r) => setTimeout(r, 700));
   }
   stopEngine();
-  throw new Error("the AI engine did not become ready within 3 minutes");
+  throw new Error(`the AI engine did not become ready within 10 minutes.\n${logTail()}`);
 }
 
 // ── IPC ─────────────────────────────────────────────────────
@@ -392,7 +428,18 @@ function register(win) {
   });
 
   // ── updates ───────────────────────────────────────────────
-  h("check_update", (a) => updater.checkForUpdate(a || {}));
+  h("check_update", async (a) => {
+    const info = await updater.checkForUpdate(a || {});
+    if (translocated()) {
+      return {
+        ...info,
+        installable: false,
+        reason:
+          "macOS is running Forge AI from a temporary read-only copy, which happens until the app is moved out of Downloads. Drag Forge AI into your Applications folder, open it from there, and updates will install themselves.",
+      };
+    }
+    return info;
+  });
   h("download_update", async ({ info }) => {
     const r = await updater.fetchUpdate(info, (p) => win.webContents.send("update://progress", p));
     return r;
@@ -442,13 +489,36 @@ function register(win) {
   });
   h("stop_engine", stopEngine);
   h("engine_status", status);
+  h("engine_log", () => logTail(200));
+  h("open_engine_log", () => shell.showItemInFolder(logFile()));
+  h("environment", () => ({
+    translocated: translocated(),
+    app_path: process.platform === "darwin" ? path.resolve(process.execPath, "..", "..", "..") : process.execPath,
+    in_applications: process.execPath.startsWith("/Applications/"),
+    models_dir: modelsDir(),
+    free_disk_bytes: (() => {
+      try {
+        const s = fs.statfsSync(modelsDir());
+        return s.bavail * s.bsize;
+      } catch {
+        return 0;
+      }
+    })(),
+    total_memory_bytes: os.totalmem(),
+  }));
   h("link_readiness", () => {
     let addr = null;
     for (const list of Object.values(os.networkInterfaces())) for (const i of list || []) {
       if (i.family === "IPv4") { const [a, b] = i.address.split(".").map(Number); if (a === 100 && b >= 64 && b <= 127) addr = i.address; }
     }
-    return { mesh_interface_detected: !!addr, mesh_address: addr, distributed_inference_enabled: false,
-      explanation: "Distributed inference is not enabled in this release. A Tailscale-style mesh address is detected for future clustering, but models only run on this computer." };
+    return {
+      mesh_interface_detected: !!addr,
+      mesh_address: addr,
+      distributed_inference_enabled: false,
+      explanation: addr
+        ? "A private mesh address was found on this machine, so the networking side of clustering is in place. Running one model across two computers is still not implemented, so every model runs here."
+        : "No private mesh network was found. Clustering is not implemented yet either, so every model runs on this computer.",
+    };
   });
 }
 
@@ -479,7 +549,7 @@ app.whenReady().then(() => {
     h["Access-Control-Allow-Origin"] = ["*"]; h["Access-Control-Allow-Headers"] = ["*"]; h["Access-Control-Allow-Methods"] = ["GET, POST, OPTIONS"];
     cb({ responseHeaders: h, statusLine: d.method === "OPTIONS" ? "HTTP/1.1 204 No Content" : d.statusLine });
   });
-  const win = createWindow();
+  win = createWindow();
   register(win);
   reminders.load(root(), (r, late) => {
     try {

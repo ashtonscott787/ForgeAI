@@ -47,7 +47,7 @@ export function Setup({ self, health }: { self: MachineCapability | null; health
           <div className="panel">
             <div className="panel-h">
               <span className="t">Linking other computers</span>
-              <span className="badge">Not enabled in 0.1</span>
+              <span className="badge">Not implemented yet</span>
             </div>
             <div className="panel-b">
               {link && (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Settings, type UpdateInfo } from "../lib/ipc";
 
 export function SettingsView({
@@ -141,6 +141,13 @@ export function SettingsView({
                 />
               </Field>
 
+              <Field
+                label="Memory Forge AI may use"
+                hint="A ceiling on what models may take. Lower it to keep room for other apps; it cannot exceed what this computer has."
+              >
+                <MemoryBudget settings={settings} save={save} />
+              </Field>
+
               <Field label="CPU threads" hint="Leave empty to let the runtime decide.">
                 <input
                   type="number"
@@ -205,5 +212,43 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     <button className={`toggle${on ? " on" : ""}`} role="switch" aria-checked={on} onClick={() => onChange(!on)}>
       <span className="knob" />
     </button>
+  );
+}
+
+/** The ceiling is expressed against the machine's real memory, read live. */
+function MemoryBudget({
+  settings,
+  save,
+}: {
+  settings: Settings;
+  save: (p: Partial<Settings>) => void;
+}) {
+  const [total, setTotal] = useState(0);
+  useEffect(() => {
+    void api
+      .environment()
+      .then((e) => setTotal(e.total_memory_bytes))
+      .catch(() => undefined);
+  }, []);
+  const GiB = 1024 ** 3;
+  const max = Math.max(2, Math.floor((total || 8 * GiB) / GiB));
+  const current = settings.memory_budget_bytes ? Math.round(settings.memory_budget_bytes / GiB) : max;
+  return (
+    <div className="budget">
+      <input
+        type="range"
+        min={1}
+        max={max}
+        step={1}
+        value={Math.min(current, max)}
+        onChange={(e) => {
+          const gib = Number(e.target.value);
+          save({ memory_budget_bytes: gib >= max ? null : gib * GiB });
+        }}
+      />
+      <span className="num">
+        {Math.min(current, max)} GB{current >= max ? " · no limit" : ""} of {max} GB
+      </span>
+    </div>
   );
 }
