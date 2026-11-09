@@ -80,7 +80,7 @@ test("a connection dropped mid-body fails and never produces the final file", as
   const dir = tempDir();
   try {
     await assert.rejects(
-      downloadModel(win, { dir, modelId: "m", url: urlOf(server), fileName: "d.gguf", sha256: "" }),
+      downloadModel(win, { dir, modelId: "m", url: urlOf(server), fileName: "d.gguf", sha256: "", retryWaits: [] }),
       /interrupted|cut short|dropped|stalled/,
     );
     assert.equal(fs.existsSync(path.join(dir, "d.gguf")), false, "a truncated model must not be installed");
@@ -116,5 +116,31 @@ test("a second request for the same model while one is running is refused", asyn
       /already downloading/,
     );
     await first;
+  } finally { server.close(); }
+});
+
+test("a connection dropped mid-download is retried and resumes from the partial file", async () => {
+  const data = crypto.randomBytes(300_000);
+  let requests = 0;
+  const server = await serve((req, res) => {
+    requests += 1;
+    const range = req.headers.range;
+    if (requests === 1) {
+      // First attempt: send part of the body, then drop the connection.
+      res.writeHead(200, { "Content-Length": data.length });
+      res.write(data.subarray(0, 100_000));
+      setTimeout(() => res.socket.destroy(), 30);
+      return;
+    }
+    // Later attempts: honour the Range request, as a real server does.
+    const start = range ? Number(/bytes=(\d+)-/.exec(range)[1]) : 0;
+    res.writeHead(range ? 206 : 200, { "Content-Length": data.length - start });
+    res.end(data.subarray(start));
+  });
+  const dir = tempDir();
+  try {
+    const out = await downloadModel(win, { dir, modelId: "m", url: urlOf(server), fileName: "r.gguf", sha256: sha(data), retryWaits: [10] });
+    assert.deepEqual(fs.readFileSync(out), data);
+    assert.equal(requests, 2, "one retry, which resumed");
   } finally { server.close(); }
 });

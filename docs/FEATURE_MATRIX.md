@@ -126,3 +126,15 @@ tag's source). Not run on macOS or Windows.
 | Reminders page is basic | **Improved (UI-tested)** | Edit text and time, mark done, snooze 10 min / 1 hour / tomorrow, overdue highlight, clear past, reopen, examples when empty. Backend unit tests for reminders are still missing. |
 | Latest release on GitHub | **Not released** | Tags stop at v0.5.2. The work since is on `claude/epic-turing-bfqx3r` and has not been tagged or published. |
 | Agents | **Missing** | No Agents view exists in any release. |
+
+## Download from GitHub and Hugging Face (verified this round)
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Gemma 2 2B Q4_K_M: resolved file name, size and SHA256 | **Working (live)** | `FORGE_LIVE=1 NODE_USE_ENV_PROXY=1 node --test tests/live-download.test.cjs`. |
+| Gemma 2 2B download completes and verifies | **Working (live)** | 1.7 GB downloaded through the app's transfer code; hashed on disk against the published SHA256; GGUF signature checked; no partial file left. |
+| Dropped connection retried and resumed | **Working (unit)** | `transfer.test.cjs`: a connection dropped mid-download is retried from the partial file. Live drop occurred once during testing and was refused rather than installed. |
+| v0.5.2 Windows setup from GitHub matches SHA256SUMS | **Working** | Downloaded and hashed. Its contents are not verified (no 7-Zip here). |
+| v0.5.2 macOS zip from GitHub matches SHA256SUMS | **Working (checksum); broken (content)** | Checksum matches. The engine is missing libraries: see RELEASE_PROCESS.md. |
+| macOS engine loads | **Broken in v0.5.2; fixed in the workflow, not yet built** | `electron/engine-check.cjs`, `scripts/engine-links.cjs`; tests against the real zip. |
+| Engine runs Gemma 2 2B on Linux | **Working** | Real llama-server, `/v1/chat/completions` answered. |

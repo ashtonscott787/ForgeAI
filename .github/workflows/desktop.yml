@@ -112,6 +112,10 @@ jobs:
           chmod +x engine/llama-server 2>/dev/null || true
           ls -l engine
 
+      - name: Make the macOS engine loadable
+        if: runner.os == 'macOS'
+        shell: bash
+        run: node scripts/engine-links.cjs engine
       - name: Cache the Electron download
         uses: actions/cache@v4
         with:
@@ -166,6 +170,12 @@ jobs:
       # here and the archives are rebuilt from the signed copy. This is not
       # notarization: Gatekeeper still warns once, and right-click → Open still
       # applies. It is the difference between a warning and a dead app.
+      - name: Check the packaged engine can load (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/engine-links.cjs --check "$(ls -d release/mac*/Forge\ AI.app)/Contents/Resources/engine"
       - name: Ad-hoc sign and repackage (macOS)
         if: runner.os == 'macOS'
         shell: bash

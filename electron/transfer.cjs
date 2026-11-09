@@ -27,12 +27,28 @@ function get(url, headers, redirects = 0) {
 // One transfer per model file at a time. A second request for the same file is
 // refused rather than writing to the same .part file twice.
 const inFlight = new Set();
-async function downloadModel(win, { dir, modelId, url, fileName, sha256 }) {
+/** Failures that a retry can fix: the connection, a stall, or a body that ended early. */
+function isTransient(e) {
+  return /connection dropped|cut short|stalled|did not answer|ECONNRESET|ETIMEDOUT|socket hang up|ENOTFOUND|EAI_AGAIN/i.test(String(e && e.message));
+}
+
+async function downloadModel(win, { dir, modelId, url, fileName, sha256, retryWaits }) {
   const name = safeName(fileName);
   if (inFlight.has(name)) throw new Error("this model is already downloading");
   inFlight.add(name);
   try {
-    return await transfer(win, { dir, modelId, url, fileName: name, sha256 }, true);
+    // A dropped connection is common on large files. Retry from the partial file, a few times, with
+    // growing waits. Checksum failures and server refusals are not retried: they will not change.
+    const WAITS = retryWaits ?? [2_000, 5_000, 15_000, 30_000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await transfer(win, { dir, modelId, url, fileName: name, sha256 }, true);
+      } catch (e) {
+        if (!isTransient(e) || attempt >= WAITS.length) throw e;
+        win.webContents.send("download://progress", { model_id: modelId, received: 0, total: 0, bytes_per_sec: 0, done: false, retrying: attempt + 1, reason: e.message });
+        await new Promise((r) => setTimeout(r, WAITS[attempt]));
+      }
+    }
   } finally {
     inFlight.delete(name);
   }
