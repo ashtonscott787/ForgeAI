@@ -1,83 +1,57 @@
 # Architecture
 
-## The rule that holds it together
+**Status as of commit 0d09c94 (branch `claude/epic-turing-bfqx3r`).**
 
-**The UI never talks to a runtime, a peer or the network directly.** It calls
-the Rust core, which looks identical whether the model is on this laptop or
-split across three machines in another building. That one boundary is why
-clustering could be added in Phase 3 without rewriting the chat app.
+## Active shells
 
-```
-React (src/)
-   │  typed invoke, src/lib/ipc.ts — mirrors the serde types exactly
-   ▼
-Tauri shell (src-tauri/) ─── spawns ──▶ llama-server / rpc-server
-   │                                        ▲
-   │ calls                                  │ mesh-tunnelled TCP, loopback-bound
-   ▼                                        │
-forge-core (core/)                   forge-mesh (sidecar/mesh/)
-  types · hardware · registry             embedded tsnet node
-  planner · runtime                       userspace WireGuard, no driver
-```
-
-## Module boundaries
-
-| Crate / dir | Owns | Must not know |
+| Shell | Status | Evidence |
 | --- | --- | --- |
-| `core/types.rs` | `MachineCapability`, `Placement`, `PlacementPlan` | everything else |
-| `core/hardware.rs` | one capability record for this machine, headroom policy | networking, models |
-| `core/registry.rs` | catalogue, quantization choice, download sizing, recommendation | inference, peers |
-| `core/planner.rs` | model + cluster → a plan, with its predicted cost | how runtimes are spawned |
-| `core/runtime.rs` | `Placement` → llama.cpp argument vectors | planning, networking |
-| `src-tauri/` | windows, updates, process spawning, per-OS GPU probing | domain decisions |
-| `sidecar/mesh/` | mesh identity, peer list, port forwarding | models, placement |
+| **Electron** (`electron/`) | Active. Shipped by `.github/workflows/desktop.yml`. `package.json` `main` = `electron/main.cjs`. | Read the workflow and `package.json`. |
+| **Tauri** (`src-tauri/`) | Legacy. Still compiled into `src/lib/ipc.ts` as a fallback when `window.forge` is absent. Not packaged by `desktop.yml`. | `grep @tauri-apps src` finds `src/lib/ipc.ts`; `package.json` still lists `@tauri-apps/*`. |
+| **Rust core** (`core/`, `Cargo.toml`) | Exists; `cargo test -p forge-core` runs in `checks.yml`. **Not run in this session** (no Rust toolchain was exercised). | `.github/workflows/checks.yml` |
 
-`core/` has no Tauri and no GPU dependency on purpose: it compiles and tests on
-a bare CI runner, which is where the logic that actually matters is gated.
+`docs/ARCHITECTURE.md` used to describe only the Tauri/Rust design. That description
+applies to the legacy shell and is kept below for reference.
 
-## The two contracts
+## Electron process model
 
-**`MachineCapability`** is the only thing the planner sees about a machine:
-usable model bytes, backend, measured links, trust, runtime build ids. Adding
-NPUs or a cloud burst node later means extending this record, not touching the
-scheduler.
+```
+Renderer (React, src/)            sandbox: true, contextIsolation: true, nodeIntegration: false
+   │  window.forge.invoke(cmd,args)  (preload.cjs, one generic channel)
+   ▼
+Preload (electron/preload.cjs)     exposes invoke / on / pathForFile only
+   │  ipcRenderer.invoke("forge:<cmd>")
+   ▼
+Main (electron/main.cjs)           h(name, fn) registers each forge:* handler
+   ├─ transfer.cjs     model downloads (resumable, checksum-verified)
+   ├─ updater.cjs      GitHub release check, verified download, apply
+   ├─ skills.cjs       user skills (JSON file, atomic write)
+   ├─ connectors.cjs   user HTTP connectors (token in OS keychain via secrets.cjs)
+   ├─ secrets.cjs      safeStorage-encrypted values
+   ├─ memory.cjs, reminders.cjs, research.cjs, extract.cjs, when.cjs
+   └─ spawns llama-server (engine) and talks to it over 127.0.0.1 HTTP
+Engine (llama-server)              streamed to the renderer via fetch/SSE (src/lib/chat.ts)
+```
 
-**`Placement`** is the only thing the runtime manager accepts: `Local`,
-`Remote`, `Split { shards }` or `Replicated`. Adding tensor-parallel later is a
-new variant, not a new architecture.
+## Chat request lifecycle (renderer)
 
-## Where the honesty lives
+`Chat.tsx` `send()` creates a run record `{ stopped, handle }` in `activeRun`.
+Stop (`stopRun`) marks it stopped, cancels the fetch via `AbortController`, and
+clears the waiting state. Every async stage checks `run.stopped` before it
+continues. Stream callbacks ignore events once a run is stopped.
 
-`core/planner.rs` encodes the product constraint in executable form:
+**Not yet implemented:** a per-request ID visible to the main process, so that
+cancelling a local inference request also asks the engine to stop generating
+(today the HTTP connection is closed, and the engine's own behaviour on disconnect
+is assumed, not verified).
 
-1. If the model fits on one machine, **never split it.**
-2. If it fits on several, **replicate and load-balance** — that is faster.
-3. Only split when nothing can hold it alone.
-4. **Never split over an unmeasured or slow link.** A WAN peer can be routed
-   to whole, never split across.
+## Legacy Rust core (for reference)
 
-Every plan returns `predicted_tok_s` alongside `best_single_tok_s`, and
-`is_regression()` is true when distributing is strictly worse. The pre-flight
-panel renders exactly this, so the product can never silently hand someone a
-slower experience and call it a feature.
-
-These rules are covered by tests in `core/src/planner.rs`, including
-`never_splits_a_model_that_fits` and `refuses_to_split_over_a_wan_link`.
-
-## Why a Go sidecar beside a Rust core
-
-`tsnet` embeds a complete Tailscale node **inside a process** on a userspace
-TCP/IP stack: no root, no system daemon, no virtual network interface, no
-WinTUN driver, no macOS NetworkExtension entitlement. For a product whose first
-promise is "nothing to install", that is the difference between shipping and
-waiting on an Apple entitlement review.
-
-The trade is that only traffic through that process crosses the mesh — which is
-exactly what Forge needs. `ControlURL` is configurable, so pointing it at a
-self-hosted Headscale removes any dependency on Tailscale-operated
-coordination.
-
-`rpc-server` has no authentication or encryption of its own. It is bound to
-loopback and is only ever reachable through the mesh tunnel. This is enforced
-in `core/runtime.rs` and covered by the
-`http_surface_is_always_loopback_only` test.
+| Crate / dir | Owns |
+| --- | --- |
+| `core/types.rs` | `MachineCapability`, `Placement`, `PlacementPlan` |
+| `core/hardware.rs` | one capability record for this machine |
+| `core/registry.rs` | catalogue, quantisation choice, download sizing |
+| `core/planner.rs` | model + cluster → placement plan |
+| `core/runtime.rs` | placement → llama.cpp argument vectors |
+| `sidecar/mesh/` | Go mesh node for two-computer operation (not verified in this session) |

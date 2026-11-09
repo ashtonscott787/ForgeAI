@@ -19,8 +19,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm typecheck
       - run: pnpm build
+      - name: Electron main-process syntax
+        run: node --check electron/main.cjs && node --check electron/transfer.cjs && node --check electron/updater.cjs && node --check electron/skills.cjs && node --check electron/connectors.cjs
+      - name: Unit and integration tests
+        run: pnpm test
 
   core:
     runs-on: ubuntu-latest
