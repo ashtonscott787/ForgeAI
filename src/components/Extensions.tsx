@@ -11,7 +11,7 @@ export function DefaultBrowserPanel() {
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   useEffect(() => {
-    void api.defaultBrowserStatus().then((s) => { setIsDefault(s.is_default); setPlatform(s.platform); }).catch((e) => setErr(String(e)));
+    void api.defaultBrowserStatus().then((s) => { setIsDefault(Boolean(s?.is_default)); setPlatform(s?.platform ?? ""); }).catch((e) => setErr(String(e)));
   }, []);
   return (
     <div className="panel">

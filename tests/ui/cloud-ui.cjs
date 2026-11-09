@@ -225,6 +225,34 @@ async function sendInChat(page, text) {
     await page.getByText("finished here").last().waitFor({ timeout: 8000 });
   }, { local: true, engineBase });
 
+  await scenario("Stop while the engine is starting stops the start and returns the chat to idle", server, async (page) => {
+    await page.getByRole("button", { name: "Chat", exact: true }).click();
+    const box = page.locator('textarea[placeholder^="Ask anything"]');
+    await box.fill("Start a model please");
+    await box.press("Enter");
+    await page.getByRole("button", { name: "Stop", exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    await page.waitForFunction(() => window.__calls.some((c) => c.cmd === "stop_engine"), null, { timeout: 5000 });
+    await page.getByRole("button", { name: "Stop", exact: true }).waitFor({ state: "detached", timeout: 5000 });
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator(".banner.err").count(), 0, "a stopped start shows no error: " + (await page.locator(".banner.err").allInnerTexts()).join(" | "));
+  }, { local: true, engineBase, stallEngine: true });
+
+  await scenario("reminders: add, edit, mark done, and clear the past", server, async (page) => {
+    await page.getByRole("button", { name: "Reminders", exact: true }).click();
+    await page.getByLabel("What to remind you about").fill("Call Sam");
+    await page.getByLabel("When").fill("in an hour");
+    await page.getByRole("button", { name: "Add reminder" }).click();
+    await page.getByText("Call Sam").first().waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Edit" }).first().click();
+    await page.getByLabel("Reminder text").fill("Call Sam about the invoice");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Call Sam about the invoice").waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Done" }).first().click();
+    await page.getByText("Past · 1").waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Clear past" }).click().catch(() => undefined);
+  });
+
   await scenario("a generated web page runs its own script inside its frame", server, async (page) => {
     await page.getByRole("button", { name: "Chat", exact: true }).click();
     const box = page.locator('textarea[placeholder^="Ask anything"]');

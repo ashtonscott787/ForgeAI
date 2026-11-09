@@ -68,12 +68,22 @@ const BRIDGE = `(() => {
   const handlers = {
     health: () => ({ runtime_available: Boolean(cfg.local), runtime_id: "test", models_dir: "/tmp", app_version: "0.5.2" }),
     installed_models: () => (cfg.local ? [{ file_name: "tiny-test.gguf", bytes: 2 * 2 ** 30 }] : []),
-    ensure_engine: ({ modelFile }) => ({ running: true, port: cfg.enginePort || 0, model_file: modelFile, base_url: cfg.engineBase }),
+    // A stalled start: the engine never becomes ready until Stop stops it, as in the app.
+    ensure_engine: ({ modelFile }) => (cfg.stallEngine
+      ? new Promise((resolve, reject) => { window.__engineStop = () => reject(new Error("The AI engine was stopped while it was starting.")); })
+      : { running: true, port: cfg.enginePort || 0, model_file: modelFile, base_url: cfg.engineBase }),
+    default_browser_status: () => ({ is_default: false, platform: "darwin" }),
+    stop_engine: () => { calls.push({ cmd: "stop_engine", args: {} }); if (window.__engineStop) window.__engineStop(); return null; },
     detect_hardware: () => ({ schema: 1, id: 1, name: "Test Mac", os: "macOS", backend: "metal", trust: "selfhost", ram_bytes: 16 * 2 ** 30, vram_bytes: 0, unified_memory: true, usable_model_bytes: 8 * 2 ** 30, runtimes: [], links: [], load: 0, online: true }),
     catalogue: () => ({ schema: 1, generated_at: "2026-01-01", models: [] }),
     cpu_label: () => "Test CPU",
     link_readiness: () => ({ tailscale: "unavailable" }),
-    reminders_list: () => [],
+    // A stateful stand-in for the reminder commands (the real module is in electron/reminders.cjs).
+    reminders_list: () => window.__reminders || [],
+    reminder_create: ({ text, when }) => { const r = { id: "r" + Math.random().toString(36).slice(2, 7), text, at: Date.now() + 3600e3, repeat: null, state: "pending", late: false, last_fired: null, when }; window.__reminders = [...(window.__reminders || []), r]; return r; },
+    reminder_update: (patch) => { const list = window.__reminders || []; const r = list.find((x) => x.id === patch.id); if (!r) throw new Error("that reminder no longer exists"); Object.assign(r, patch); return r; },
+    reminder_delete: ({ id }) => { window.__reminders = (window.__reminders || []).filter((x) => x.id !== id); return null; },
+    parse_when: ({ text }) => (/nonsense/.test(text) ? { error: "I could not work out that time." } : { at: Date.now() + 3600e3, repeat: null, text }),
     memory_list: () => [],
     connectors_list: () => [],
     skills_list: () => [],

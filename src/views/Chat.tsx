@@ -390,6 +390,10 @@ export function Chat(props: Props) {
     const loadStarted = performance.now();
     if (!engine.running || engine.model_file !== picked.file_name) {
       setStatus(value === "auto" ? `Auto chose ${picked.label} — starting it…` : `Starting ${picked.label}…`);
+      // Stop while the engine is starting must stop the start itself, not only the screen.
+      run.stop = () => {
+        void api.stopEngine().catch(() => undefined);
+      };
       try {
         engine = await api.ensureEngine(picked.file_name!);
         if (run.stopped) return;

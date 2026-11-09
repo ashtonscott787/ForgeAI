@@ -11,6 +11,7 @@ import {
   type InstalledModel,
   type MachineCapability,
 } from "../lib/ipc";
+import { publisherFor } from "../lib/publisher";
 import { describeInstalled, forgetInstall, recordFor, recordInstall, type LibraryRecord } from "../lib/library";
 import { Logo } from "../components/Logo";
 import type { HubHit, HubSort, RepoFile } from "../lib/ipc";
@@ -383,7 +384,7 @@ export function Models(props: Props) {
             <div key={e.id} className="mcard">
               <div className="mcard-top">
                 <div className="mcard-id">
-                  <Logo author={e.repo.split("/")[0] ?? e.developer} name={`${e.family} ${e.developer}`} />
+                  <Logo author={publisherFor(e.developer) || e.developer} name={`${e.family} ${e.developer}`} />
                   <div>
                   <div className="mcard-name">{e.name}</div>
                   <div className="mcard-sub">

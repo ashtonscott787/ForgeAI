@@ -55,6 +55,8 @@ export const DEFAULT_CLUSTER_SPEED_FACTOR = 0.62;
 export interface LocalModel {
   value: string;
   name: string;
+  /** Hugging Face organisation of the original publisher, for its logo. Empty when unknown. */
+  author?: string;
   family: string;
   mark: string;
   params: string;

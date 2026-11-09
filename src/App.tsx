@@ -1,5 +1,6 @@
 import { Browser } from "./views/Browser";
 import { cloudRows } from "./lib/cloud";
+import { publisherFor } from "./lib/publisher";
 import { loadConversations, newConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
 import type { ChatMessage } from "./lib/chat";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -58,6 +59,7 @@ function selectorRows(installed: InstalledEntry[]): LocalModel[] {
   const rows = installed.map((m) => ({
     value: m.file_name,
     name: m.label,
+    author: publisherFor(m.record?.developer),
     family: m.record?.developer ?? "Installed file",
     mark: markFor(m.record?.family ?? m.label),
     params: m.record ? `${m.record.params_b}B` : "GGUF",

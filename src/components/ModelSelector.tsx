@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mark, type MarkKind } from "./Marks";
+import { Logo } from "./Logo";
 import {
   DEFAULT_CONFIGURATION,
   EFFORT_EFFECT,
@@ -189,7 +190,7 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
             onClick={() => setOpen((o) => !o)}
           >
             <span className="mark">
-              <Mark kind={selected.mark as MarkKind} />
+              {selected.author ? <Logo author={selected.author} name={selected.name} size={22} /> : <Mark kind={selected.mark as MarkKind} />}
             </span>
             <span>{selected.name}</span>
             {isCustom(selCfg) && <span className="cfgb">{configBadge(selCfg)}</span>}
@@ -241,7 +242,7 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
                         }}
                       >
                         <span className="mico">
-                          <Mark kind={m.mark as MarkKind} />
+                          {m.author ? <Logo author={m.author} name={m.name} size={22} /> : <Mark kind={m.mark as MarkKind} />}
                         </span>
                         <span className="minfo">
                           <span className="mname">

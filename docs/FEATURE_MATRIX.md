@@ -115,3 +115,14 @@ tag's source). Not run on macOS or Windows.
 | Default browser: status is shown | **Working** | E2E reads the status. |
 | Default browser: button registers Forge for web links | **Untested** | Pressing it would change this machine's registration. Not pressed in tests. macOS and Windows behaviour not checked. |
 | Vision model download (model + projector) | **Untested end to end** | The projector is fetched after the model. Resolver tested by reading code; the download itself was not run through the app. |
+
+## Reported on macOS (this round)
+
+| Item | Status | Evidence / gap |
+| --- | --- | --- |
+| Models stuck "Starting…" from the translocated copy | **Improved, not verified on macOS** | The app now refuses to start the engine from the App Translocation location, with a message to move it to Applications. Quarantine itself is only removed by a signed, notarised build, which this project does not yet produce. |
+| Stop does not work while a model is starting | **Fixed (UI-tested)** | Stop now also stops the engine start. UI scenario "Stop while the engine is starting". Not verified against a real slow Mac start. |
+| Each model shows its own logo | **Fixed (code)** | Catalogue repos belong to one uploader, so every card showed that uploader's avatar. Models now show their original publisher's Hugging Face organisation (mapping in `src/lib/publisher.ts`), with the built-in mark as fallback. |
+| Reminders page is basic | **Improved (UI-tested)** | Edit text and time, mark done, snooze 10 min / 1 hour / tomorrow, overdue highlight, clear past, reopen, examples when empty. Backend unit tests for reminders are still missing. |
+| Latest release on GitHub | **Not released** | Tags stop at v0.5.2. The work since is on `claude/epic-turing-bfqx3r` and has not been tagged or published. |
+| Agents | **Missing** | No Agents view exists in any release. |

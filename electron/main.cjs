@@ -273,6 +273,9 @@ async function ensureEngine({ modelFile }) {
 let win = null;
 async function startEngine({ modelFile }) {
   stopEngine();
+  // Launched from the translocated copy, the app's files sit in a read-only temporary location.
+  // Say so at once, rather than starting an engine that cannot load and waiting for it to fail.
+  if (translocated()) throw new Error("Forge AI is running from a temporary copy, so the AI engine cannot start. Quit Forge AI, drag it into your Applications folder, and open it from there.");
   const model = path.join(modelsDir(), safeName(modelFile));
   if (!fs.existsSync(model)) throw new Error("model file not found — download it first");
   if (!fs.existsSync(serverBin())) throw new Error("The AI engine is missing from this copy of Forge AI.");
