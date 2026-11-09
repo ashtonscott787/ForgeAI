@@ -124,7 +124,7 @@ tag's source). Not run on macOS or Windows.
 | Stop does not work while a model is starting | **Fixed (UI-tested)** | Stop now also stops the engine start. UI scenario "Stop while the engine is starting". Not verified against a real slow Mac start. |
 | Each model shows its own logo | **Fixed (code)** | Catalogue repos belong to one uploader, so every card showed that uploader's avatar. Models now show their original publisher's Hugging Face organisation (mapping in `src/lib/publisher.ts`), with the built-in mark as fallback. |
 | Reminders page is basic | **Improved (UI-tested)** | Edit text and time, mark done, snooze 10 min / 1 hour / tomorrow, overdue highlight, clear past, reopen, examples when empty. Backend unit tests for reminders are still missing. |
-| Latest release on GitHub | **Not released** | Tags stop at v0.5.2. The work since is on `claude/epic-turing-bfqx3r` and has not been tagged or published. |
+| Latest release on GitHub | **v0.5.3 published** | Built from `claude/epic-turing-bfqx3r` (run 42718297271) and served by `releases/latest`. Not yet merged into `main`. |
 | Agents | **Missing** | No Agents view exists in any release. |
 
 ## Download from GitHub and Hugging Face (verified this round)
@@ -135,6 +135,9 @@ tag's source). Not run on macOS or Windows.
 | Gemma 2 2B download completes and verifies | **Working (live)** | 1.7 GB downloaded through the app's transfer code; hashed on disk against the published SHA256; GGUF signature checked; no partial file left. |
 | Dropped connection retried and resumed | **Working (unit)** | `transfer.test.cjs`: a connection dropped mid-download is retried from the partial file. Live drop occurred once during testing and was refused rather than installed. |
 | v0.5.2 Windows setup from GitHub matches SHA256SUMS | **Working** | Downloaded and hashed. Its contents are not verified (no 7-Zip here). |
-| v0.5.2 macOS zip from GitHub matches SHA256SUMS | **Working (checksum); broken (content)** | Checksum matches. The engine is missing libraries: see RELEASE_PROCESS.md. |
-| macOS engine loads | **Broken in v0.5.2; fixed in the workflow, not yet built** | `electron/engine-check.cjs`, `scripts/engine-links.cjs`; tests against the real zip. |
+| v0.5.2 macOS zip from GitHub | **Superseded; still broken** | Checksum matched, but its engine is missing 104 library links. Replaced by v0.5.3. |
+| v0.5.3 macOS zip from GitHub matches SHA256SUMS | **Working** | Downloaded from the release: checksum matches, engine passes the library check, nine unversioned links are real symlinks with correct targets, bundle reports 0.5.3. |
+| v0.5.3 Windows installers match SHA256SUMS | **Working** | Downloaded and hashed. Contents not inspected (no extraction tool here). |
+| macOS engine loads | **Working in v0.5.3 (CI)** | On a macOS runner: the app was installed into Applications, every library checked, `llama-server --version` loaded them all. |
+| Engine runs Gemma 2 2B on macOS | **Working (CI)** | `scripts/smoke-engine.sh` against the installed app on a macOS runner: the engine started, became ready, and returned a non-empty reply. Not run on user hardware. |
 | Engine runs Gemma 2 2B on Linux | **Working** | Real llama-server, `/v1/chat/completions` answered. |

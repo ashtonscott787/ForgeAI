@@ -212,6 +212,20 @@ jobs:
           node scripts/engine-links.cjs --check "$RUNNER_TEMP/zipcheck/Forge AI.app/Contents/Resources/engine"
           "$RUNNER_TEMP/zipcheck/Forge AI.app/Contents/Resources/engine/llama-server" --version
 
+      # The dmg is published too, and hdiutil builds it separately from the zip,
+      # so it gets the same check rather than being assumed good.
+      - name: Verify the released dmg contains a loadable engine
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          MP="$RUNNER_TEMP/dmgcheck"
+          rm -rf "$MP" && mkdir -p "$MP"
+          hdiutil attach release/Forge-AI-macOS-arm64.dmg -mountpoint "$MP" -nobrowse -readonly
+          trap 'hdiutil detach "$MP" -quiet || true' EXIT
+          node scripts/engine-links.cjs --check "$MP/Forge AI.app/Contents/Resources/engine"
+          codesign --verify --deep --strict "$MP/Forge AI.app"
+
       # Installed the way a user would: copied out of the download into Applications, then run from there.
       - name: Install the app into Applications (test install)
         if: runner.os == 'macOS'

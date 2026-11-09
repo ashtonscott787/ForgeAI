@@ -10,22 +10,28 @@ no cloud inference, no data leaving the machine. macOS and Windows.
 | **macOS** (Apple Silicon) | [Forge-AI-macOS-arm64.zip](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-macOS-arm64.zip) |
 | **Windows** (64-bit) | [Forge-AI-Windows-Setup.exe](https://github.com/ashtonscott787/ForgeAI/releases/latest/download/Forge-AI-Windows-Setup.exe) |
 
-> **The macOS build in release 0.5.2 is broken.** Its engine is missing 104
-> library links, so the model will not start (you will see "tried:" with a
-> temporary path). Do not use it until a corrected release (0.5.3 or later) is
-> published. The Windows build is unaffected by this.
+The links above always resolve to the newest release, currently **0.5.3**.
 
-Neither build is code-signed, so each system warns you once on first launch: on
-macOS, move the app into Applications first, then right-click it and choose Open.
-Running it from the downloads folder or a disk image makes macOS run a temporary
-copy, and Forge AI cannot update or find itself in that copy. On Windows choose
-More info then Run anyway. `site/download.html` is a download page with the same
-links.
+> **Use 0.5.3 or newer on macOS.** The 0.5.2 macOS build shipped an engine
+> missing 104 library links, so no model would start — the error read
+> `tried: …` with a temporary path. 0.5.3 fixes that, and the build now refuses
+> to publish a macOS app whose engine cannot load. The Windows build was never
+> affected.
 
-> **Status: 0.5.2 release, not yet verified on macOS.** Everything listed under
-> *What works* has been built and exercised on the development machine; the
-> macOS and Windows installers have not yet run the model end to end on those
-> systems. Everything under *Not built yet* is absent rather than stubbed.
+**On macOS, move Forge AI into your Applications folder before opening it.**
+Neither build is code-signed, so macOS warns once on first launch: right-click
+the app and choose Open. Opened straight from Downloads or from the disk image,
+macOS runs it as a read-only temporary copy, in which Forge AI can neither
+update itself nor start the engine, and it will tell you so. On Windows choose
+More info, then Run anyway. `site/download.html` is a download page with the
+same links.
+
+> **Status: 0.5.3, early.** Everything under *What works* has been built and
+> exercised. For 0.5.3 specifically, a macOS runner installed the app into
+> Applications and ran Gemma 2 2B Q4_K_M through the bundled engine to a real
+> reply. What has *not* been checked on macOS is the app's own window and the
+> in-app model download; those are exercised on Linux and in unit tests only.
+> Everything under *Not built yet* is absent rather than stubbed.
 
 ## What works
 
