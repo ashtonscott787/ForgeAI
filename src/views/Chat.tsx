@@ -3,8 +3,9 @@ import { Attachments } from "../components/Attachments";
 import { AssistantMessage } from "../components/Message";
 import { PerfLine } from "../components/Perf";
 import { ModelSelectorPrompt } from "../components/ModelSelector";
-import { streamChat, type ChatMessage, type StreamHandle } from "../lib/chat";
-import type { Attachment, EngineStatus, Health, MachineCapability } from "../lib/ipc";
+import { streamChat, type ChatMessage, type Perf, type StreamHandle } from "../lib/chat";
+import { PROVIDER_LABEL, parseCloud, usableModels } from "../lib/cloud";
+import type { Attachment, EngineStatus, Health, MachineCapability, ProviderStatus } from "../lib/ipc";
 import { api, pathForFile } from "../lib/ipc";
 import type { InstalledEntry } from "../lib/library";
 import type { LocalModel, ModelConfiguration } from "../lib/models";
@@ -19,29 +20,54 @@ interface Props {
   engine: EngineStatus;
   health: Health | null;
   self: MachineCapability | null;
+  providers: ProviderStatus[];
   onModelChange: (v: string) => void;
   onConfigurationChange: (v: string, c: ModelConfiguration) => void;
   onEngineChange: (e: EngineStatus) => void;
   onGoto: (v: "models" | "setup" | "settings") => void;
   contextSize: number;
+  /** The conversation on screen. Every request writes to the conversation it started in. */
+  conversationId: string;
   messages: ChatMessage[];
-  onMessages: (m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+  onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 }
+
+/** One in-flight send. Stop cancels it; nothing else can touch it. */
+interface Run {
+  stopped: boolean;
+  stop: () => void;
+}
+
+let requestSeq = 0;
+const newRequestId = () => `r${Date.now().toString(36)}${(requestSeq++).toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 export function Chat(props: Props) {
   const [prompt, setPrompt] = useState("");
   const messages = props.messages;
-  const setMessages = props.onMessages;
-  const [streaming, setStreaming] = useState(false);
+  const id = props.conversationId;
+  const writeTo = (convId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
+    props.onMessagesFor(convId, m);
+  // Streaming and errors are tracked per conversation, so chats run independently.
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const streaming = Boolean(busy[id]);
+  const runs = useRef(new Map<string, Run>());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const error = errors[id] ?? null;
+  const setError = (msg: string | null) =>
+    setErrors((p) => {
+      const n = { ...p };
+      if (msg) n[id] = msg;
+      else delete n[id];
+      return n;
+    });
+  const failIn = (convId: string, msg: string) => {
+    setErrors((p) => ({ ...p, [convId]: msg }));
+  };
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadNote, setLoadNote] = useState<string | null>(null);
   const [files, setFiles] = useState<Attachment[]>([]);
   const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [loadNote, setLoadNote] = useState<string | null>(null);
-  // The send in progress, from the first await (files, engine start) through the
-  // last token. Stop marks it stopped so no later stage starts or writes again.
-  const activeRun = useRef<{ stopped: boolean; handle: StreamHandle | null } | null>(null);
   // One automatic follow-up per search, so a model that keeps asking cannot loop.
   const researched = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
@@ -87,61 +113,110 @@ export function Chat(props: Props) {
   }
 
   /**
-   * Stop works at any stage of a send, not only while tokens are arriving. It
-   * cancels the stream if one is open, prevents a send that is still preparing
-   * from starting its stream, and clears the waiting state at once.
+   * Stop works at any stage of the send on screen. It cancels the request
+   * (local stream or cloud request), stops later stages from starting, clears
+   * the waiting state, and keeps any text that already arrived.
    */
   function stopRun() {
-    const run = activeRun.current;
+    const convId = id;
+    const run = runs.current.get(convId);
     if (!run) return;
     run.stopped = true;
-    run.handle?.cancel();
-    activeRun.current = null;
+    runs.current.delete(convId);
+    run.stop();
+    setBusy((b) => ({ ...b, [convId]: false }));
     setStatus(null);
     setLoadNote(null);
-    setStreaming(false);
-    // Drop an empty reply placeholder; keep whatever text already arrived.
-    setMessages((prev) => {
+    writeTo(convId, (prev) => {
       const last = prev[prev.length - 1];
       return last?.role === "assistant" && !last.content ? prev.slice(0, -1) : prev;
     });
   }
 
   /**
-   * Sending is the only entry point, and it owns loading the model. There is
-   * no Load button: the message is held, the engine is started if it is not
-   * already the right one, and the turn proceeds when the model answers.
+   * Sending is the only entry point. Local models load on demand; cloud models
+   * are called through the provider adapter. Every write goes to `convId`.
    */
   async function send(text: string) {
+    const convId = id;
     const body = text.trim();
-    if (!body || streaming) return;
-    if (!props.health?.runtime_available) {
-      setError("The AI engine is missing from this copy of Forge AI.");
-      return;
+    if (!body || runs.current.has(convId)) return;
+
+    const endRun = (run: Run) => {
+      if (runs.current.get(convId) === run) runs.current.delete(convId);
+      setBusy((b) => ({ ...b, [convId]: false }));
+    };
+    const failRun = (run: Run, msg: string) => {
+      endRun(run);
+      setStatus(null);
+      setLoadNote(null);
+      writeTo(convId, (prev) => {
+        const last = prev[prev.length - 1];
+        return last?.role === "assistant" && !last.content ? prev.slice(0, -1) : prev;
+      });
+      failIn(convId, msg);
+    };
+
+    // Auto only chooses among local models. With none installed, a connected cloud model is used instead.
+    let value = props.value;
+    if (value === "auto" && !hasModels) {
+      const firstCloud = props.models.find((m) => m.value.startsWith("cloud:"));
+      if (firstCloud) value = firstCloud.value;
     }
-    if (!hasModels) {
-      setError("No models are installed yet.");
-      return;
+    const cloud = parseCloud(value);
+    if (!cloud) {
+      if (!props.health?.runtime_available) {
+        failIn(convId, "The AI engine is missing from this copy of Forge AI.");
+        return;
+      }
+      if (!hasModels) {
+        failIn(convId, "No local models are installed yet. Install one, or connect a cloud provider in Settings.");
+        return;
+      }
     }
 
-    const picked =
-      props.value === "auto"
-        ? choose(body, props.installed, props.self?.usable_model_bytes ?? 0, props.engine.model_file)
-        : (() => {
-            const m = props.installed.find((i) => i.file_name === props.value);
-            return m ? { file_name: m.file_name, label: m.label, why: "" } : null;
-          })();
+    let picked: { label: string; file_name?: string };
+    if (cloud) {
+      const s = props.providers.find((p) => p.provider === cloud.provider);
+      if (!s?.verified_at) {
+        failIn(convId, `${PROVIDER_LABEL[cloud.provider]} is not connected. Test the connection in Settings first.`);
+        return;
+      }
+      if (!usableModels(s).some((m) => m.id === cloud.model)) {
+        failIn(convId, "That model is no longer on this connection's list. Pick another one.");
+        return;
+      }
+      picked = { label: cloud.model };
+    } else {
+      const choice =
+        value === "auto"
+          ? choose(body, props.installed, props.self?.usable_model_bytes ?? 0, props.engine.model_file)
 
-    if (!picked) {
-      setError("That model is no longer installed. Pick another one.");
-      return;
+          : (() => {
+              const m = props.installed.find((i) => i.file_name === value);
+              return m ? { file_name: m.file_name, label: m.label, why: "" } : null;
+            })();
+      if (!choice) {
+        failIn(convId, "That model is no longer installed. Pick another one.");
+        return;
+      }
+      picked = { label: choice.label, file_name: choice.file_name };
     }
 
     setError(null);
+    setErrors((p) => {
+      const n = { ...p };
+      delete n[convId];
+      return n;
+    });
     setPrompt("");
     const started = performance.now();
     const attached = files;
     const usable = attached.filter((f) => f.readable && f.text.trim());
+
+    const run: Run = { stopped: false, stop: () => undefined };
+    runs.current.set(convId, run);
+    setBusy((b) => ({ ...b, [convId]: true }));
 
     const next: ChatMessage[] = [
       ...messages,
@@ -151,11 +226,8 @@ export function Chat(props: Props) {
         files: attached.map((f) => ({ name: f.name, bytes: f.bytes, kind: f.kind, readable: f.readable })),
       },
     ];
-    setMessages([...next, { role: "assistant", content: "", model: picked.label }]);
+    writeTo(convId, [...next, { role: "assistant", content: "", model: picked.label }]);
     setFiles([]);
-    setStreaming(true);
-    const run: { stopped: boolean; handle: StreamHandle | null } = { stopped: false, handle: null };
-    activeRun.current = run;
 
     // Documents are folded into the message the model sees, not the one shown.
     let contextChars = 0;
@@ -173,107 +245,155 @@ export function Chat(props: Props) {
         sendContent = `${built.context}\n\n${body}`;
       } catch (e) {
         if (run.stopped) return;
-        setStatus(null);
-        setStreaming(false);
-        activeRun.current = null;
-        setMessages((prev) => prev.slice(0, -1));
-        setError(`Could not prepare the attached files: ${e instanceof Error ? e.message : String(e)}`);
+        failRun(run, `Could not prepare the attached files: ${e instanceof Error ? e.message : String(e)}`);
         return;
       }
+    }
+
+    const memories = await api.memoryForPrompt().catch(() => [] as string[]);
+    if (run.stopped) return;
+    const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);
+    if (run.stopped) return;
+    const system = systemPrompt(memories, enabledSkills);
+
+    const outbound = next.map((m, i) =>
+      i === next.length - 1 ? { role: "user" as const, content: sendContent } : { role: m.role, content: m.content },
+    );
+
+    if (cloud) {
+      // Providers reject empty turns, so earlier empty placeholders are dropped.
+      const turns = outbound
+        .filter((m) => m.content.trim().length > 0)
+        .map((m) => ({ role: m.role === "assistant" ? ("assistant" as const) : ("user" as const), content: m.content }));
+      const requestId = newRequestId();
+      run.stop = () => {
+        void api.providerCancel(requestId).catch(() => undefined);
+      };
+      let firstAt = 0;
+      const unsubscribe = api.onProviderToken(({ requestId: rid, text }) => {
+        if (rid !== requestId || run.stopped) return;
+        if (!firstAt) firstAt = performance.now();
+        writeTo(convId, (prev) => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") copy[copy.length - 1] = { ...last, content: last.content + text };
+          return copy;
+        });
+      });
+      setStatus(`Sending to ${PROVIDER_LABEL[cloud.provider]}…`);
+      try {
+        const streamed = await api.providerStream({
+          requestId,
+          provider: cloud.provider,
+          model: cloud.model,
+          system,
+          messages: turns,
+        });
+        if (run.stopped) return;
+        const res = { usage: streamed?.usage ?? { input: null, output: null }, tokens: streamed?.tokens ?? 0 };
+        const ended = performance.now();
+        const first = firstAt || ended;
+        setStatus(null);
+        writeTo(convId, (prev) => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = {
+              ...last,
+              usage: res.usage,
+              perf: {
+                total_ms: ended - started,
+                load_ms: 0,
+                first_token_ms: first - started,
+                generate_ms: ended - first,
+                tokens: res.usage.output ?? 0,
+                tok_s: res.usage.output && ended > first ? (res.usage.output / (ended - first)) * 1000 : 0,
+                model: picked.label,
+                machine: PROVIDER_LABEL[cloud.provider] + " cloud",
+                where: "cloud",
+                context_chars: contextChars || undefined,
+              },
+            };
+          }
+          return copy;
+        });
+        endRun(run);
+      } catch (e) {
+        if (run.stopped) return;
+        failRun(run, e instanceof Error ? e.message : String(e));
+      } finally {
+        void unsubscribe.then((f) => f()).catch(() => undefined);
+      }
+      return;
     }
 
     let engine = props.engine;
     const loadStarted = performance.now();
     if (!engine.running || engine.model_file !== picked.file_name) {
-      setStatus(
-        props.value === "auto"
-          ? `Auto chose ${picked.label} — starting it…`
-          : `Starting ${picked.label}…`,
-      );
+      setStatus(value === "auto" ? `Auto chose ${picked.label} — starting it…` : `Starting ${picked.label}…`);
       try {
-        engine = await api.ensureEngine(picked.file_name);
+        engine = await api.ensureEngine(picked.file_name!);
         if (run.stopped) return;
         props.onEngineChange(engine);
       } catch (e) {
         if (run.stopped) return;
-        setStreaming(false);
-        setStatus(null);
-        setLoadNote(null);
-        activeRun.current = null;
-        setMessages((prev) => prev.slice(0, -1));
-        setError(`${picked.label} did not start. ${e instanceof Error ? e.message : String(e)}`);
+        failRun(run, `${picked.label} did not start. ${e instanceof Error ? e.message : String(e)}`);
         return;
       }
     }
-    const memories = await api.memoryForPrompt().catch(() => [] as string[]);
-    const enabledSkills = await api.skillsForPrompt().catch(() => []);
-    if (run.stopped) return;
     const loadMs = engine === props.engine ? 0 : performance.now() - loadStarted;
     setStatus(null);
     setLoadNote(null);
 
-    const outbound: ChatMessage[] = next.map((m, i) =>
-      i === next.length - 1 ? { role: "user", content: sendContent } : { role: m.role, content: m.content },
-    );
     let firstTokenAt = 0;
-
-    run.handle = streamChat(
-      engine.base_url,
-      [{ role: "system", content: systemPrompt(memories, enabledSkills) }, ...outbound],
-      {
-        onToken: (piece) => {
-          if (run.stopped) return;
-          if (!firstTokenAt) firstTokenAt = performance.now();
-          setMessages((prev) => {
-            const copy = [...prev];
-            const last = copy[copy.length - 1];
-            if (last && last.role === "assistant") {
-              copy[copy.length - 1] = { ...last, content: last.content + piece };
-            }
-            return copy;
-          });
-        },
-        onDone: ({ tokens }) => {
-          if (run.stopped) return;
-          if (activeRun.current === run) activeRun.current = null;
-          setStreaming(false);
-          const ended = performance.now();
-          const first = firstTokenAt || ended;
-          const generateMs = ended - first;
-          setMessages((prev) => {
-            const copy = [...prev];
-            const last = copy[copy.length - 1];
-            if (last && last.role === "assistant") {
-              copy[copy.length - 1] = {
-                ...last,
-                perf: {
-                  total_ms: ended - started,
-                  load_ms: loadMs,
-                  first_token_ms: first - started,
-                  generate_ms: generateMs,
-                  tokens,
-                  tok_s: generateMs > 0 ? (tokens / generateMs) * 1000 : 0,
-                  model: picked.label,
-                  machine: props.self?.name ?? "this computer",
-                  where: "local",
-                  context_chars: contextChars || undefined,
-                },
-              };
-            }
-            return copy;
-          });
-        },
-        onError: (message) => {
-          if (run.stopped) return;
-          if (activeRun.current === run) activeRun.current = null;
-          setStreaming(false);
-          setError(message);
-        },
+    const handle: StreamHandle = streamChat(engine.base_url, [{ role: "system", content: system }, ...outbound], {
+      onToken: (piece) => {
+        if (run.stopped) return;
+        if (!firstTokenAt) firstTokenAt = performance.now();
+        writeTo(convId, (prev) => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") copy[copy.length - 1] = { ...last, content: last.content + piece };
+          return copy;
+        });
       },
-    );
+      onDone: ({ tokens }) => {
+        if (run.stopped) return;
+        endRun(run);
+        const ended = performance.now();
+        const first = firstTokenAt || ended;
+        const generateMs = ended - first;
+        writeTo(convId, (prev) => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            const perf: Perf = {
+              total_ms: ended - started,
+              load_ms: loadMs,
+              first_token_ms: first - started,
+              generate_ms: generateMs,
+              tokens,
+              tok_s: generateMs > 0 ? (tokens / generateMs) * 1000 : 0,
+              model: picked.label,
+              machine: props.self?.name ?? "this computer",
+              where: "local",
+              context_chars: contextChars || undefined,
+            };
+            copy[copy.length - 1] = { ...last, perf };
+          }
+          return copy;
+        });
+      },
+      onError: (message) => {
+        if (run.stopped) return;
+        failRun(run, message);
+      },
+    });
+    run.stop = () => handle.cancel();
   }
 
   const empty = messages.length === 0;
+
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();

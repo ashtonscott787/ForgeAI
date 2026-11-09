@@ -623,3 +623,15 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .budget{display:flex;align-items:center;gap:10px}
 .budget input[type=range]{accent-color:var(--ember);width:160px}
 .errtext{white-space:pre-wrap;font-size:12.5px;margin-bottom:8px;max-height:220px;overflow:auto}
+
+/* Cloud accounts */
+.cloudcard { border: 1px solid var(--line, rgba(127,127,127,.25)); border-radius: 12px; padding: 14px; margin: 10px 0; display: grid; gap: 10px; }
+.cloudhead { display: flex; gap: 10px; align-items: center; }
+.conn { font-size: 13px; }
+.conn-ok { color: #2fb07f; }
+.conn-warn { color: #d99a2b; }
+.conn-bad { color: #e5534b; }
+.conn-idle { opacity: .7; }
+.cloudmodels ul { margin: 6px 0; padding-left: 18px; }
+.cloudmodels li { margin: 3px 0; }
+.ghostbtn.danger { color: #e5534b; }

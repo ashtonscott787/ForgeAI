@@ -1,7 +1,11 @@
 // Forge AI desktop shell (Electron). Mirrors the Tauri command surface so the
 // same React frontend runs unchanged. Inference is the bundled llama.cpp
 // `llama-server`, bound to 127.0.0.1 on a free port.
-const { app, BrowserWindow, ipcMain, screen, shell, session, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell, session, dialog, protocol } = require("electron");
+const preview = require("./preview.cjs");
+
+// Generated pages load from this scheme, with their own policy. Must be declared before the app is ready.
+protocol.registerSchemesAsPrivileged([{ scheme: preview.SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: false, corsEnabled: false } }]);
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -18,6 +22,8 @@ const memory = require("./memory.cjs");
 const skills = require("./skills.cjs");
 const { isTrustedSender } = require("./trust.cjs");
 const providers = require("./providers.cjs");
+const { openEngineLog } = require("./engine-log.cjs");
+const providerState = require("./provider-state.cjs");
 const connectors = require("./connectors.cjs");
 const secrets = require("./secrets.cjs");
 const research = require("./research.cjs");
@@ -237,22 +243,13 @@ async function startEngine({ modelFile }) {
   if (settings.threads) args.push("--threads", String(settings.threads));
   // --no-mmap reads the whole file into RAM instead of paging it from disk.
   if (settings.load_into_memory) args.push("--no-mmap");
-  const log = fs.createWriteStream(logFile(), { flags: "w" });
-  log.on("error", () => {
-    /* a log that cannot be written must never take the app down */
-  });
+  const log = openEngineLog(logFile());
   const proc = spawn(serverBin(), args, { cwd: engineDir(), windowsHide: true, env: { ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH } });
-  // Two streams into one file: neither may close it, or whichever finishes
-  // second writes to an ended stream and crashes the main process.
-  proc.stdout.pipe(log, { end: false });
-  proc.stderr.pipe(log, { end: false });
-  proc.once("close", () => {
-    try {
-      log.end();
-    } catch {
-      /* already closed */
-    }
-  });
+  // Both output streams feed one guarded log. The log is closed exactly once, on
+  // close, and any later chunk is dropped rather than written to an ended stream.
+  proc.stdout.on("data", (c) => log.write(c));
+  proc.stderr.on("data", (c) => log.write(c));
+  proc.once("close", () => log.close());
   let exited = null;
   proc.on("exit", (code) => { exited = code; if (engine.proc === proc) engine = { proc: null, port: 0, model_file: null }; });
   proc.on("error", (e) => { exited = String(e); });
@@ -287,6 +284,8 @@ function register(win) {
     if (!isTrustedSender(e, path.join(__dirname, "..", "dist", "index.html"))) throw new Error("refused: this message did not come from the Forge AI window");
     try { return await fn(a || {}); } catch (e) { throw new Error(e?.message || String(e)); }
   });
+  h("preview_register", ({ html }) => preview.register(html));
+  h("preview_forget", ({ id }) => { preview.forget(id); return null; });
   h("health", () => ({ runtime_available: fs.existsSync(serverBin()), runtime_id: RUNTIME_ID, models_dir: modelsDir(), app_version: app.getVersion() }));
   h("detect_hardware", hardware);
   h("cpu_label", cpuLabel);
@@ -343,18 +342,60 @@ function register(win) {
   h("reminder_snooze", ({ id, minutes }) => reminders.snooze(id, minutes));
 
   // ── cloud providers ───────────────────────────────────────
-  // Keys live in the keychain. Each streamed request has its own id and
-  // AbortController, so a Stop affects only that request.
-  const PROVIDERS = ["anthropic", "openai"];
-  const providerKey = (p) => { if (!PROVIDERS.includes(p)) throw new Error("unknown provider"); return "provider:" + p; };
-  h("provider_key_set", ({ provider, key }) => { secrets.set(providerKey(provider), String(key || "").trim()); return secrets.status(); });
-  h("provider_key_status", () => PROVIDERS.map((p) => ({ provider: p, saved: Boolean(secrets.get(providerKey(p))) })));
+  // Keys live only in the keychain and never go back to the renderer. Saved
+  // (has a key), verified (last authenticated test passed) and failed are kept
+  // as separate facts in provider-state.cjs.
+  const PROVIDERS = providerState.PROVIDERS;
+  const providerName = (p) => { if (!PROVIDERS.includes(p)) throw new Error("unknown provider"); return p; };
+  const keyName = (p) => "provider:" + providerName(p);
+  const providerStatus = () => {
+    const snap = providerState.snapshot();
+    return PROVIDERS.map((p) => ({ provider: p, saved: Boolean(secrets.get(keyName(p))), ...snap[p] }));
+  };
+  h("provider_status", () => providerStatus());
+  h("provider_key_save", ({ provider, key }) => {
+    const k = String(key || "").trim();
+    if (k.length < 10 || k.length > 300 || /\s/.test(k)) throw new Error("That does not look like an API key. Paste the whole key, with no spaces.");
+    secrets.set(keyName(provider), k);
+    providerState.disconnect(providerName(provider));
+    return providerStatus();
+  });
+  h("provider_test", async ({ provider }) => {
+    const p = providerName(provider);
+    const key = secrets.get(keyName(p));
+    if (!key) throw new Error("No key is saved for this provider yet.");
+    try {
+      const { models } = await providers.listModels(p, { apiKey: key });
+      providerState.markVerified(p, models);
+      return providerStatus();
+    } catch (e) {
+      const msg = providers.redact(e.message, key);
+      providerState.markFailed(p, msg);
+      throw new Error(msg);
+    }
+  });
+  h("provider_disconnect", ({ provider }) => { providerState.disconnect(providerName(provider)); return providerStatus(); });
+  h("provider_remove", ({ provider }) => {
+    const p = providerName(provider);
+    secrets.set(keyName(p), "");
+    providerState.forget(p);
+    return providerStatus();
+  });
+  h("provider_manual_add", ({ provider, id }) => { providerState.addManual(providerName(provider), id); return providerStatus(); });
+  h("provider_manual_remove", ({ provider, id }) => { providerState.removeManual(providerName(provider), String(id)); return providerStatus(); });
+
   const providerRuns = new Map();
   h("provider_stream", async ({ requestId, provider, model, system, messages }) => {
+    const p = providerName(provider);
     if (!/^[\w-]{1,64}$/.test(String(requestId || ""))) throw new Error("invalid request id");
     if (providerRuns.has(requestId)) throw new Error("that request is already running");
-    if (typeof model !== "string" || !model || model.length > 200) throw new Error("invalid model");
-    if (!Array.isArray(messages) || messages.length > 500) throw new Error("invalid messages");
+    const row = providerState.get(p);
+    const key = secrets.get(keyName(p));
+    if (!key) throw new Error("No key is saved for this provider.");
+    // The model must come from this connection's own list, so a renderer cannot name arbitrary models.
+    const listed = row.models.some((m) => m.id === model) || row.manual.includes(model);
+    if (!listed) throw new Error("That model is not on this connection's list. Test the connection, or add the model name in Settings.");
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 500) throw new Error("invalid messages");
     const clean = messages.map((m) => {
       if (!["user", "assistant"].includes(m?.role) || typeof m.content !== "string") throw new Error("invalid message");
       return { role: m.role, content: m.content.slice(0, 200_000) };
@@ -363,15 +404,16 @@ function register(win) {
     providerRuns.set(requestId, ac);
     const wc = BrowserWindow.getAllWindows()[0]?.webContents;
     try {
-      const result = await providers.stream(provider, {
-        apiKey: secrets.get(providerKey(provider)), model, system: typeof system === "string" ? system.slice(0, 20_000) : undefined,
+      const result = await providers.stream(p, {
+        apiKey: key, model,
+        system: typeof system === "string" ? system.slice(0, 20_000) : undefined,
         messages: clean, signal: ac.signal,
         onToken: (text) => { if (!ac.signal.aborted) wc?.send("provider://token", { requestId, text }); },
       });
       return { ...result, cancelled: false };
     } catch (e) {
-      if (e.kind === "cancelled") return { tokens: 0, stopReason: "cancelled", cancelled: true };
-      throw new Error(e.message);
+      if (e.kind === "cancelled") return { tokens: 0, stopReason: "cancelled", usage: { input: null, output: null }, cancelled: true };
+      throw new Error(providers.redact(e.message, key));
     } finally {
       providerRuns.delete(requestId);
     }
@@ -575,11 +617,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  protocol.handle(preview.SCHEME, (req) => {
+    const r = preview.respond(req.url);
+    return new Response(r.body, { status: r.status, headers: r.headers });
+  });
   settings = loadSettings();
   updater.cleanupOldBundles();
   secrets.load(root());
   memory.load(root());
   skills.load(root());
+  providerState.load(root());
   connectors.load(root());
   // The renderer is a file:// page; let it read the loopback engine's streamed replies.
   session.defaultSession.webRequest.onHeadersReceived({ urls: ["http://127.0.0.1/*"] }, (d, cb) => {

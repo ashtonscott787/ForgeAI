@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/ipc";
 import { CopyButton } from "./Copy";
 
@@ -27,18 +27,42 @@ export function HtmlPreview({ code, streaming }: { code: string; streaming?: boo
   const [saved, setSaved] = useState<string | null>(null);
 
   // Re-mounting on every token would thrash the frame, so the preview only
-  // takes a new document once the block is complete.
-  const doc = useMemo(() => code, [code]);
+  // takes a new page once the block is complete. Each page is registered with
+  // the main process and loaded from its own origin, under its own policy.
+  const [src, setSrc] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  useEffect(() => {
+    let id: string | null = null;
+    let live = true;
+    if (streaming) return;
+    api.previewRegister(code).then(
+      (p) => {
+        if (!live) { void api.previewForget(p.id).catch(() => undefined); return; }
+        id = p.id;
+        setPreviewError(null);
+        setSrc(p.url);
+      },
+      (e) => { if (live) setPreviewError(e instanceof Error ? e.message : String(e)); },
+    );
+    return () => {
+      live = false;
+      if (id) void api.previewForget(id).catch(() => undefined);
+    };
+  }, [code, streaming]);
 
   const frame = (
     <div className={`previewstage${device.width ? " bounded" : ""}`}>
-      <iframe
-        className="previewframe"
-        title="Generated page"
-        sandbox="allow-scripts"
-        srcDoc={doc}
-        style={device.width ? { width: device.width } : undefined}
-      />
+      {previewError && <div className="banner err"><div className="errtext">{previewError}</div></div>}
+      {src && (
+        <iframe
+          className="previewframe"
+          title="Generated page"
+          sandbox="allow-scripts"
+          src={src}
+          referrerPolicy="no-referrer"
+          style={device.width ? { width: device.width } : undefined}
+        />
+      )}
     </div>
   );
 

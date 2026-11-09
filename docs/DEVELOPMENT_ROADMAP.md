@@ -6,10 +6,10 @@ Ordered by dependency. Status reflects `FEATURE_MATRIX.md`.
 - [x] Confirm branch, commits, active shell (Electron).
 - [x] Feature matrix and architecture docs.
 - [x] CI runs typecheck, build, syntax checks and tests.
-- [ ] Repair CSP without breaking the HTML preview (needs a design decision: separate origin for previews). Not done: a CSP applies to srcdoc frames too.
+- [x] Content-Security-Policy on the app page; generated previews moved to `forge-preview:` with their own policy (tested in Chromium; the scheme itself needs a check in Electron).
 - [x] IPC sender validation on every `forge:*` handler (tested).
 - [ ] Remove or isolate the legacy Tauri fallback in `src/lib/ipc.ts`.
-- [ ] Reproduce `ERR_STREAM_WRITE_AFTER_END`, or prove it no longer occurs, with a test.
+- [~] `ERR_STREAM_WRITE_AFTER_END`: engine log writes moved behind a guard, with a regression test. The original crash was not reproduced in the packaged app.
 
 ## Phase 1 — Reliability
 - [ ] Per-request IDs and engine-side cancellation.
@@ -20,11 +20,15 @@ Ordered by dependency. Status reflects `FEATURE_MATRIX.md`.
 ## Phase 2 — AI foundations
 - [ ] Provider-neutral inference interface.
 - [x] Anthropic and OpenAI streaming adapters, keys in the keychain, IPC wired (tested against fixtures).
-- [ ] Settings and model-picker UI for cloud models; live API verification with real keys.
-- [ ] Unify local and cloud behind one renderer-side interface (today local goes straight to llama-server).
+- [x] Settings panel (connect, test, disconnect, remove, manual models) and unified model selector, with UI tests.
+- [ ] Live API verification with real keys (needs the owner's keys).
+- [ ] Provider logos: neutral badges only; official logos need brand permission.
+- [ ] Cost estimates: needs a trustworthy, maintained price source. Not shown.
+- [~] One selector and one send path for local and cloud; local still streams from llama-server directly.
 - [ ] Catalogue filters and licensed provider logos.
 
 ## Phase 3 — MCP and skills
+- [~] MCP client: design written (`docs/MCP.md`); no code yet.
 - [ ] MCP client using the official SDK over stdio and HTTP.
 - [ ] Visual skills builder; skill manifest schema and validation.
 - [ ] Model-requested tool calls through an approval gate outside the model.

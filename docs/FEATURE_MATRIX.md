@@ -1,42 +1,79 @@
 # Feature matrix
 
 Classifications: **Working** · **Partial** · **Broken** · **Missing** · **Untested** · **Blocked externally**.
-"Evidence" lists what actually supports the classification. Nothing is marked Working
-on the basis of code presence alone.
+"Evidence" names what supports the classification. Code presence alone is not evidence.
+
+Test key: **U** = unit/integration (`pnpm test`, 53 tests). **UI** = end-to-end in Chromium against the
+production build (`pnpm test:ui`, 11 scenarios). The UI suite replaces the Electron main process with a
+stand-in bridge (see `tests/ui/harness.cjs`); it does not exercise Electron itself.
+
+## Cloud models
 
 | Feature | Status | Evidence / gap |
 | --- | --- | --- |
-| Chat send and streaming (local engine) | **Untested** in packaged app | Streaming logic unit-tested against a live SSE server (cancel). Not exercised in the app. |
-| Stop button, all stages | **Partial** | Stop cancels attachment reading, engine start, and streaming (`Chat.tsx`). Local inference is not told to stop server-side. Not clicked in the app. |
-| Streaming token rendering | **Working (code)** | Stray `return` removed; rendering not visually verified. |
-| `ERR_STREAM_WRITE_AFTER_END` | **Untested** | Root cause not reproduced. Late callbacks are now guarded; no reproduction test exists. |
-| Model download: resume (206) / restart (200, 416) | **Working (tested)** | `tests/transfer.test.cjs`: 6 tests pass against a local HTTP server. |
-| Model download: truncation refused | **Working (tested)** | Test "connection dropped mid-body". |
-| Model download: checksum verification | **Working (tested)** | Test "checksum mismatch". Only when the catalogue supplies a SHA256 (Hugging Face LFS oid). Models without one are installed on size/format checks only. |
-| Model download: disk-full handling | **Partial** | Pre-check against `statfs`; not tested. |
-| Update check (GitHub releases) | **Untested** | Code in `electron/updater.cjs`. No network test. |
-| Update download + SHA256SUMS verification | **Partial** | Truncation check added; sha check existed. Not tested. |
-| macOS update apply (App Translocation, /Applications) | **Untested / unverified** | Code exists; no macOS test environment here. |
-| Windows update apply | **Untested** | Code exists; no Windows test environment here. |
-| Model loading / hardware detection | **Untested** | No test environment with GPU or low-RAM hardware. |
-| Skills (text): create, edit, enable, delete, import, export | **Working (tested)** | `tests/extensions.test.cjs`. UI not clicked in app. |
-| Skills in prompt | **Working (tested)** | `systemPrompt()` filters enabled skills; not unit-tested yet. |
-| Connectors: add, validate address, call, redirect refusal | **Working (tested)** | `tests/extensions.test.cjs`. Token storage path **untested** (keychain not available in CI). |
-| Connectors: model-invoked calls | **Missing** | Intentionally absent until an approval flow exists. |
-| Visual skills builder | **Missing** | Not built. |
-| MCP client | **Missing** | Not built. |
-| Visual REST connector builder (pagination, error mapping) | **Missing** | Not built. |
-| Private knowledge bases | **Missing** | Not built. |
-| Forge Model Studio (datasets, LoRA) | **Missing** | Not built. |
-| Voice and meetings | **Missing** | Not built. |
-| Business workspaces (server-enforced) | **Missing** | Not built. Requires a backend. |
-| Skills marketplace | **Missing** | Not built. |
-| Phone companion | **Missing** | Not built. |
-| Memory, reminders, web research, attachments | **Untested** | Code present in `electron/`; no tests. |
-| Tailscale / remote host | **Blocked externally** | Requires a tailnet and two machines. Mesh sidecar not verified. |
-| Cloud API providers: Anthropic, OpenAI adapters | **Partial (tested, no UI)** | `electron/providers.cjs`: streaming, cancellation, typed errors, https-only. 7 tests against fixture servers (`tests/providers.test.cjs`). IPC `provider_stream` / `provider_cancel` / key storage wired. No model picker or settings UI for cloud models yet. Not tested against live vendor APIs (no keys). |
-| Stop for cloud requests | **Partial (tested at adapter level)** | `AbortController` per request id; test shows no tokens after abort. |
-| IPC sender validation | **Working (tested)** | Every `forge:*` handler refuses messages not from the app page (`electron/trust.cjs`, 2 tests). |
-| Provider-neutral model interface (local + cloud) | **Missing** | Local path still calls llama-server directly from `chat.ts`; cloud path is separate. Not unified. |
-| Packaged desktop build (macOS, Windows) | **Untested here** | `desktop.yml` builds on CI runners; no artefact was produced or inspected in this session. |
-| Code signing / notarisation | **Blocked externally** | No Developer ID or Windows certificate in this environment. |
+| Save an API key (keychain) | **Working** | UI: "connect a key". Key goes to `secrets.cjs` (`safeStorage`). Keychain round-trip itself not tested here. |
+| Test connection with an authenticated request | **Working (fixtures)** · live **Blocked externally** | U: `providers-cloud.test.cjs` (listing, pagination, 401, redirect, timeout). Not run against real Anthropic/OpenAI: no keys. |
+| Connected vs saved vs failed shown separately | **Working** | UI: "rejected key is saved but failed". State in `provider-state.cjs` (U: `provider-state.test.cjs`). |
+| Disconnect (keeps key) / Remove key | **Working** | UI: "disconnect keeps the key; remove key deletes it". |
+| Manually entered model IDs | **Working** | Validated by regex; stream refuses models not on the connection's list (main process). |
+| Unified selector: local + cloud | **Working** | Cloud rows come from verified lists (`lib/cloud.ts`). UI: default-model scenario, local and cloud both send. |
+| Default model setting | **Working** | UI: "default model setting picks a cloud model". Saved via `set_settings`. |
+| Auto picks local; falls back to cloud if no local model | **Working** | Auto only considers local models (`router.ts`). Fallback in `Chat.tsx`. UI-tested indirectly (cloud sends without a local model). |
+| Authentic provider logos | **Not done (by design)** | Shows a neutral "A"/"O" badge. Vendor logos require brand permission; see below. |
+| Streaming replies (Anthropic, OpenAI) | **Working (fixtures + UI stand-in)** | U: UTF-8 streaming, usage, malformed frames, error events. UI: streams into bubble. Live API **Blocked externally**. |
+| Stop cancels a cloud request | **Working** | UI: "Stop cancels the cloud request…". Cancel is per request id; U: cancelling one stream leaves another running. |
+| Responses land in the conversation they started in | **Working** | UI: "reply finishing after switching chats". Writes use `setMessagesFor(conversationId)`. |
+| Concurrent chats with independent requests | **Working** | UI: two chats streaming at once; Stop in one leaves the other running. |
+| Token usage | **Partial** | Shown when the provider reports it; null is shown as not reported. Input tokens are stored but not displayed. |
+| Cost estimate | **Missing (deliberate)** | No trustworthy price source is fetched. Nothing is estimated. |
+| Attachments for cloud models | **Partial** | Text files are folded into the prompt (same as local). Images and PDFs are not sent to cloud models. |
+| Context length, vision, tool support per model | **Not shown** | The provider list does not report them here. Nothing is claimed. |
+| Request limits: timeout, size, redirects | **Working (fixtures)** | U: timeout kind, oversized request refused, redirect refused, response size cap. |
+| Key never in renderer state after submit | **Working (UI)** | UI: key not in page HTML after connect; field cleared. Renderer sends the key once to the main process. |
+| Key redacted from error text | **Working** | U: redaction tests, including keys echoed in error bodies. |
+
+## Security and rendering
+
+| Feature | Status | Evidence / gap |
+| --- | --- | --- |
+| IPC sender validation | **Working** | U: `trust.test.cjs`. Every `forge:*` handler checks the sender is the app page. |
+| Content Security Policy (app window) | **Working (Chromium)** | `index.html` meta policy; U checks it equals the policy in code; UI runs under it. Electron itself not run. |
+| Generated HTML previews | **Working (Chromium stand-in)** | Each page is served from `forge-preview:` with its own policy (`preview.cjs`). UI: page script runs, its network request is blocked. The real `forge-preview:` scheme is **Untested** (Electron only). |
+| Engine log writes never reach an ended stream | **Working (unit)** | U: `engine-log.test.cjs` reproduces the `ERR_STREAM_WRITE_AFTER_END` code and shows the guard. The original crash was **not reproduced** in the packaged app. |
+
+## Local models and downloads
+
+| Feature | Status | Evidence / gap |
+| --- | --- | --- |
+| Local chat streams a complete reply | **Working (stand-in engine)** | UI: "local model still streams". The real llama-server is not run here. |
+| Stop on a local reply | **Working (stand-in engine)** | UI: "Stop works on a local reply mid-stream". Engine-side cancellation is not verified. |
+| Model download: resume, 416, truncation, stall, duplicate | **Working** | U: `transfer.test.cjs` (6 tests). |
+| Model download: checksum where available | **Working** | U: checksum mismatch test. Models without a published SHA256 get size and format checks only. |
+| Hardware detection, memory-aware loading | **Untested** | No GPU or low-RAM machine here. |
+| Updater (check, verify, apply) | **Untested** | `updater.cjs`. Truncation check added; no mock release server yet. |
+| macOS App Translocation, /Applications | **Untested** | No macOS environment. |
+| Packaged desktop build | **Untested here** | `desktop.yml` builds on CI; no artefact produced in this session. |
+| Code signing / notarisation | **Blocked externally** | No Developer ID or Windows certificate here. |
+
+## Skills and connectors
+
+| Feature | Status | Evidence / gap |
+| --- | --- | --- |
+| Skills: create, edit, enable, import, export | **Working** | U: `extensions.test.cjs`. |
+| Connectors: address rules, live request, redirect refusal | **Working** | U: `extensions.test.cjs`. Token path needs a keychain, untested in CI. |
+| Model-invoked connector calls | **Missing** | Intentionally absent until approval gating exists. |
+| Visual skills builder | **Missing** | Not started. |
+| Visual REST connector builder | **Missing** | Not started. |
+
+## Not started
+
+| Feature | Status | Note |
+| --- | --- | --- |
+| MCP client | **Missing** | Design only: `docs/MCP.md`. |
+| Private knowledge bases | **Missing** | |
+| Forge Model Studio | **Missing** | |
+| Voice and meetings | **Missing** | |
+| Business workspaces | **Missing** | Needs a server with authentication. |
+| Skills marketplace | **Missing** | |
+| Phone companion | **Missing** | |
+| Tailscale / remote host | **Blocked externally** | Needs a tailnet and two machines. |

@@ -33,6 +33,30 @@ Main (electron/main.cjs)           h(name, fn) registers each forge:* handler
 Engine (llama-server)              streamed to the renderer via fetch/SSE (src/lib/chat.ts)
 ```
 
+## Cloud models
+
+```
+Chat.tsx send()  ──  parseCloud(value) = { provider, model }
+   │  api.providerStream({ requestId, provider, model, system, messages })
+   ▼
+main: provider_stream  ── checks: key saved, model on the connection's list, message shape
+   │  providers.stream()  (https only, redirects refused, timeouts, size caps)
+   ▼
+Anthropic Messages API  |  OpenAI Chat Completions   (SSE)
+   │  provider://token {requestId, text}   (per-request events)
+   ▼
+Chat.tsx writes into the conversation that started the request
+```
+
+Verification is separate from saving. `provider_test` makes an authenticated listing request and
+records the result in `providers.json`. The selector offers only models from that list, plus
+models the person typed in.
+
+## Generated pages
+
+A ```html block is stored in the main process (`preview.cjs`) and loaded from `forge-preview:`.
+The app page's policy allows frames only from that scheme. Each page carries its own policy.
+
 ## Chat request lifecycle (renderer)
 
 `Chat.tsx` `send()` creates a run record `{ stopped, handle }` in `activeRun`.
@@ -40,10 +64,11 @@ Stop (`stopRun`) marks it stopped, cancels the fetch via `AbortController`, and
 clears the waiting state. Every async stage checks `run.stopped` before it
 continues. Stream callbacks ignore events once a run is stopped.
 
-**Not yet implemented:** a per-request ID visible to the main process, so that
-cancelling a local inference request also asks the engine to stop generating
-(today the HTTP connection is closed, and the engine's own behaviour on disconnect
-is assumed, not verified).
+Each request has its own run record and its own id. Stop cancels that run only. Cloud requests
+are cancelled in the main process by id. Local requests close the HTTP stream; whether the engine
+stops generating on disconnect is assumed, not verified.
+
+**Not yet implemented:** a cancel for local generation that the engine itself acknowledges.
 
 ## Legacy Rust core (for reference)
 

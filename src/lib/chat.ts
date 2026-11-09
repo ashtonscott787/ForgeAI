@@ -13,6 +13,8 @@ export interface ChatMessage {
   model?: string;
   /** Measured timings for this turn. Absent means nothing was measured. */
   perf?: Perf;
+  /** Provider-reported token usage for a cloud reply. Null fields were not reported, and are shown as such. */
+  usage?: { input: number | null; output: number | null };
   /** Files the user attached to this turn. */
   files?: { name: string; bytes: number; kind: string; readable: boolean }[];
 }
@@ -27,7 +29,7 @@ export interface Perf {
   tok_s: number;
   model: string;
   machine: string;
-  where: "local" | "cluster";
+  where: "local" | "cluster" | "cloud";
   context_chars?: number;
 }
 

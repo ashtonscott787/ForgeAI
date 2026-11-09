@@ -1,6 +1,8 @@
+import { CloudPanel } from "../components/CloudPanel";
 import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
 import { useEffect, useState } from "react";
-import { api, type Settings, type UpdateInfo } from "../lib/ipc";
+import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
+import type { LocalModel } from "../lib/models";
 
 export function SettingsView({
   settings,
@@ -9,6 +11,10 @@ export function SettingsView({
   update,
   checking,
   onCheck,
+  providers,
+  onProviders,
+  models,
+  onUseModel,
 }: {
   settings: Settings;
   onChange: (s: Settings) => void;
@@ -16,6 +22,10 @@ export function SettingsView({
   update: UpdateInfo | null;
   checking: boolean;
   onCheck: () => void;
+  providers: ProviderStatus[];
+  onProviders: (p: ProviderStatus[]) => void;
+  models: LocalModel[];
+  onUseModel: (value: string) => void;
 }) {
   const [saved, setSaved] = useState(false);
 
@@ -39,6 +49,7 @@ export function SettingsView({
       </div>
       <div className="scroll">
         <div className="pbody">
+          <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
           <SkillsPanel />
           <ConnectorsPanel />
           <div className="panel">

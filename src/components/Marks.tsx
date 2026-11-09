@@ -22,6 +22,8 @@ export type MarkKind =
   | "cohere"
   | "nvidia"
   | "falcon"
+  | "anthropic"
+  | "openai"
   | "generic";
 
 const PALETTE: Record<MarkKind, [string, string]> = {
@@ -39,6 +41,9 @@ const PALETTE: Record<MarkKind, [string, string]> = {
   cohere: ["#d946a0", "#f0a3d6"],
   nvidia: ["#62b800", "#a5e65a"],
   falcon: ["#0ea5a5", "#7fd9d9"],
+  // Neutral badge colours for cloud providers. Not the vendors' logos.
+  anthropic: ["#c96442", "#e8a07c"],
+  openai: ["#10a37f", "#6ee7c0"],
   generic: ["#8b8b94", "#c3c3cb"],
 };
 
@@ -59,6 +64,8 @@ export function markFor(name: string): MarkKind {
   if (n.includes("command") || n.includes("cohere") || n.includes("aya")) return "cohere";
   if (n.includes("nemotron") || n.includes("nvidia")) return "nvidia";
   if (n.includes("falcon") || n.includes("tii")) return "falcon";
+  if (n.includes("anthropic") || n.includes("claude")) return "anthropic";
+  if (n.includes("openai") || n.includes("gpt")) return "openai";
   return "generic";
 }
 
@@ -85,6 +92,10 @@ export function Mark({ kind, size = 26 }: { kind: MarkKind; size?: number }) {
 
 function Shape({ kind, accent }: { kind: MarkKind; accent: string }) {
   switch (kind) {
+    case "anthropic": // provider initial, drawn as text; not the vendor logo
+      return <text x="16" y="21.5" textAnchor="middle" fontSize="15" fontWeight="700" fill={accent} stroke="none">A</text>;
+    case "openai":
+      return <text x="16" y="21.5" textAnchor="middle" fontSize="15" fontWeight="700" fill={accent} stroke="none">O</text>;
     case "qwen": // stacked hexagon
       return (
         <>

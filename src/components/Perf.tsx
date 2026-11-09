@@ -29,7 +29,7 @@ export function PerfLine({ perf }: { perf: Perf }) {
           {perf.context_chars ? (
             <div><dt>Document context</dt><dd>{perf.context_chars.toLocaleString()} characters</dd></div>
           ) : null}
-          <div><dt>Ran on</dt><dd>{perf.where === "local" ? "this computer" : "cluster"}</dd></div>
+          <div><dt>Ran on</dt><dd>{perf.where === "local" ? "this computer" : perf.where === "cloud" ? "provider cloud" : "cluster"}</dd></div>
         </dl>
       )}
     </div>

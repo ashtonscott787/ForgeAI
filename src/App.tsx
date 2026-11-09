@@ -1,3 +1,4 @@
+import { cloudRows } from "./lib/cloud";
 import { loadConversations, newConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
 import type { ChatMessage } from "./lib/chat";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -20,6 +21,7 @@ import {
   type UpdateProgress,
   type MachineCapability,
   type Settings,
+  type ProviderStatus,
 } from "./lib/ipc";
 import type { LocalModel, ModelConfiguration } from "./lib/models";
 import { describeInstalled, type InstalledEntry } from "./lib/library";
@@ -81,6 +83,11 @@ export default function App() {
   const [value, setValue] = useState("auto");
   const [installedFiles, setInstalledFiles] = useState<InstalledModel[]>([]);
   const [configurations, setConfigurations] = useState<Record<string, ModelConfiguration>>({});
+  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  useEffect(() => {
+    if (!inTauri) return;
+    void api.providerStatus().then(setProviders).catch(() => undefined);
+  }, []);
 
   // updates
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
@@ -114,11 +121,12 @@ export default function App() {
   const [activeId, setActiveId] = useState<string>(() => convos[0]?.id ?? "");
   const active: Conversation = convos.find((c) => c.id === activeId) ?? convos[0] ?? newConversation();
   useEffect(() => saveConversations(convos), [convos]);
-  const setActiveMessages = useCallback(
-    (m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
+  // Writes name their conversation, so a reply that finishes after a switch lands where it started.
+  const setMessagesFor = useCallback(
+    (convId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
       setConvos((list) =>
         list.map((c) => {
-          if (c.id !== activeId) return c;
+          if (c.id !== convId) return c;
           const messages = typeof m === "function" ? m(c.messages) : m;
           const firstUser = messages.find((x) => x.role === "user");
           return {
@@ -176,7 +184,8 @@ export default function App() {
       .catch(() => undefined);
   }, []);
   const installed = useMemo(() => describeInstalled(installedFiles), [installedFiles]);
-  const models = useMemo(() => selectorRows(installed), [installed]);
+  // One selector: installed local models first, then verified cloud models.
+  const models = useMemo(() => [...selectorRows(installed), ...cloudRows(providers)], [installed, providers]);
 
   const runCheck = useCallback(
     async (manual: boolean) => {
@@ -389,7 +398,9 @@ export default function App() {
               onGoto={setView}
               contextSize={settings.context_size}
               messages={active.messages}
-              onMessages={setActiveMessages}
+              conversationId={activeId}
+              providers={providers}
+              onMessagesFor={setMessagesFor}
             />
           </section>
 
@@ -433,6 +444,10 @@ export default function App() {
               update={update}
               checking={checking}
               onCheck={() => void runCheck(true)}
+              providers={providers}
+              onProviders={setProviders}
+              models={models}
+              onUseModel={setValue}
             />
           </section>
           </div>

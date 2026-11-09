@@ -257,6 +257,34 @@ export interface ConnectorInput {
   token?: string;
 }
 
+export type ProviderId = "anthropic" | "openai";
+export interface ProviderModel {
+  id: string;
+  label: string;
+}
+export interface ProviderStatus {
+  provider: ProviderId;
+  /** A key is saved in the OS keychain. Says nothing about whether it works. */
+  saved: boolean;
+  /** The last authenticated test passed at this time (ms). Null if never, or since a failure. */
+  verified_at: number | null;
+  /** Models the last successful test returned, plus any typed in by hand. */
+  models: ProviderModel[];
+  manual: string[];
+  last_error: string | null;
+  last_error_at: number | null;
+}
+export interface ProviderUsage {
+  input: number | null;
+  output: number | null;
+}
+export interface ProviderStreamResult {
+  tokens: number;
+  stopReason: string | null;
+  usage: ProviderUsage;
+  cancelled: boolean;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -348,6 +376,21 @@ export const api = {
   publisherAvatar: (author: string) => invoke<{ avatar: string | null }>("publisher_avatar", { author }),
   onUpdateProgress: (cb: (p: UpdateProgress) => void) =>
     listen<UpdateProgress>("update://progress", (e) => cb(e.payload)),
+  previewRegister: (html: string) => invoke<{ id: string; url: string }>("preview_register", { html }),
+  previewForget: (id: string) => invoke<null>("preview_forget", { id }),
+  providerStatus: () => invoke<ProviderStatus[]>("provider_status"),
+  providerKeySave: (provider: ProviderId, key: string) => invoke<ProviderStatus[]>("provider_key_save", { provider, key }),
+  providerTest: (provider: ProviderId) => invoke<ProviderStatus[]>("provider_test", { provider }),
+  providerDisconnect: (provider: ProviderId) => invoke<ProviderStatus[]>("provider_disconnect", { provider }),
+  providerRemove: (provider: ProviderId) => invoke<ProviderStatus[]>("provider_remove", { provider }),
+  providerManualAdd: (provider: ProviderId, id: string) => invoke<ProviderStatus[]>("provider_manual_add", { provider, id }),
+  providerManualRemove: (provider: ProviderId, id: string) => invoke<ProviderStatus[]>("provider_manual_remove", { provider, id }),
+  /** Streams a cloud reply. Tokens arrive through onProviderToken; the promise resolves with usage at the end. */
+  providerStream: (args: { requestId: string; provider: ProviderId; model: string; system?: string; messages: { role: "user" | "assistant"; content: string }[] }) =>
+    invoke<ProviderStreamResult>("provider_stream", { ...args }),
+  providerCancel: (requestId: string) => invoke<{ cancelled: boolean }>("provider_cancel", { requestId }),
+  onProviderToken: (cb: (p: { requestId: string; text: string }) => void) =>
+    listen<{ requestId: string; text: string }>("provider://token", (e) => cb(e.payload)),
   onDownloadProgress: (cb: (p: DownloadProgress) => void) =>
     listen<DownloadProgress>("download://progress", (e) => cb(e.payload)),
 };
