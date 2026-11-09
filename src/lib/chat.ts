@@ -15,6 +15,8 @@ export interface ChatMessage {
   perf?: Perf;
   /** Provider-reported token usage for a cloud reply. Null fields were not reported, and are shown as such. */
   usage?: { input: number | null; output: number | null };
+  /** Images attached to this turn, as data URLs. Only sent to vision models. */
+  images?: string[];
   /** Files the user attached to this turn. */
   files?: { name: string; bytes: number; kind: string; readable: boolean }[];
 }
@@ -59,9 +61,21 @@ export function streamChat(
         headers: { "Content-Type": "application/json" },
         // Only the two fields the server expects; anything else is local bookkeeping.
         body: JSON.stringify({
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          messages: messages.map((m) =>
+            m.images && m.images.length
+              ? {
+                  role: m.role,
+                  content: [
+                    { type: "text", text: m.content },
+                    ...m.images.map((url) => ({ type: "image_url", image_url: { url } })),
+                  ],
+                }
+              : { role: m.role, content: m.content },
+          ),
           stream: true,
           cache_prompt: true,
+          // Describing an image should give the same answer each time. Ordinary chat keeps the engine's sampling.
+          ...(messages.some((m) => m.images && m.images.length) ? { temperature: 0 } : {}),
         }),
         signal: controller.signal,
       });

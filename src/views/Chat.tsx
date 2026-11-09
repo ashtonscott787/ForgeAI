@@ -9,7 +9,7 @@ import type { Attachment, EngineStatus, Health, MachineCapability, ProviderStatu
 import { api, pathForFile } from "../lib/ipc";
 import type { InstalledEntry } from "../lib/library";
 import type { LocalModel, ModelConfiguration } from "../lib/models";
-import { systemPrompt } from "../lib/prompt";
+import { systemPrompt, VISION_SYSTEM } from "../lib/prompt";
 import { choose } from "../lib/router";
 
 interface Props {
@@ -28,9 +28,9 @@ interface Props {
   contextSize: number;
   /** The conversation on screen. Every request writes to the conversation it started in. */
   conversationId: string;
-  /** Text to place in the composer, from another view. Not sent automatically. */
-  prefill?: string | null;
-  onPrefillUsed?: () => void;
+  /** Text and images from another view (the browser). Placed in the composer; never sent automatically. */
+  handoff?: { text: string; images: string[] } | null;
+  onHandoffUsed?: () => void;
   messages: ChatMessage[];
   onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 }
@@ -43,6 +43,30 @@ interface Run {
 
 let requestSeq = 0;
 const newRequestId = () => `r${Date.now().toString(36)}${(requestSeq++).toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+
+/** An image the person attached or handed over, in the attachment list. */
+function imageAttachment(dataUrl: string, i: number): Attachment {
+  const mime = /^data:image\/([a-z+.-]+);base64,/i.exec(dataUrl)?.[1] ?? "png";
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  return {
+    name: `screenshot-${i + 1}.${mime === "jpeg" ? "jpg" : mime}`,
+    path: "",
+    bytes: Math.floor((b64.length * 3) / 4),
+    ext: `.${mime === "jpeg" ? "jpg" : mime}`,
+    kind: "image",
+    pages: null,
+    text: "",
+    preview: b64,
+    readable: true,
+    note: "",
+  };
+}
+/** The data URL a vision model is given for an attached image. */
+function imageDataUrl(f: Attachment): string {
+  const ext = (f.ext || ".png").replace(".", "").toLowerCase();
+  const mime = ext === "jpg" ? "jpeg" : ext;
+  return `data:image/${mime};base64,${f.preview}`;
+}
 
 export function Chat(props: Props) {
   const [prompt, setPrompt] = useState("");
@@ -76,10 +100,12 @@ export function Chat(props: Props) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!props.prefill) return;
-    setPrompt(props.prefill);
-    props.onPrefillUsed?.();
-  }, [props.prefill]);
+    if (!props.handoff) return;
+    const { text, images } = props.handoff;
+    setPrompt(text);
+    setFiles((prev) => [...prev, ...images.map(imageAttachment)]);
+    props.onHandoffUsed?.();
+  }, [props.handoff]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -184,6 +210,14 @@ export function Chat(props: Props) {
       }
     }
 
+    const images = files
+      .filter((f) => f.kind === "image" && f.preview)
+      .map((f) => imageDataUrl(f));
+    if (images.length && cloud) {
+      failIn(convId, "Images are only sent to local vision models for now. Remove the image, or choose a local vision model.");
+      return;
+    }
+
     let picked: { label: string; file_name?: string };
     if (cloud) {
       const s = props.providers.find((p) => p.provider === cloud.provider);
@@ -197,8 +231,12 @@ export function Chat(props: Props) {
       }
       picked = { label: cloud.model };
     } else {
+      // With an image attached, Auto must pick a model that can read images.
+      const visionChoice = images.length && value === "auto" ? props.installed.find((i) => i.vision) : undefined;
       const choice =
-        value === "auto"
+        visionChoice
+          ? { file_name: visionChoice.file_name, label: visionChoice.label, why: "" }
+          : value === "auto"
           ? choose(body, props.installed, props.self?.usable_model_bytes ?? 0, props.engine.model_file)
 
           : (() => {
@@ -210,6 +248,10 @@ export function Chat(props: Props) {
         return;
       }
       picked = { label: choice.label, file_name: choice.file_name };
+      if (images.length && !props.installed.find((i) => i.file_name === choice.file_name)?.vision) {
+        failIn(convId, `${choice.label} cannot read images. Install a vision model, such as SmolVLM, from the Models library, and choose it.`);
+        return;
+      }
     }
 
     setError(null);
@@ -232,6 +274,7 @@ export function Chat(props: Props) {
       {
         role: "user",
         content: body,
+        images: images.length ? images : undefined,
         files: attached.map((f) => ({ name: f.name, bytes: f.bytes, kind: f.kind, readable: f.readable })),
       },
     ];
@@ -263,10 +306,13 @@ export function Chat(props: Props) {
     if (run.stopped) return;
     const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);
     if (run.stopped) return;
-    const system = systemPrompt(memories, enabledSkills);
+    // With an image, the short instruction is used: see VISION_SYSTEM.
+    const system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills);
 
-    const outbound = next.map((m, i) =>
-      i === next.length - 1 ? { role: "user" as const, content: sendContent } : { role: m.role, content: m.content },
+    const outbound: ChatMessage[] = next.map((m, i) =>
+      i === next.length - 1
+        ? { role: "user" as const, content: sendContent, images: images.length ? images : undefined }
+        : { role: m.role, content: m.content },
     );
 
     if (cloud) {
@@ -300,6 +346,10 @@ export function Chat(props: Props) {
         });
         if (run.stopped) return;
         const res = { usage: streamed?.usage ?? { input: null, output: null }, tokens: streamed?.tokens ?? 0 };
+        if (res.tokens === 0) {
+          failRun(run, `${PROVIDER_LABEL[cloud.provider]} returned no text. Try again, or choose another model.`);
+          return;
+        }
         const ended = performance.now();
         const first = firstAt || ended;
         setStatus(null);
@@ -368,6 +418,11 @@ export function Chat(props: Props) {
       },
       onDone: ({ tokens }) => {
         if (run.stopped) return;
+        // A reply with no text is a failure the person should see, not an empty bubble.
+        if (tokens === 0) {
+          failRun(run, `${picked.label} returned no text. Try again, or choose another model.`);
+          return;
+        }
         endRun(run);
         const ended = performance.now();
         const first = firstTokenAt || ended;

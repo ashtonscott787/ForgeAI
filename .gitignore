@@ -14,3 +14,6 @@ app-icon.png
 engine/
 release/
 _dl/
+
+# local engine build for development and tests; never commit binaries
+/engine-dev

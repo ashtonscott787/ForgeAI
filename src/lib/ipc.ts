@@ -138,7 +138,12 @@ export interface EngineStatus {
   base_url: string;
 }
 
-export interface InstalledModel { file_name: string; bytes: number }
+export interface InstalledModel {
+  file_name: string;
+  bytes: number;
+  /** A projector file sits beside this model, so it can read images. */
+  vision?: boolean;
+}
 
 export interface LinkReadiness {
   mesh_interface_detected: boolean;
@@ -306,6 +311,8 @@ export const api = {
   startEngine: (modelFile: string) => invoke<EngineStatus>("start_engine", { modelFile }),
   /** Start the model only if it is not already the one running. */
   ensureEngine: (modelFile: string) => invoke<EngineStatus>("ensure_engine", { modelFile }),
+  resolveProjector: (repo: string, quant: string) =>
+    invoke<{ found: boolean; file_name?: string; url?: string; bytes?: number; sha256?: string }>("resolve_projector", { repo, quant }),
   resolveArtifact: (repo: string, quant: string) =>
     invoke<Resolved>("resolve_artifact", { repo, quant }),
   searchHub: (opts: { query: string; sort?: HubSort; author?: string; limit?: number }) =>
@@ -383,6 +390,11 @@ export const api = {
   publisherAvatar: (author: string) => invoke<{ avatar: string | null }>("publisher_avatar", { author }),
   onUpdateProgress: (cb: (p: UpdateProgress) => void) =>
     listen<UpdateProgress>("update://progress", (e) => cb(e.payload)),
+  defaultBrowserStatus: () => invoke<{ is_default: boolean; platform: string }>("default_browser_status"),
+  defaultBrowserRequest: () => invoke<{ is_default: boolean; platform: string }>("default_browser_request"),
+  defaultBrowserSettings: () => invoke<{ opened: boolean }>("default_browser_settings"),
+  /** Links that arrive from outside Forge AI, to open in the built-in browser. */
+  onBrowserOpen: (cb: (p: { url: string }) => void) => listen<{ url: string }>("browser://open", (e) => cb(e.payload)),
   webSearch: (query: string) => invoke<WebResult>("web_search", { query }),
   webArticle: (title: string) => invoke<{ title: string; text: string; url: string }>("web_article", { title }),
   /** Saves a PNG the person chose a place for. Returns the path, or null if cancelled. */

@@ -1,6 +1,54 @@
 import { useEffect, useState } from "react";
 import { api, type Connector, type Skill } from "../lib/ipc";
 
+/**
+ * Whether Forge AI opens web links. Changing it is always the person's choice: the button asks
+ * the operating system, which may show its own prompt. Forge AI never changes it on its own.
+ */
+export function DefaultBrowserPanel() {
+  const [isDefault, setIsDefault] = useState<boolean | null>(null);
+  const [platform, setPlatform] = useState<string>("");
+  const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    void api.defaultBrowserStatus().then((s) => { setIsDefault(s.is_default); setPlatform(s.platform); }).catch((e) => setErr(String(e)));
+  }, []);
+  return (
+    <div className="panel">
+      <div className="panel-h"><span className="t">Default browser</span></div>
+      <div className="panel-b">
+        <p className="hint">
+          When Forge AI is the default browser, links from other apps open in Forge AI's built-in browser.
+          Forge AI changes this only when you press the button.
+        </p>
+        <p role="status">
+          {isDefault === null ? "Checking…" : isDefault ? "Forge AI opens web links." : "Forge AI does not open web links yet."}
+        </p>
+        {err && <div className="banner err"><div className="errtext">{err}</div></div>}
+        {note && <p className="hint">{note}</p>}
+        <div className="actions">
+          {!isDefault && (
+            <button
+              className="primary"
+              onClick={() =>
+                void api.defaultBrowserRequest().then((s) => {
+                  setIsDefault(s.is_default);
+                  setNote(s.is_default ? null : platform === "win32" ? "Windows may need you to confirm this in its Default apps settings." : "Your system may ask you to confirm. If nothing changes, set Forge AI as the default web browser in your system settings.");
+                }).catch((e) => setErr(String(e)))
+              }
+            >
+              Make Forge AI the default browser
+            </button>
+          )}
+          {platform === "win32" && (
+            <button className="ghostbtn" onClick={() => void api.defaultBrowserSettings().catch((e) => setErr(String(e)))}>Open Windows default apps</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Skills: named instructions the person writes and switches on. */
 export function SkillsPanel() {
   const [skills, setSkills] = useState<Skill[]>([]);

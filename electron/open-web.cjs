@@ -38,20 +38,15 @@ function checkPageUrl(raw) {
   return u.toString();
 }
 
-function getJSON(url, { timeoutMs = LIMITS.timeoutMs } = {}) {
+// How requests leave the machine. Electron's net module uses the system proxy settings, which a
+// corporate network needs; plain Node https ignores them. The app injects Electron's transport.
+let transport = null;
+function useTransport(fn) { transport = fn; }
+
+function nodeGet(url, timeoutMs) {
   return new Promise((resolve, reject) => {
     const lib = url.protocol === "https:" ? https : http;
     const req = lib.get(url, { headers: { "User-Agent": UA, Accept: "application/json" }, timeout: timeoutMs }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400) {
-        res.resume();
-        reject(new WebError("The source redirected the request, which Forge AI refuses.", "redirect"));
-        return;
-      }
-      if (res.statusCode !== 200) {
-        res.resume();
-        reject(new WebError(`The source answered HTTP ${res.statusCode}.`, "server"));
-        return;
-      }
       let body = "";
       let size = 0;
       res.setEncoding("utf8");
@@ -60,14 +55,22 @@ function getJSON(url, { timeoutMs = LIMITS.timeoutMs } = {}) {
         if (size > LIMITS.bodyBytes) { req.destroy(); reject(new WebError("The source sent too much data.", "limit")); return; }
         body += c;
       });
-      res.on("end", () => {
-        try { resolve(JSON.parse(body)); } catch { reject(new WebError("The source sent a response that could not be read.", "malformed")); }
-      });
+      res.on("end", () => resolve({ status: res.statusCode, body }));
       res.on("error", () => reject(new WebError("The connection to the source was lost.", "network")));
     });
     req.on("timeout", () => req.destroy(new WebError("The source did not answer in time.", "timeout")));
-    req.on("error", (e) => { if (!(e instanceof WebError)) reject(new WebError(`Could not reach the source: ${e.message}`, "network")); else reject(e); });
+    req.on("error", (e) => (e instanceof WebError ? reject(e) : reject(new WebError(`Could not reach the source: ${e.message}`, "network"))));
   });
+}
+
+async function getJSON(url, { timeoutMs = LIMITS.timeoutMs } = {}) {
+  const r = transport
+    ? await transport(url.toString(), { timeoutMs, maxBytes: LIMITS.bodyBytes, userAgent: UA })
+    : await nodeGet(url, timeoutMs);
+  if (r.status >= 300 && r.status < 400) throw new WebError("The source redirected the request, which Forge AI refuses.", "redirect");
+  if (r.status === 429) throw new WebError("The source is rate-limiting requests from this computer. Try again in a minute.", "rate_limit");
+  if (r.status !== 200) throw new WebError(`The source answered HTTP ${r.status}.`, "server");
+  try { return JSON.parse(r.body); } catch { throw new WebError("The source sent a response that could not be read.", "malformed"); }
 }
 
 const strip = (html) => String(html).replace(/<[^>]*>/g, "").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
@@ -143,4 +146,4 @@ function readablePageText(html, maxChars = LIMITS.textChars) {
   return lines.join("\n").slice(0, maxChars);
 }
 
-module.exports = { wikipediaSearch, wikipediaSummary, readablePageText, checkPageUrl, WebError, LIMITS };
+module.exports = { wikipediaSearch, wikipediaSummary, readablePageText, checkPageUrl, useTransport, WebError, LIMITS };

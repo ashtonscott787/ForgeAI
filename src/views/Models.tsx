@@ -123,6 +123,13 @@ export function Models(props: Props) {
         [entry.id]: { model_id: entry.id, received: 0, total: r.bytes, bytes_per_sec: 0, done: false },
       }));
       await api.downloadModel(entry.id, r.url, r.file_name, r.sha256);
+      if (entry.vision) {
+        // A vision model needs its projector beside it, under the name the engine looks for.
+        setBusy((b) => ({ ...b, [entry.id]: "Fetching the image reader…" }));
+        const p = await api.resolveProjector(entry.repo, q);
+        if (!p.found || !p.url || !p.file_name) throw new Error("this repository publishes no image projector, so it cannot read images");
+        await api.downloadModel(entry.id + ":projector", p.url, "mmproj-" + r.file_name, p.sha256 ?? "");
+      }
       recordInstall(recordFor(entry, r.file_name, q, r.bytes));
       props.onInstalledChange();
     } catch (e) {

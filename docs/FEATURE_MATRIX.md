@@ -91,3 +91,27 @@ stand-in bridge (see `tests/ui/harness.cjs`); it does not exercise Electron itse
 | Skills marketplace | **Missing** | |
 | Phone companion | **Missing** | |
 | Tailscale / remote host | **Blocked externally** | Needs a tailnet and two machines. |
+
+## Verified on this machine (real Electron, real engine, live network)
+
+Run on Linux under Xvfb, with the Electron binary from node_modules and a llama-server built from the
+pinned llama.cpp tag (b12180 is the release the workflow uses; the build here is from the same
+tag's source). Not run on macOS or Windows.
+
+| Feature | Status | Evidence |
+| --- | --- | --- |
+| Real Electron app starts and renders | **Working** | `pnpm test:e2e`: 10 checks, all passing. |
+| Built-in browser opens a real https page in a webview | **Working** | E2E: example.com loads; guest prefs: no Node, sandboxed, no preload, persistent partition. |
+| Plain http is never opened as a guest | **Working** | E2E. |
+| Screenshot of the guest, saved as a real PNG | **Working** | E2E: PNG signature and size checked. The dialog is stubbed to a path. |
+| Generated page runs its script; its network request is blocked | **Working** | E2E through the real `forge-preview:` scheme. |
+| App page CSP blocks injected inline script | **Working** | E2E. |
+| Link from another launch opens in the running window | **Working** | E2E: second process with a URL argument. |
+| Screenshot analysis by a vision model (SmolVLM-256M + projector) | **Working (narrow)** | Engine: "Red." for a red image. E2E: the reply names the colour through the real engine. Quality beyond a solid-colour check is **not evaluated**. |
+| Image requests use a short instruction | **Working** | The app's full house rules made the 256M model answer off-topic ("Forge."). Measured on this machine. |
+| Empty model replies shown as errors | **Working** | Code path in Chat.tsx; not separately tested. |
+| Live Wikipedia search and summary | **Working (live, rate-limited)** | `FORGE_LIVE=1 pnpm test:live`: 2 of 2 passed on the third attempt. Wikipedia rate-limits this shared address (HTTP 429); the app reports that plainly. |
+| Keyless lookups follow the system proxy | **Working (code)** | Requests go through Electron's `net` in the app. Node's `https` ignores the proxy, so tests use Node unless the transport is injected. Not exercised behind a real corporate proxy. |
+| Default browser: status is shown | **Working** | E2E reads the status. |
+| Default browser: button registers Forge for web links | **Untested** | Pressing it would change this machine's registration. Not pressed in tests. macOS and Windows behaviour not checked. |
+| Vision model download (model + projector) | **Untested end to end** | The projector is fetched after the model. Resolver tested by reading code; the download itself was not run through the app. |

@@ -1,5 +1,5 @@
 import { CloudPanel } from "../components/CloudPanel";
-import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
+import { SkillsPanel, ConnectorsPanel, DefaultBrowserPanel } from "../components/Extensions";
 import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
@@ -49,6 +49,7 @@ export function SettingsView({
       </div>
       <div className="scroll">
         <div className="pbody">
+          <DefaultBrowserPanel />
           <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
           <SkillsPanel />
           <ConnectorsPanel />

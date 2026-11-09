@@ -25,7 +25,7 @@ const ORIGIN_NOTE = "Pages open in a separate, sandboxed browser. Forge AI reads
 export function Browser({
   onSendToChat,
 }: {
-  onSendToChat: (text: string) => void;
+  onSendToChat: (text: string, images?: string[]) => void;
 }) {
   const [tabs, setTabs] = useState<Tab[]>([{ id: newId(), url: HOME, title: "New tab" }]);
   const [activeId, setActiveId] = useState<string>(tabs[0]!.id);
@@ -36,6 +36,16 @@ export function Browser({
   const [searching, setSearching] = useState(false);
   const webviews = useRef<Map<string, HTMLElement & { getURL?: () => string }>>(new Map());
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]!;
+
+  // A link opened from another app arrives here and opens in a new tab.
+  useEffect(() => {
+    const off = api.onBrowserOpen(({ url }) => {
+      const id = newId();
+      setTabs((ts) => [...ts, { id, url, title: url.replace(/^https:\/\//, "").split("/")[0] ?? url }]);
+      setActiveId(id);
+    });
+    return () => void off.then((f) => f()).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     setAddress(active.url);
@@ -130,6 +140,18 @@ export function Browser({
     }
   }
 
+  /** Hands the page to the chat as an image, for a vision model to describe. Nothing is sent until the person presses Send. */
+  async function askAboutScreenshot() {
+    const view = wv();
+    if (!view || !active.url) return;
+    try {
+      const image = await view.capturePage();
+      onSendToChat("What is on this page? Describe what you can see.", [image.toDataURL()]);
+    } catch (e) {
+      setNotice(`Could not take a screenshot: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   return (
     <div className="browser">
       <div className="browser-tabs" role="tablist" aria-label="Browser tabs">
@@ -158,7 +180,8 @@ export function Browser({
         />
         <button className="browser-go" type="submit">Go</button>
         <button type="button" className="browser-action" disabled={!active.url} onClick={() => void readPage()}>Send page to chat</button>
-        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void saveScreenshot()}>Screenshot</button>
+        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void askAboutScreenshot()}>Ask about screenshot</button>
+        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void saveScreenshot()}>Save screenshot</button>
       </form>
 
       {notice && <div className="browser-notice" role="status">{notice}</div>}

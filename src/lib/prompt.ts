@@ -21,6 +21,13 @@ export const SYSTEM_PROMPT = [
   "Otherwise answer normally in Markdown. Be concise and concrete.",
 ].join("\n");
 
+/**
+ * The instruction used when an image is attached. Small vision models lose track of the long house
+ * rules above and answer off-topic (measured: a 256M vision model answered "Forge." to a colour question
+ * under the full rules, and "Red." under this one). The image is the subject, so the rules are left out.
+ */
+export const VISION_SYSTEM = "You are Forge AI, a private assistant running on the user's own computer. Be concise and concrete.";
+
 /** The prompt actually sent: house rules, approved memory, then enabled skills. */
 export function systemPrompt(
   memories: string[],

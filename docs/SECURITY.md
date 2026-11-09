@@ -60,3 +60,12 @@
 ## Reporting
 
 Report security issues to the repository owner privately before public disclosure.
+
+## Added in this round
+
+- **Keyless lookups** leave through Electron's `net` module (the system proxy applies). Redirects are refused. Responses are capped at 512 KB. Requests carry a descriptive User-Agent.
+- **Default browser** changes only when the person presses the button in Settings. The status is read without changing anything.
+- **Links from other apps** are accepted only if they are public https addresses. They open as new browser tabs; they are never loaded in the app page.
+- **Single instance.** A second launch hands its link to the running window and exits.
+- **Images** go to a model only when the person attaches them or hands them over from the browser. Cloud models refuse images for now, rather than sending them anywhere new.
+- **Model files.** A projector is never listed as a model. Its name is fixed to the model's name, so a projector cannot be mistaken for a model.

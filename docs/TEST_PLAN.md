@@ -60,3 +60,30 @@ process boundary; the React app, its state and its streaming code run as shipped
 - Packaged macOS and Windows applications.
 - Every item in the directive's end-to-end list beyond cloud and local chat.
 - Knowledge, workspaces, MCP, marketplace, voice, Model Studio, phone companion: no code yet.
+
+## Real Electron (`tests/e2e/electron.e2e.cjs`, `pnpm test:e2e`)
+
+Starts the real Electron main process and renderer with Playwright's Electron support.
+On Linux, run under a virtual display:
+
+```
+xvfb-run -a pnpm test:e2e
+```
+
+Electron refuses to run as root without `--no-sandbox`, which the suite passes.
+
+The vision check needs a model and its projector, and is skipped without them:
+
+```
+FORGE_TEST_VISION_DIR=/path/to/folder pnpm test:e2e
+```
+
+The folder must hold `SmolVLM-256M-Instruct-Q8_0.gguf` and `mmproj-SmolVLM-256M-Instruct-Q8_0.gguf`.
+The engine must be a llama-server at `engine-dev/llama-server` in the repository root. That path is
+git-ignored. A symlink to a locally built engine is what the verification used.
+
+The suite is **not in CI**: CI does not build llama-server or download model files.
+
+## Live checks (`tests/live.test.cjs`, `pnpm test:live`)
+
+Calls Wikipedia. Skipped unless `FORGE_LIVE=1`. Expect occasional HTTP 429 from shared addresses; retry later.

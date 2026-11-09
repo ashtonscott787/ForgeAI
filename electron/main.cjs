@@ -1,7 +1,7 @@
 // Forge AI desktop shell (Electron). Mirrors the Tauri command surface so the
 // same React frontend runs unchanged. Inference is the bundled llama.cpp
 // `llama-server`, bound to 127.0.0.1 on a free port.
-const { app, BrowserWindow, ipcMain, screen, shell, session, dialog, protocol } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell, session, dialog, protocol, net: electronNet } = require("electron");
 const preview = require("./preview.cjs");
 
 // Generated pages load from this scheme, with their own policy. Must be declared before the app is ready.
@@ -24,6 +24,29 @@ const { isTrustedSender } = require("./trust.cjs");
 const providers = require("./providers.cjs");
 const { openEngineLog } = require("./engine-log.cjs");
 const openWeb = require("./open-web.cjs");
+// Keyless lookups leave through Electron's network stack, so they follow the system proxy.
+openWeb.useTransport((url, { timeoutMs, maxBytes, userAgent }) => new Promise((resolve, reject) => {
+  const req = electronNet.request({ method: "GET", url, redirect: "error" });
+  req.setHeader("User-Agent", userAgent);
+  req.setHeader("Accept", "application/json");
+  const timer = setTimeout(() => { req.abort(); reject(new openWeb.WebError("The source did not answer in time.", "timeout")); }, timeoutMs);
+  req.on("response", (res) => {
+    let body = "";
+    let size = 0;
+    res.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) { clearTimeout(timer); req.abort(); reject(new openWeb.WebError("The source sent too much data.", "limit")); return; }
+      body += chunk.toString("utf8");
+    });
+    res.on("end", () => { clearTimeout(timer); resolve({ status: res.statusCode, body }); });
+    res.on("error", () => { clearTimeout(timer); reject(new openWeb.WebError("The connection to the source was lost.", "network")); });
+  });
+  req.on("error", (e) => {
+    clearTimeout(timer);
+    reject(new openWeb.WebError(/redirect/i.test(e.message) ? "The source redirected the request, which Forge AI refuses." : `Could not reach the source: ${e.message}`, /redirect/i.test(e.message) ? "redirect" : "network"));
+  });
+  req.end();
+}));
 const providerState = require("./provider-state.cjs");
 const connectors = require("./connectors.cjs");
 const secrets = require("./secrets.cjs");
@@ -95,9 +118,17 @@ const cpuLabel = () => `${os.cpus()[0]?.model?.trim() ?? "CPU"} · ${os.cpus().l
 
 // ── models ──────────────────────────────────────────────────
 const safeName = (n) => { if (!n || n !== path.basename(n) || !n.endsWith(".gguf")) throw new Error("invalid model file name"); return n; };
+// A vision model is a language model plus a projector file named "mmproj-<model file>".
+// Projectors are never listed as models of their own.
+const projectorName = (modelFile) => "mmproj-" + modelFile;
+const isProjector = (f) => f.startsWith("mmproj-");
 function installed() {
-  return fs.readdirSync(modelsDir()).filter((f) => f.endsWith(".gguf"))
-    .map((f) => ({ file_name: f, bytes: fs.statSync(path.join(modelsDir(), f)).size }));
+  return fs.readdirSync(modelsDir()).filter((f) => f.endsWith(".gguf") && !isProjector(f))
+    .map((f) => ({
+      file_name: f,
+      bytes: fs.statSync(path.join(modelsDir(), f)).size,
+      vision: fs.existsSync(path.join(modelsDir(), projectorName(f))),
+    }));
 }
 function get(url, headers, redirects = 0) {
   return new Promise((resolve, reject) => {
@@ -129,12 +160,33 @@ function getJSON(url, redirects = 0) {
     }).on("error", (e) => reject(new Error(`cannot reach Hugging Face: ${e.message}`)));
   });
 }
+/** The projector for a vision model: the one matching the quant, else f16, else the smallest. */
+async function resolveProjector({ repo, quant }) {
+  const tree = await getJSON(`https://huggingface.co/api/models/${repo}/tree/main?recursive=1`);
+  const projectors = (Array.isArray(tree) ? tree : []).filter((f) => f.type === "file" && /(^|\/)mmproj[-_.].*\.gguf$/i.test(f.path));
+  if (!projectors.length) return { found: false };
+  const norm = (p) => p.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const want = norm(String(quant || ""));
+  const exact = want ? projectors.filter((f) => norm(f.path).includes(want)) : [];
+  const f16 = projectors.filter((f) => /f16/i.test(f.path));
+  const chosen = (exact[0] ?? f16[0] ?? projectors.sort((a, b) => size(a) - size(b))[0]);
+  return {
+    found: true,
+    file_name: chosen.path.split("/").pop(),
+    url: `https://huggingface.co/${repo}/resolve/main/${encodeURI(chosen.path)}?download=true`,
+    bytes: size(chosen),
+    sha256: (chosen.lfs && typeof chosen.lfs.oid === "string" && chosen.lfs.oid.length === 64) ? chosen.lfs.oid : "",
+  };
+}
 async function resolveArtifact({ repo, quant }) {
   const tree = await getJSON(`https://huggingface.co/api/models/${repo}/tree/main?recursive=1`);
   const ggufs = (Array.isArray(tree) ? tree : []).filter((f) => f.type === "file" && /\.gguf$/i.test(f.path));
   if (!ggufs.length) throw new Error(`no GGUF files found in ${repo}`);
   const whole = ggufs.filter((f) => !/-\d{5}-of-\d{5}\./.test(f.path)); // skip split uploads
-  const pool = whole.length ? whole : ggufs;
+  // Projectors are not models. Leaving them in the pool would let a small projector win on size.
+  const models = ggufs.filter((f) => !/(^|\/)mmproj[-_.]/i.test(f.path));
+  const pool = (whole.length ? whole : ggufs).filter((f) => !/(^|\/)mmproj[-_.]/i.test(f.path));
+  if (!pool.length || !models.length) throw new Error(`no model GGUF files found in ${repo}`);
   const want = String(quant || "Q4_K_M").toLowerCase().replace(/[^a-z0-9]/g, "");
   const norm = (p) => p.toLowerCase().replace(/[^a-z0-9]/g, "");
   const exact = pool.filter((f) => norm(f.path).includes(want));
@@ -242,6 +294,9 @@ async function startEngine({ modelFile }) {
     "--n-gpu-layers", String(layers),
   ];
   if (settings.threads) args.push("--threads", String(settings.threads));
+  // A vision model's projector sits beside it; the engine reads images only with it.
+  const projector = path.join(modelsDir(), projectorName(safeName(modelFile)));
+  if (fs.existsSync(projector)) args.push("--mmproj", projector);
   // --no-mmap reads the whole file into RAM instead of paging it from disk.
   if (settings.load_into_memory) args.push("--no-mmap");
   const log = openEngineLog(logFile());
@@ -299,6 +354,7 @@ function register(win) {
   h("start_engine", startEngine);
   h("ensure_engine", ensureEngine);
   h("resolve_artifact", resolveArtifact);
+  h("resolve_projector", resolveProjector);
   h("search_hub", (a) => searchHub(a || {}));
   h("list_repo_files", (a) => listRepoFiles(a || {}));
   // ── attachments ───────────────────────────────────────────
@@ -457,6 +513,18 @@ function register(win) {
   h("memory_update", (m) => memory.update(m || {}));
   h("memory_delete", ({ id }) => memory.remove(id));
   h("memory_for_prompt", ({ project } = {}) => memory.forPrompt({ project }));
+  h("default_browser_status", () => defaultBrowserStatus());
+  h("default_browser_request", () => {
+    // Asked for by the person's own button press. The operating system may show its own prompt.
+    for (const p of WEB_PROTOCOLS) app.setAsDefaultProtocolClient(p);
+    return defaultBrowserStatus();
+  });
+  h("default_browser_settings", () => {
+    // Windows has a settings page for this. macOS and Linux do not expose a reliable link to it.
+    if (process.platform !== "win32") return { opened: false };
+    shell.openExternal("ms-settings:defaultapps");
+    return { opened: true };
+  });
   // Saves a PNG from the built-in browser to a place the person chooses.
   h("save_screenshot", async ({ dataUrl }) => {
     const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
@@ -620,6 +688,36 @@ function register(win) {
   });
 }
 
+// ── default browser and incoming links ─────────────────────
+// Forge AI asks the operating system to register it for web links only when the person
+// presses the button in Settings. It never changes the setting on its own.
+const WEB_PROTOCOLS = ["https", "http"];
+const defaultBrowserStatus = () => ({
+  is_default: WEB_PROTOCOLS.every((p) => app.isDefaultProtocolClient(p)),
+  platform: process.platform,
+});
+// Links that arrive from outside (another app, or the OS) open in the built-in browser.
+const pendingLinks = [];
+function openLink(url) {
+  try { openWeb.checkPageUrl(url); } catch { return; }
+  const w = BrowserWindow.getAllWindows()[0];
+  if (!w || !w.webContents || w.webContents.isLoading()) { pendingLinks.push(url); return; }
+  w.webContents.send("browser://open", { url });
+}
+const linkFrom = (argv) => (Array.isArray(argv) ? argv.find((a) => /^https?:\/\//i.test(String(a))) : null);
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, argv) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
+    const link = linkFrom(argv);
+    if (link) openLink(link);
+  });
+}
+app.on("open-url", (event, url) => { event.preventDefault(); openLink(url); });
+
 function createWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
   const width = Math.min(1280, Math.round(workAreaSize.width * 0.9));
@@ -632,6 +730,12 @@ function createWindow() {
   win.once("ready-to-show", () => win.show());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: "deny" }; });
   win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
+  // Links received before the page was ready are delivered once it has loaded.
+  win.webContents.once("did-finish-load", () => {
+    for (const url of pendingLinks.splice(0)) win.webContents.send("browser://open", { url });
+  });
+  const firstLink = linkFrom(process.argv);
+  if (firstLink) pendingLinks.push(firstLink);
   return win;
 }
 

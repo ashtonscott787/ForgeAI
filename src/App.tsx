@@ -85,8 +85,8 @@ export default function App() {
   const [installedFiles, setInstalledFiles] = useState<InstalledModel[]>([]);
   const [configurations, setConfigurations] = useState<Record<string, ModelConfiguration>>({});
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
-  // Text handed over from the browser. The chat puts it in the composer; the person sends it.
-  const [prefill, setPrefill] = useState<string | null>(null);
+  // Text and images handed over from the browser. The chat puts them in the composer; the person sends them.
+  const [handoff, setHandoff] = useState<{ text: string; images: string[] } | null>(null);
   useEffect(() => {
     if (!inTauri) return;
     void api.providerStatus().then(setProviders).catch(() => undefined);
@@ -403,8 +403,8 @@ export default function App() {
               contextSize={settings.context_size}
               messages={active.messages}
               conversationId={activeId}
-              prefill={prefill}
-              onPrefillUsed={() => setPrefill(null)}
+              handoff={handoff}
+              onHandoffUsed={() => setHandoff(null)}
               providers={providers}
               onMessagesFor={setMessagesFor}
             />
@@ -412,8 +412,8 @@ export default function App() {
 
           <section className={`view${view === "browser" ? " active" : ""}`}>
             <Browser
-              onSendToChat={(text) => {
-                setPrefill(text);
+              onSendToChat={(text, images = []) => {
+                setHandoff({ text, images });
                 setView("chat");
               }}
             />
