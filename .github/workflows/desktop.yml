@@ -137,10 +137,28 @@ jobs:
 
       - run: pnpm build
 
+      - name: Cache electron-builder's own tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron-builder
+            ~\AppData\Local\electron-builder\Cache
+          key: ebtools-${{ runner.os }}-25.1.8
+
+      # electron-builder fetches NSIS and its signing tools at build time and
+      # does not retry, so one 504 from that host loses the whole run.
       - name: Package
-        run: pnpm exec electron-builder ${{ matrix.builder }} --publish never
+        shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          for attempt in 1 2 3 4; do
+            if pnpm exec electron-builder ${{ matrix.builder }} --publish never; then exit 0; fi
+            echo "packaging attempt $attempt failed; waiting before retry"
+            sleep 30
+          done
+          echo "packaging failed after four attempts"
+          exit 1
 
       # Apple Silicon refuses to launch a Mach-O with no signature at all, and
       # reports it as "damaged" rather than unsigned. electron-builder skips
