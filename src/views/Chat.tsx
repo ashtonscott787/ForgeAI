@@ -39,7 +39,9 @@ export function Chat(props: Props) {
   const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [loadNote, setLoadNote] = useState<string | null>(null);
-  const handleRef = useRef<StreamHandle | null>(null);
+  // The send in progress, from the first await (files, engine start) through the
+  // last token. Stop marks it stopped so no later stage starts or writes again.
+  const activeRun = useRef<{ stopped: boolean; handle: StreamHandle | null } | null>(null);
   // One automatic follow-up per search, so a model that keeps asking cannot loop.
   const researched = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
@@ -82,6 +84,27 @@ export function Chat(props: Props) {
     } finally {
       setReading(false);
     }
+  }
+
+  /**
+   * Stop works at any stage of a send, not only while tokens are arriving. It
+   * cancels the stream if one is open, prevents a send that is still preparing
+   * from starting its stream, and clears the waiting state at once.
+   */
+  function stopRun() {
+    const run = activeRun.current;
+    if (!run) return;
+    run.stopped = true;
+    run.handle?.cancel();
+    activeRun.current = null;
+    setStatus(null);
+    setLoadNote(null);
+    setStreaming(false);
+    // Drop an empty reply placeholder; keep whatever text already arrived.
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      return last?.role === "assistant" && !last.content ? prev.slice(0, -1) : prev;
+    });
   }
 
   /**
@@ -131,6 +154,8 @@ export function Chat(props: Props) {
     setMessages([...next, { role: "assistant", content: "", model: picked.label }]);
     setFiles([]);
     setStreaming(true);
+    const run: { stopped: boolean; handle: StreamHandle | null } = { stopped: false, handle: null };
+    activeRun.current = run;
 
     // Documents are folded into the message the model sees, not the one shown.
     let contextChars = 0;
@@ -143,11 +168,14 @@ export function Chat(props: Props) {
           body,
           Math.max(4000, Math.floor(props.contextSize * 2.6)),
         );
+        if (run.stopped) return;
         contextChars = built.context.length;
         sendContent = `${built.context}\n\n${body}`;
       } catch (e) {
+        if (run.stopped) return;
         setStatus(null);
         setStreaming(false);
+        activeRun.current = null;
         setMessages((prev) => prev.slice(0, -1));
         setError(`Could not prepare the attached files: ${e instanceof Error ? e.message : String(e)}`);
         return;
@@ -164,17 +192,21 @@ export function Chat(props: Props) {
       );
       try {
         engine = await api.ensureEngine(picked.file_name);
+        if (run.stopped) return;
         props.onEngineChange(engine);
       } catch (e) {
+        if (run.stopped) return;
         setStreaming(false);
         setStatus(null);
         setLoadNote(null);
+        activeRun.current = null;
         setMessages((prev) => prev.slice(0, -1));
         setError(`${picked.label} did not start. ${e instanceof Error ? e.message : String(e)}`);
         return;
       }
     }
     const memories = await api.memoryForPrompt().catch(() => [] as string[]);
+    if (run.stopped) return;
     const loadMs = engine === props.engine ? 0 : performance.now() - loadStarted;
     setStatus(null);
     setLoadNote(null);
@@ -184,13 +216,13 @@ export function Chat(props: Props) {
     );
     let firstTokenAt = 0;
 
-    handleRef.current = streamChat(
+    run.handle = streamChat(
       engine.base_url,
       [{ role: "system", content: systemPrompt(memories) }, ...outbound],
       {
         onToken: (piece) => {
+          if (run.stopped) return;
           if (!firstTokenAt) firstTokenAt = performance.now();
-          return
           setMessages((prev) => {
             const copy = [...prev];
             const last = copy[copy.length - 1];
@@ -201,6 +233,8 @@ export function Chat(props: Props) {
           });
         },
         onDone: ({ tokens }) => {
+          if (run.stopped) return;
+          if (activeRun.current === run) activeRun.current = null;
           setStreaming(false);
           const ended = performance.now();
           const first = firstTokenAt || ended;
@@ -229,6 +263,8 @@ export function Chat(props: Props) {
           });
         },
         onError: (message) => {
+          if (run.stopped) return;
+          if (activeRun.current === run) activeRun.current = null;
           setStreaming(false);
           setError(message);
         },
@@ -364,7 +400,7 @@ export function Chat(props: Props) {
             onModelChange={(m) => props.onModelChange(m.value)}
             onConfigurationChange={props.onConfigurationChange}
             onPromptChange={setPrompt}
-            onStop={() => handleRef.current?.cancel()}
+            onStop={stopRun}
             onSubmit={({ prompt: text }) => void send(text)}
           />
             </div>

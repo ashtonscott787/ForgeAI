@@ -12,6 +12,7 @@ const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { readAttachment, selectRelevant } = require("./extract.cjs");
 const updater = require("./updater.cjs");
+const { downloadModel } = require("./transfer.cjs");
 const reminders = require("./reminders.cjs");
 const memory = require("./memory.cjs");
 const secrets = require("./secrets.cjs");
@@ -99,42 +100,6 @@ function get(url, headers, redirects = 0) {
     req.on("error", reject);
   });
 }
-async function download(win, { modelId, url, fileName, sha256 }) {
-  const name = safeName(fileName);
-  const final = path.join(modelsDir(), name), part = final + ".part";
-  if (fs.existsSync(final)) return final;
-  let have = fs.existsSync(part) ? fs.statSync(part).size : 0;
-  const res = await get(url, have ? { Range: `bytes=${have}-` } : {});
-  if (res.statusCode === 200) have = 0; // server ignored Range: restart
-  else if (res.statusCode !== 206) { res.resume(); throw new Error(`download failed: HTTP ${res.statusCode}`); }
-  const total = have + Number(res.headers["content-length"] || 0);
-  const free = (() => { try { return fs.statfsSync(modelsDir()).bavail * fs.statfsSync(modelsDir()).bsize; } catch { return Infinity; } })();
-  if (total - have > free) { res.resume(); throw new Error("not enough free disk space for this model"); }
-  const out = fs.createWriteStream(part, { flags: have ? "a" : "w" });
-  let received = have, last = 0, lastBytes = have, t0 = Date.now();
-  await new Promise((resolve, reject) => {
-    res.on("data", (c) => {
-      received += c.length;
-      const now = Date.now();
-      if (now - last > 250) {
-        const bps = ((received - lastBytes) * 1000) / Math.max(1, now - (last || t0));
-        last = now; lastBytes = received;
-        win.webContents.send("download://progress", { model_id: modelId, received, total, bytes_per_sec: bps, done: false });
-      }
-    });
-    res.pipe(out);
-    res.on("error", reject); out.on("error", reject); out.on("finish", resolve);
-  });
-  if (sha256) {
-    const h = crypto.createHash("sha256");
-    await new Promise((r, j) => fs.createReadStream(part).on("data", (c) => h.update(c)).on("end", r).on("error", j));
-    if (h.digest("hex") !== sha256.toLowerCase()) { fs.rmSync(part); throw new Error("downloaded file failed its checksum and was discarded"); }
-  }
-  fs.renameSync(part, final);
-  win.webContents.send("download://progress", { model_id: modelId, received, total, bytes_per_sec: 0, done: true });
-  return final;
-}
-
 
 // ── Hugging Face resolution ─────────────────────────────────
 // Catalogue entries name a repository, not a file. The exact GGUF file name is
@@ -323,7 +288,7 @@ function register(win) {
   h("set_settings", ({ settings: s }) => { settings = { ...DEFAULTS, ...s }; saveSettings(settings); });
   h("catalogue", () => JSON.parse(fs.readFileSync(path.join(__dirname, "catalogue.json"), "utf8")));
   h("installed_models", installed);
-  h("download_model", (a) => download(win, a));
+  h("download_model", (a) => downloadModel(win, { dir: modelsDir(), ...a }));
   h("delete_model", ({ fileName }) => { const p = path.join(modelsDir(), safeName(fileName)); if (engine.model_file === fileName) stopEngine(); fs.rmSync(p, { force: true }); fs.rmSync(p + ".part", { force: true }); });
   h("start_engine", startEngine);
   h("ensure_engine", ensureEngine);

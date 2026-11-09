@@ -121,6 +121,7 @@ async function download(url, dest, onProgress) {
   let received = 0;
   let last = 0;
   await new Promise((resolve, reject) => {
+    res.setTimeout(120_000, () => res.destroy(new Error("the update download stalled")));
     res.on("data", (c) => {
       received += c.length;
       const now = Date.now();
@@ -130,9 +131,15 @@ async function download(url, dest, onProgress) {
       }
     });
     res.pipe(out);
-    res.on("error", reject);
+    res.on("error", (e) => { out.destroy(); reject(e); });
+    res.on("close", () => {
+      if (!res.complete) { out.destroy(); reject(new Error("the update download was interrupted")); }
+    });
     out.on("error", reject);
-    out.on("finish", resolve);
+    out.on("finish", () => {
+      if (total && received !== total) reject(new Error("the update download was cut short"));
+      else resolve();
+    });
   });
   onProgress?.({ received, total: total || received });
   return dest;
