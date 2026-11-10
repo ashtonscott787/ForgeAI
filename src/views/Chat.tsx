@@ -113,6 +113,18 @@ export function Chat(props: Props) {
     props.onHandoffUsed?.();
   }, [props.handoff]);
 
+  /** Asks the last question again, from the point just before it was asked. */
+  function regenerate() {
+    if (streaming) return;
+    let at = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]!.role === "user") { at = i; break; }
+    }
+    if (at < 0) return;
+    const asked = messages[at]!;
+    void send(asked.content, messages.slice(0, at));
+  }
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming, status]);
@@ -178,7 +190,13 @@ export function Chat(props: Props) {
    * Sending is the only entry point. Local models load on demand; cloud models
    * are called through the provider adapter. Every write goes to `convId`.
    */
-  async function send(text: string) {
+  /**
+   * `base` replaces the history this turn is built on. Regenerating passes the
+   * conversation as it stood before the last question, so the reply is produced
+   * again from the same point rather than appended to a transcript that already
+   * contains it.
+   */
+  async function send(text: string, base?: ChatMessage[]) {
     const convId = id;
     const body = text.trim();
     if (!body || runs.current.has(convId)) return;
@@ -276,7 +294,7 @@ export function Chat(props: Props) {
     setBusy((b) => ({ ...b, [convId]: true }));
 
     const next: ChatMessage[] = [
-      ...messages,
+      ...(base ?? messages),
       {
         role: "user",
         content: body,
@@ -532,6 +550,11 @@ export function Chat(props: Props) {
                 )}
               </div>
               {m.perf && <PerfLine perf={m.perf} />}
+              {m.role === "assistant" && i === messages.length - 1 && !streaming && m.content && (
+                <div className="turnacts">
+                  <button type="button" className="linkbtn" onClick={regenerate}>Regenerate</button>
+                </div>
+              )}
             </div>
           ))}
           {status && (

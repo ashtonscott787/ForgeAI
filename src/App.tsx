@@ -92,6 +92,7 @@ export default function App() {
   const [handoff, setHandoff] = useState<{ text: string; images: string[]; browser?: BrowserActivity } | null>(null);
   // The browser pane belongs to a conversation, so switching chats keeps each one's pane as it was.
   const [panes, setPanes] = useState<Record<string, boolean>>({});
+  const [convQuery, setConvQuery] = useState("");
   useEffect(() => {
     if (!inTauri) return;
     void api.providerStatus().then(setProviders).catch(() => undefined);
@@ -304,9 +305,28 @@ export default function App() {
           <button className="newchat" onClick={startNewChat}>
             New chat
           </button>
+          {convos.filter((c) => c.messages.length > 0).length > 3 && (
+            <input
+              className="convsearch"
+              type="search"
+              aria-label="Search chats"
+              placeholder="Search chats"
+              value={convQuery}
+              onChange={(e) => setConvQuery(e.target.value)}
+            />
+          )}
           <div className="convlist">
             {convos
               .filter((c) => c.messages.length > 0)
+              .filter((c) => {
+                // Titles alone miss the chat you remember by something said in it.
+                const q = convQuery.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  c.title.toLowerCase().includes(q) ||
+                  c.messages.some((m) => m.content.toLowerCase().includes(q))
+                );
+              })
               .sort((a, b) => b.updated - a.updated)
               .map((c) => (
                 <div
