@@ -1,4 +1,5 @@
 import { Browser } from "./views/Browser";
+import type { BrowserActivity } from "./lib/chat";
 import { cloudRows } from "./lib/cloud";
 import { publisherFor } from "./lib/publisher";
 import { loadConversations, newConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
@@ -88,7 +89,9 @@ export default function App() {
   const [configurations, setConfigurations] = useState<Record<string, ModelConfiguration>>({});
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   // Text and images handed over from the browser. The chat puts them in the composer; the person sends them.
-  const [handoff, setHandoff] = useState<{ text: string; images: string[] } | null>(null);
+  const [handoff, setHandoff] = useState<{ text: string; images: string[]; browser?: BrowserActivity } | null>(null);
+  // The browser pane belongs to a conversation, so switching chats keeps each one's pane as it was.
+  const [panes, setPanes] = useState<Record<string, boolean>>({});
   useEffect(() => {
     if (!inTauri) return;
     void api.providerStatus().then(setProviders).catch(() => undefined);
@@ -390,6 +393,17 @@ export default function App() {
 
           <div className="views">
           <section className={`view${view === "chat" ? " active" : ""}`}>
+            <div className={`chat-split${panes[activeId] ? " withpane" : ""}`}>
+            <button
+              type="button"
+              className={`browser-toggle${panes[activeId] ? " on" : ""}`}
+              aria-pressed={Boolean(panes[activeId])}
+              title={panes[activeId] ? "Hide the browser" : "Open the browser"}
+              aria-label={panes[activeId] ? "Hide the browser" : "Open the browser"}
+              onClick={() => setPanes((p) => ({ ...p, [activeId]: !p[activeId] }))}
+            >
+              🌐
+            </button>
             <Chat
               models={models}
               installed={installed}
@@ -410,12 +424,22 @@ export default function App() {
               providers={providers}
               onMessagesFor={setMessagesFor}
             />
+            {panes[activeId] && (
+              <aside className="chat-pane" aria-label="Browser">
+                <Browser
+                  compact
+                  onClose={() => setPanes((p) => ({ ...p, [activeId]: false }))}
+                  onSendToChat={(text, images = [], browser) => setHandoff({ text, images, browser })}
+                />
+              </aside>
+            )}
+            </div>
           </section>
 
           <section className={`view${view === "browser" ? " active" : ""}`}>
             <Browser
-              onSendToChat={(text, images = []) => {
-                setHandoff({ text, images });
+              onSendToChat={(text, images = [], browser) => {
+                setHandoff({ text, images, browser });
                 setView("chat");
               }}
             />

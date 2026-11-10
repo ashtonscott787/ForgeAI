@@ -19,6 +19,25 @@ export interface ChatMessage {
   images?: string[];
   /** Files the user attached to this turn. */
   files?: { name: string; bytes: number; kind: string; readable: boolean }[];
+  /** What the built-in browser did to produce this turn, shown as a collapsed summary. */
+  browser?: BrowserActivity;
+}
+
+/** One thing the browser did. The label is what the person reads; nothing is inferred. */
+export interface BrowserAction {
+  kind: "opened" | "read" | "captured" | "searched";
+  label: string;
+  detail?: string;
+}
+
+/**
+ * A record of browser work attached to a turn. Every entry describes something
+ * that actually happened in the browser pane — never a plan or an intention.
+ */
+export interface BrowserActivity {
+  actions: BrowserAction[];
+  /** The page the actions ended on, shown as a small card. */
+  page?: { title: string; url: string; shot?: string };
 }
 
 /** Every figure here is measured. Nothing is estimated or filled in. */

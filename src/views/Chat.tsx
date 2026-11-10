@@ -3,7 +3,8 @@ import { Attachments } from "../components/Attachments";
 import { AssistantMessage } from "../components/Message";
 import { PerfLine } from "../components/Perf";
 import { ModelSelectorPrompt } from "../components/ModelSelector";
-import { streamChat, type ChatMessage, type Perf, type StreamHandle } from "../lib/chat";
+import { streamChat, type BrowserActivity, type ChatMessage, type Perf, type StreamHandle } from "../lib/chat";
+import { BrowserActivityCard } from "../components/BrowserActivity";
 import { PROVIDER_LABEL, parseCloud, usableModels } from "../lib/cloud";
 import type { Attachment, EngineStatus, Health, MachineCapability, ProviderStatus } from "../lib/ipc";
 import { api, pathForFile } from "../lib/ipc";
@@ -29,7 +30,7 @@ interface Props {
   /** The conversation on screen. Every request writes to the conversation it started in. */
   conversationId: string;
   /** Text and images from another view (the browser). Placed in the composer; never sent automatically. */
-  handoff?: { text: string; images: string[] } | null;
+  handoff?: { text: string; images: string[]; browser?: BrowserActivity } | null;
   onHandoffUsed?: () => void;
   messages: ChatMessage[];
   onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
@@ -99,11 +100,16 @@ export function Chat(props: Props) {
   const researched = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Browser work waits here until the person actually sends, so a page they
+  // looked at and then discarded never appears in the transcript.
+  const pendingBrowser = useRef<BrowserActivity | null>(null);
+
   useEffect(() => {
     if (!props.handoff) return;
-    const { text, images } = props.handoff;
+    const { text, images, browser } = props.handoff;
     setPrompt(text);
     setFiles((prev) => [...prev, ...images.map(imageAttachment)]);
+    if (browser) pendingBrowser.current = browser;
     props.onHandoffUsed?.();
   }, [props.handoff]);
 
@@ -276,8 +282,10 @@ export function Chat(props: Props) {
         content: body,
         images: images.length ? images : undefined,
         files: attached.map((f) => ({ name: f.name, bytes: f.bytes, kind: f.kind, readable: f.readable })),
+        browser: pendingBrowser.current ?? undefined,
       },
     ];
+    pendingBrowser.current = null;
     writeTo(convId, [...next, { role: "assistant", content: "", model: picked.label }]);
     setFiles([]);
 
@@ -516,6 +524,7 @@ export function Chat(props: Props) {
                 ) : (
                   m.content
                 )}
+                {m.role === "user" && m.browser && <BrowserActivityCard activity={m.browser} />}
                 {m.role === "user" && m.files && m.files.length > 0 && (
                   <div className="msgfiles num">
                     {m.files.map((f) => `${f.name}${f.readable ? "" : " (not read)"}`).join(" · ")}

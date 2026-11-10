@@ -221,14 +221,21 @@ async function ensureEngine({ modelFile }) {
 let win = null;
 async function startEngine({ modelFile }) {
   stopEngine();
-  // Launched from the translocated copy, the app's files sit in a read-only temporary location.
-  // Say so at once, rather than starting an engine that cannot load and waiting for it to fail.
-  if (translocated()) throw new Error("Forge AI is running from a temporary copy, so the AI engine cannot start. Quit Forge AI, drag it into your Applications folder, and open it from there.");
-  // The engine must be able to load before it is started. A build missing a library names it here.
+  // Translocation alone is not a reason to refuse. macOS runs a quarantined app from a read-only
+  // copy of the whole bundle, libraries included, so an engine whose libraries are present loads
+  // there exactly as it does from Applications. What cannot work in that copy is updating, which
+  // is handled where updates are offered. So only an engine that genuinely cannot load stops a
+  // start — and when the app is also translocated the message says so, because moving it to
+  // Applications is the one step that fixes a stale copy and clears the quarantine at once.
   const missingLibs = missingEngineLibraries(engineDir());
   if (missingLibs.length) {
     const names = [...new Set(missingLibs.map((m) => m.name.split("/").pop()))];
-    throw new Error(`The AI engine cannot load: ${names.slice(0, 4).join(", ")}${names.length > 4 ? " and more" : ""} ${names.length === 1 ? "is" : "are"} missing from this copy of Forge AI. Download the latest version from the Forge AI releases page, or reinstall.`);
+    const what = `${names.slice(0, 4).join(", ")}${names.length > 4 ? " and more" : ""} ${names.length === 1 ? "is" : "are"} missing from this copy of Forge AI`;
+    throw new Error(
+      translocated()
+        ? `The AI engine cannot load: ${what}. Forge AI is running from a temporary copy, which is what macOS does with an app opened straight from Downloads. Quit Forge AI, drag it into your Applications folder, and open it from there. If it still cannot load, download the latest version from the Forge AI releases page.`
+        : `The AI engine cannot load: ${what}. Download the latest version from the Forge AI releases page, or reinstall.`,
+    );
   }
   const model = path.join(modelsDir(), safeName(modelFile));
   if (!fs.existsSync(model)) throw new Error("model file not found — download it first");

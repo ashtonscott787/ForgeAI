@@ -268,8 +268,11 @@ async function sendInChat(page, text) {
 
   await scenario("the browser searches open sources and opens a result in a new tab", server, async (page) => {
     await page.getByRole("button", { name: "Browser", exact: true }).click();
-    await page.getByLabel("Search open sources").fill("Forge AI");
-    await page.getByRole("button", { name: "Search", exact: true }).click();
+    // Every tab now starts on a real page, so words typed in the address bar are
+    // the way to search open sources, and the results appear over the page.
+    await page.getByLabel("Address or search").fill("Forge AI");
+    await page.getByRole("button", { name: "Go", exact: true }).click();
+    await page.waitForSelector(".browser-results-pane", { timeout: 5000 });
     await page.getByRole("button", { name: "Forge AI", exact: true }).waitFor({ timeout: 5000 });
     await page.getByRole("button", { name: "Forge AI", exact: true }).click();
     const src = await page.locator("webview").first().getAttribute("src");

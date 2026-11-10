@@ -194,6 +194,10 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 /* preview card */
 .preview{position:absolute;left:calc(100% + 9px);bottom:0;width:286px;background:var(--raised);border:1px solid var(--line-strong);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);padding:15px;opacity:0;transform:translateX(-6px) scale(.98);pointer-events:none;transition:opacity 180ms var(--ease),transform 180ms var(--ease);transform-origin:left bottom}
 .preview.show{opacity:1;transform:none;pointer-events:auto}
+/* A descendant may re-enable hit-testing that its parent switched off, so a
+   closed (invisible) model popup was still swallowing clicks over the chat.
+   While the popup is shut, nothing inside it is clickable. */
+.pop:not(.open) .preview{pointer-events:none}
 .pv-h{display:flex;align-items:center;gap:9px}
 .pv-h .mico{width:32px;height:32px}
 .pv-h .t{font-size:13.5px;font-weight:600;letter-spacing:-.014em}
@@ -656,3 +660,91 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .browser-search input { flex: 1; height: 36px; border-radius: 10px; border: 1px solid rgba(127,127,127,.3); padding: 0 12px; background: transparent; color: inherit; }
 .browser-search button { height: 36px; border-radius: 10px; padding: 0 14px; background: #e0641f; color: #fff; border: 0; cursor: pointer; }
 .browser-results { padding-left: 20px; display: grid; gap: 12px; }
+
+/* ── browser in a chat ──────────────────────────────────────
+   The pane sits beside the conversation rather than replacing it, so a page
+   and the reply about it are visible at once. */
+.chat-split { position: relative; display: flex; height: 100%; min-height: 0; }
+.chat-split > :first-of-type { flex: 1; min-width: 0; }
+.chat-pane {
+  flex: 0 0 clamp(320px, 38%, 560px);
+  min-width: 0;
+  border-left: 1px solid var(--line, #2a2a2a);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Narrow windows cannot show both, so the pane takes the width it needs. */
+@media (max-width: 900px) {
+  .chat-split.withpane > :first-of-type { display: none; }
+  .chat-pane { flex: 1; border-left: 0; }
+}
+
+.browser-toggle {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  /* Above the model-details popup, which is absolutely positioned in the same
+     area of an empty chat and would otherwise swallow the click. */
+  z-index: 30;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line, #2a2a2a);
+  background: var(--card, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.browser-toggle:hover { opacity: 1; }
+.browser-toggle.on { opacity: 1; border-color: var(--accent, #6aa3ff); }
+.chat-split.withpane .browser-toggle { right: calc(clamp(320px, 38%, 560px) + 14px); }
+@media (max-width: 900px) { .chat-split.withpane .browser-toggle { right: 14px; } }
+
+.browser.compact .browser-bar { flex-wrap: wrap; gap: 4px; }
+.browser.compact .browser-action { font-size: 11px; padding: 3px 7px; }
+.browser.compact .browser-address { min-width: 120px; }
+.browser-close { margin-left: auto; }
+
+/* ── what the browser did, attached to a turn ───────────────
+   Collapsed by default: evidence, not the answer. */
+.bact { margin: 8px 0 2px; border: 1px solid var(--line, #2a2a2a); border-radius: 10px; overflow: hidden; }
+.bact-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 9px 12px; background: transparent; border: 0; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.bact-head:hover { background: var(--card, rgba(255, 255, 255, 0.03)); }
+.bact-globe { font-size: 13px; }
+.bact-chev { margin-left: auto; transition: transform 120ms ease; opacity: 0.6; }
+.bact-chev.on { transform: rotate(90deg); }
+.bact-list { list-style: none; margin: 0; padding: 0 0 4px; border-top: 1px solid var(--line, #2a2a2a); }
+.bact-row { display: flex; align-items: baseline; gap: 8px; padding: 6px 14px; font-size: 12.5px; }
+.bact-kind { opacity: 0.55; width: 12px; }
+.bact-detail { opacity: 0.6; }
+.bact-page {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-top: 1px solid var(--line, #2a2a2a);
+}
+.bact-shot { width: 108px; height: 68px; object-fit: cover; object-position: top left; border-radius: 6px; border: 1px solid var(--line, #2a2a2a); }
+.bact-shot-blank { display: grid; place-items: center; opacity: 0.4; }
+.bact-pagemeta { min-width: 0; }
+.bact-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bact-url { font-size: 12px; opacity: 0.65; padding: 0; }
+
+/* Open-source search results, over the page rather than instead of it, now that
+   every tab starts on a real page. */
+.browser-results-pane {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 4;
+  max-height: 60%; overflow-y: auto;
+  background: var(--raised); border-bottom: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-pop);
+}
+.browser-results-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12.5px;
+}
+.browser-results-head button { background: none; border: 0; color: inherit; font-size: 15px; cursor: pointer; }
+.browser { position: relative; }
