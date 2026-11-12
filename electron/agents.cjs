@@ -43,7 +43,14 @@ const TOOLS = [
 const TOOL_IDS = TOOLS.map((t) => t.id);
 const byId = (id) => TOOLS.find((t) => t.id === id) || null;
 
-const LIMITS = { name: 80, role: 200, instructions: 8000, goal: 2000, steps: 20 };
+const LIMITS = { name: 80, role: 200, description: 400, instructions: 8000, goal: 2000, steps: 20 };
+
+/**
+ * The icons an agent may carry. A fixed set rather than free text: an arbitrary
+ * string here would be rendered wherever agents are listed, and a short list
+ * also means every agent looks like it belongs to the same application.
+ */
+const ICONS = ["\u{1F916}", "\u{1F4E7}", "\u{1F50D}", "\u{1F4C1}", "\u{1F4CA}", "\u{1F9FE}", "\u{1F4DD}", "\u{1F6E0}", "\u{1F4C8}", "\u{1F9ED}", "\u{2699}", "\u{1F4AC}"];
 
 const newId = () => crypto.randomBytes(8).toString("hex");
 const clip = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
@@ -54,7 +61,9 @@ function emptyAgent(name = "New agent") {
     version: VERSION,
     id: newId(),
     name: clip(name, LIMITS.name) || "New agent",
+    icon: ICONS[0],
     role: "",
+    description: "",
     instructions: "",
     model: null,
     tools: [],
@@ -82,7 +91,10 @@ function validateAgent(raw) {
     version: VERSION,
     id: typeof raw.id === "string" && /^[a-f0-9]{8,32}$/i.test(raw.id) ? raw.id : newId(),
     name,
+    // An icon outside the set is dropped rather than rendered.
+    icon: typeof raw.icon === "string" && ICONS.includes(raw.icon) ? raw.icon : ICONS[0],
     role: clip(raw.role, LIMITS.role),
+    description: clip(raw.description, LIMITS.description),
     instructions: clip(raw.instructions, LIMITS.instructions),
     model: typeof raw.model === "string" && raw.model.trim() ? raw.model.trim().slice(0, 200) : null,
     tools,
@@ -218,7 +230,9 @@ function forgeAssistant(modelFile, verifiedLabel = "") {
   const params = String(verifiedLabel || "").trim() || paramsOf(modelFile);
   return validateAgent({
     name: `Forge AI${params ? ` ${params}` : ""}`,
+    icon: ICONS[0],
     role: "general assistant on this computer",
+    description: "Searches, reads pages and files, and writes documents. Says when it does not know.",
     model: modelFile || null,
     tools: ["web_search", "read_page", "read_files", "knowledge", "write_file", "create_reminder", "write_memory"],
     preapproved: [],
@@ -242,6 +256,18 @@ function forgeAssistant(modelFile, verifiedLabel = "") {
   });
 }
 
+/**
+ * A copy with its own id and a name that says it is one, so two agents are
+ * never confused for each other in a list.
+ */
+function duplicateAgent(agent, existing = []) {
+  const taken = new Set(existing.map((a) => a.name));
+  let name = `${agent.name} copy`;
+  let n = 2;
+  while (taken.has(name)) name = `${agent.name} copy ${n++}`;
+  return validateAgent({ ...agent, id: undefined, name: name.slice(0, LIMITS.name) });
+}
+
 const exportAgent = (a) => JSON.stringify({ ...a, format: FORMAT, version: VERSION }, null, 2);
 
 function importAgent(text) {
@@ -259,5 +285,5 @@ module.exports = {
   FORMAT, VERSION, TOOLS, TOOL_IDS, LIMITS,
   emptyAgent, validateAgent, can, needsApproval, decide,
   systemPromptFor, parseActions, parsePlan, advice, exportAgent, importAgent,
-  forgeAssistant, paramsOf,
+  forgeAssistant, paramsOf, duplicateAgent, ICONS,
 };

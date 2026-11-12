@@ -18,6 +18,15 @@ type Entry =
 
 const MAX_TURNS = 8;
 
+/**
+ * A goal that exercises the loop without touching anything. It asks the agent
+ * to say what it is and what it may do, which proves the model loads, answers,
+ * and has been given the right permissions — before it is trusted with work
+ * that changes something.
+ */
+const TEST_GOAL =
+  "This is a test. Do not use any tool. In two or three sentences, say who you are, what you are for, and list exactly the tools you have been given. If you have none, say so.";
+
 export function Agents({
   installed,
   self,
@@ -28,6 +37,7 @@ export function Agents({
 }) {
   const [list, setList] = useState<Agent[]>([]);
   const [tools, setTools] = useState<AgentTool[]>([]);
+  const [icons, setIcons] = useState<string[]>([]);
   const [editing, setEditing] = useState<Agent | null>(null);
   const [running, setRunning] = useState<Agent | null>(null);
   const [goal, setGoal] = useState("");
@@ -41,6 +51,7 @@ export function Agents({
   useEffect(() => {
     load();
     void api.agentTools().then(setTools).catch(() => undefined);
+    void api.agentIcons().then(setIcons).catch(() => undefined);
   }, []);
   useEffect(() => {
     if (self) void api.agentAdvice({ usable_bytes: self.usable_model_bytes }).then(setAdvice).catch(() => undefined);
@@ -135,7 +146,7 @@ export function Agents({
           {advice?.warn && <div className="banner" role="status">{advice.text}</div>}
 
           <div className="sharerow">
-            <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", role: "", instructions: "", model: null, tools: [], preapproved: [], updated: 0 } as Agent)}>New agent</button>
+            <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", icon: icons[0] ?? "", description: "", role: "", instructions: "", model: null, tools: [], preapproved: [], updated: 0 } as Agent)}>New agent</button>
             <button className="ghostbtn" onClick={() => void api.agentImport().then(load)}>Import</button>
             {!list.some((x) => x.name.startsWith("Forge AI")) && installed.length > 0 && (
               <button
@@ -158,13 +169,19 @@ export function Agents({
           <ul className="packlist">
             {list.map((a) => (
               <li key={a.id} className="packrow">
-                <div className="packmain">
-                  <span className="packname">{a.name}</span>
-                  <span className="hint">{a.role || "no role set"} · {a.tools.length} permission{a.tools.length === 1 ? "" : "s"}</span>
+                <div className="packmain agentmain">
+                  <span className="agenticon" aria-hidden="true">{a.icon}</span>
+                  <span className="agentnames">
+                    <span className="packname">{a.name}</span>
+                    <span className="hint">
+                      {a.description || a.role || "no description yet"} · {a.tools.length} permission{a.tools.length === 1 ? "" : "s"}
+                    </span>
+                  </span>
                 </div>
                 <div className="packacts">
                   <button className="ghostbtn" onClick={() => { setRunning(a); setLog([]); setGoal(""); }}>Run</button>
                   <button className="ghostbtn" onClick={() => setEditing(a)}>Edit</button>
+                  <button className="ghostbtn" onClick={() => void api.agentDuplicate(a.id).then(load)}>Duplicate</button>
                   <button className="ghostbtn" onClick={() => void api.agentExport(a.id)}>Export</button>
                   <button className="ghostbtn" onClick={() => void api.agentDelete(a.id).then(load)}>Delete</button>
                 </div>
@@ -176,6 +193,7 @@ export function Agents({
             <AgentEditor
               agent={editing}
               tools={tools}
+              icons={icons}
               models={installed}
               onCancel={() => setEditing(null)}
               onSave={save}
@@ -197,6 +215,14 @@ export function Agents({
                 <button className="ghostbtn" disabled={busy || !goal.trim()} onClick={() => void runGoal(running, goal.trim())}>
                   {busy ? "Working…" : "Start"}
                 </button>
+                <button
+                  className="ghostbtn"
+                  disabled={busy}
+                  title="Checks the model answers and the permissions behave, without doing anything to your computer"
+                  onClick={() => void runGoal(running, TEST_GOAL)}
+                >
+                  Test this agent
+                </button>
                 {busy && <button className="ghostbtn" onClick={() => { stop.current = true; answer(false); }}>Stop</button>}
               </div>
 
@@ -216,10 +242,14 @@ export function Agents({
                     {e.kind === "said" && <span>{e.text}</span>}
                     {e.kind === "note" && <span className="hint">{e.text}</span>}
                     {e.kind === "tool" && (
-                      <span>
-                        <strong>{e.tool.replace(/_/g, " ")}</strong>
-                        {e.state === "waiting" && " — waiting for you"}
-                        {e.state === "refused" && " — not done"}
+                      <span className="agenttool">
+                        <span className="toolline">
+                          <strong>{e.tool.replace(/_/g, " ")}</strong>
+                          <span className={`toolbadge ${e.state}`}>
+                            {e.state === "waiting" ? "needs your approval" : e.state === "done" ? "done" : "not done"}
+                          </span>
+                        </span>
+                        {e.input && <div className="hint toolinput num">{e.input.slice(0, 140)}</div>}
                         {e.result && <div className="hint agentresult">{e.result.slice(0, 600)}</div>}
                       </span>
                     )}
@@ -246,8 +276,9 @@ function parseActs(text: string) {
 }
 
 function AgentEditor({
-  agent, tools, models, onSave, onCancel,
+  agent, tools, models, icons, onSave, onCancel,
 }: {
+  icons: string[];
   agent: Agent;
   tools: AgentTool[];
   models: { file_name: string; label: string }[];
@@ -272,6 +303,27 @@ function AgentEditor({
       <div className="panel-h"><span className="t">{agent.id ? `Edit ${agent.name}` : "New agent"}</span></div>
       <label className="fl" htmlFor="ag-name">Name</label>
       <input id="ag-name" value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} placeholder="Bea" />
+
+      <span className="fl">Icon</span>
+      <div className="iconpick" role="radiogroup" aria-label="Icon">
+        {icons.map((ic) => (
+          <button
+            key={ic}
+            type="button"
+            role="radio"
+            aria-checked={a.icon === ic}
+            aria-label={`Icon ${ic}`}
+            className={`iconopt${a.icon === ic ? " on" : ""}`}
+            onClick={() => setA({ ...a, icon: ic })}
+          >
+            {ic}
+          </button>
+        ))}
+      </div>
+
+      <label className="fl" htmlFor="ag-desc">Description</label>
+      <input id="ag-desc" value={a.description} onChange={(e) => setA({ ...a, description: e.target.value })}
+        placeholder="One line, so you can tell it apart in the list" />
       <label className="fl" htmlFor="ag-role">What it is for</label>
       <input id="ag-role" value={a.role} onChange={(e) => setA({ ...a, role: e.target.value })} placeholder="handles supplier email" />
       <label className="fl" htmlFor="ag-inst">Standing instructions</label>

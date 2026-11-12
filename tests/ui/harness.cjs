@@ -136,6 +136,15 @@ const BRIDGE = `(() => {
       { id: "write_file", label: "Write or change a file", changes: true },
     ]),
     agent_list: () => (state.agents || (state.agents = [])),
+    agent_icons: () => ["\u{1F916}", "\u{1F4E7}", "\u{1F50D}", "\u{1F4C1}"],
+    agent_duplicate: ({ id }) => {
+      state.agents = state.agents || [];
+      const src = state.agents.find((a) => a.id === id);
+      if (!src) throw new Error("no such agent");
+      const copy = Object.assign({}, src, { id: "a" + (state.agents.length + 1) + "c", name: src.name + " copy" });
+      state.agents.push(copy);
+      return copy;
+    },
     agent_save: ({ agent }) => {
       state.agents = state.agents || [];
       const saved = Object.assign({}, agent, { id: agent.id || "a" + (state.agents.length + 1) });

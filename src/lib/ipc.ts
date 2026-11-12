@@ -356,6 +356,8 @@ export interface AgentTool { id: string; label: string; changes: boolean; note?:
 export interface Agent {
   id: string;
   name: string;
+  icon: string;
+  description: string;
   role: string;
   instructions: string;
   model: string | null;
@@ -436,6 +438,8 @@ export const api = {
   agentList: () => invoke<Agent[]>("agent_list"),
   agentCreateForge: (modelFile?: string) => invoke<Agent>("agent_create_forge", { model_file: modelFile ?? "" }),
   agentSave: (agent: Agent) => invoke<Agent>("agent_save", { agent }),
+  agentDuplicate: (id: string) => invoke<Agent>("agent_duplicate", { id }),
+  agentIcons: () => invoke<string[]>("agent_icons"),
   agentDelete: (id: string) => invoke<{ deleted: boolean }>("agent_delete", { id }),
   agentPrompt: (id: string) => invoke<{ system: string }>("agent_prompt", { id }),
   agentAdvice: (a: { usable_bytes: number; model_bytes?: number }) => invoke<{ ok: boolean; warn?: boolean; text: string }>("agent_advice", a),

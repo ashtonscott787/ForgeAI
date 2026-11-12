@@ -108,6 +108,42 @@ async function scenario(name, server, fn, { seed = false } = {}) {
     assert.ok(await page.locator(".bact-title").innerText(), "the page card has a title");
   }, { seed: true });
 
+  await scenario("Find in page opens, searches, and closes again", server, async (page) => {
+    await page.getByRole("button", { name: "Chat", exact: true }).click();
+    await page.getByRole("button", { name: "Open the browser" }).click();
+    await page.waitForSelector(".chat-pane");
+    assert.equal(await page.locator(".browser-find").count(), 0, "it stays out of the way until asked for");
+    await page.getByRole("button", { name: "Find", exact: true }).click();
+    await page.waitForSelector(".browser-find", { timeout: 4000 });
+    await page.getByLabel("Find in page").fill("forge");
+    assert.equal(await page.getByLabel("Find in page").inputValue(), "forge");
+    await page.getByRole("button", { name: "Close find" }).click();
+    await page.waitForSelector(".browser-find", { state: "detached", timeout: 4000 });
+  });
+
+  await scenario("Summarising a page sends it to the chat, unsent, with a summarising question", server, async (page) => {
+    // The guest's methods exist only in Electron; stand them in with the same shapes.
+    await page.evaluate(() => {
+      const el = HTMLElement.prototype;
+      el.executeJavaScript = function () { return Promise.resolve("Steel prices rose four per cent in the quarter."); };
+      el.getURL = function () { return this.getAttribute("src"); };
+    });
+    await page.getByRole("button", { name: "Chat", exact: true }).click();
+    await page.getByRole("button", { name: "Open the browser" }).click();
+    await page.waitForSelector(".chat-pane");
+    await page.locator(".chat-pane").getByTitle("Summarise this page").click();
+    await page.waitForFunction(
+      () => Array.from(document.querySelectorAll("textarea")).some((t) => t.value.includes("Summarise this page")),
+      null,
+      { timeout: 5000 },
+    );
+    const box = await page.locator('textarea[placeholder^="Ask anything"]').inputValue();
+    assert.match(box, /Steel prices rose four per cent/, "the page text came with it");
+    assert.match(box, /say so instead of inventing a summary/, "and the instruction not to invent one");
+    const sent = await page.evaluate(() => window.__calls.filter((c) => c.cmd === "provider_stream" || c.cmd === "ensure_engine"));
+    assert.equal(sent.length, 0, "nothing was sent automatically");
+  });
+
   server.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

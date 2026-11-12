@@ -227,3 +227,28 @@ npx electron scripts/verify-pdf.cjs
 
 Exits 0 and prints the file, byte count, page count and Electron version on
 success; non-zero with the reason otherwise.
+
+## Browser, agents and layout
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Browser loading and error states | **Working (code)** | Driven by the guest's own `did-start-loading`, `did-stop-loading` and `did-fail-load` events, which are the only honest source. Sub-resource failures and aborted loads are ignored, so the bar reports the page rather than every image. Not exercised against a real guest, which needs Electron. |
+| Find in page | **Working (UI)** | Opens, searches, counts matches, closes. Uses the guest's own `findInPage`. |
+| Summarise this page | **Working (UI)** | Sends the page text with a summarising question, unsent, and tells the model to say so if the page is mostly boilerplate rather than invent a summary. |
+| Agent icons and descriptions | **Working (UI)** | A fixed icon set; anything outside it is dropped rather than rendered. |
+| Duplicate an agent | **Working (unit + UI)** | New id, a name that says it is a copy, permissions carried over, original untouched. |
+| Test an agent | **Working (UI)** | Runs a goal that uses no tool, so the model, the prompt and the permission list can be checked before the agent is trusted with anything that changes. |
+| Tool status in the run log | **Working (UI)** | Each action shows done, not done, or needs your approval, with the input it was given. |
+| Responsive layout | **Working (UI)** | 7 scenarios across 700–1600px over five views, asserting nothing sits past the right edge and nothing scrolls sideways. |
+
+### Two layout bugs the measurements found
+
+The model picker is 414px wide and offset by the sidebar, so at 700px it ended
+past the window — reachable by no pointer. It now anchors to the viewport below
+900px. Its details card did the same at 1000px and is hidden where it cannot
+fit, since the same information is on the row it describes.
+
+`.chat-split > :first-of-type` matched one element per tag, not the first child,
+so the rule meant to hide the conversation on a narrow window also hid the
+browser pane's own `<aside>` — opening the browser below 900px showed nothing
+at all. Both selectors now name the element.

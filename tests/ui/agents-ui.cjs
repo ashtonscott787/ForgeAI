@@ -93,6 +93,43 @@ async function scenario(name, server, fn, cfg = { local: true }) {
     assert.match(await row.innerText(), /0 permissions/);
   });
 
+  await scenario("An agent carries an icon and a description, so it can be told apart", server, async (page) => {
+    await page.getByRole("button", { name: "New agent" }).click();
+    await page.getByLabel("Name").fill("Mail");
+    await page.getByLabel("Description").fill("drafts replies to suppliers");
+    const icons = page.locator(".iconopt");
+    await icons.first().waitFor({ timeout: 4000 });
+    await icons.nth(1).click();
+    assert.equal(await icons.nth(1).getAttribute("aria-checked"), "true", "the chosen icon is marked");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    const row = page.locator(".packrow", { hasText: "Mail" });
+    await row.waitFor({ timeout: 4000 });
+    assert.match(await row.innerText(), /drafts replies to suppliers/, "the description is what the list shows");
+    assert.ok((await row.locator(".agenticon").innerText()).trim().length > 0, "and its icon");
+  });
+
+  await scenario("An agent can be duplicated without touching the original", server, async (page) => {
+    await page.getByRole("button", { name: "New agent" }).click();
+    await page.getByLabel("Name").fill("Bea");
+    await page.getByLabel("Search the web", { exact: true }).check();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.locator(".packrow", { hasText: "Bea" }).first().waitFor({ timeout: 4000 });
+    await page.locator(".packrow", { hasText: "Bea" }).first().getByRole("button", { name: "Duplicate" }).click();
+    await page.locator(".packrow", { hasText: "Bea copy" }).waitFor({ timeout: 4000 });
+    assert.equal(await page.locator(".packrow").count(), 2, "the original is still there");
+    assert.match(await page.locator(".packrow", { hasText: "Bea copy" }).innerText(), /1 permission/, "the copy keeps its permissions");
+  });
+
+  await scenario("An agent can be tested without it doing anything", server, async (page) => {
+    await page.getByRole("button", { name: "New agent" }).click();
+    await page.getByLabel("Name").fill("Tester");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.locator(".packrow", { hasText: "Tester" }).first().getByRole("button", { name: "Run" }).click();
+    const test = page.getByRole("button", { name: "Test this agent" });
+    await test.waitFor({ timeout: 4000 });
+    assert.match(await test.getAttribute("title"), /without doing anything to your computer/);
+  });
+
   server.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

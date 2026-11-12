@@ -1004,6 +1004,8 @@ function register(win) {
     return writeAgent(agents.forgeAssistant(file, label));
   });
   h("agent_save", (a) => writeAgent(agents.validateAgent(a?.agent || a)));
+  h("agent_duplicate", (a) => writeAgent(agents.duplicateAgent(readAgent(String(a?.id || "")), listAgents())));
+  h("agent_icons", () => agents.ICONS);
   h("agent_delete", (a) => {
     const f = agentPath(String(a?.id || ""));
     if (f && fs.existsSync(f)) fs.rmSync(f);
