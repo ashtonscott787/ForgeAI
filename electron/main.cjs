@@ -411,13 +411,10 @@ async function fetchReadable(rawUrl) {
  */
 async function renderPdf(html) {
   const { BrowserWindow: BW } = require("electron");
-  const w = new BW({
-    show: false,
-    webPreferences: { offscreen: true, javascript: false, sandbox: true, contextIsolation: true, nodeIntegration: false },
-  });
+  const w = new BW(documents.PDF_WINDOW);
   try {
     await w.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    return await w.webContents.printToPDF({ printBackground: true, margins: { marginType: "default" } });
+    return await w.webContents.printToPDF(documents.PDF_OPTIONS);
   } finally {
     try { w.destroy(); } catch { /* already gone */ }
   }

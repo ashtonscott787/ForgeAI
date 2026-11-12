@@ -193,4 +193,26 @@ function htmlDocument(title, blocks) {
 <body>${body}</body></html>`;
 }
 
-module.exports = { zip, crc32, csv, docx, para, blocksFromMarkdown, htmlDocument, esc };
+/**
+ * The window printToPDF needs.
+ *
+ * JavaScript must be ON. printToPDF drives printing through the renderer, so a
+ * window created with `javascript: false` aborts with
+ * DisallowJavascriptExecutionScope before producing anything. That setting was
+ * added here as a precaution and was the whole reason PDF generation crashed.
+ *
+ * It is safe to allow: the page is built by htmlDocument, which escapes every
+ * value it is given, it is loaded from a data: URL so it has no origin and no
+ * network, and the renderer is sandboxed with no Node and no preload.
+ *
+ * `offscreen` is also off: combined with printToPDF it is a known source of
+ * blank output and hangs, and `show: false` already keeps the window hidden.
+ */
+const PDF_WINDOW = {
+  show: false,
+  webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true },
+};
+
+const PDF_OPTIONS = { printBackground: true, margins: { marginType: "default" } };
+
+module.exports = { zip, crc32, csv, docx, para, blocksFromMarkdown, htmlDocument, esc, PDF_WINDOW, PDF_OPTIONS };

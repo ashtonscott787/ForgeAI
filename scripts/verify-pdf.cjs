@@ -39,13 +39,12 @@ const SOURCE = [
 ].join("\n");
 
 async function render(html) {
-  const w = new BrowserWindow({
-    show: false,
-    webPreferences: { offscreen: true, javascript: false, sandbox: true, contextIsolation: true, nodeIntegration: false },
-  });
+  // The same options the app uses, from one place, so this cannot verify
+  // something the app does not do.
+  const w = new BrowserWindow(documents.PDF_WINDOW);
   try {
     await w.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    return await w.webContents.printToPDF({ printBackground: true, margins: { marginType: "default" } });
+    return await w.webContents.printToPDF(documents.PDF_OPTIONS);
   } finally {
     try { w.destroy(); } catch { /* already gone */ }
   }

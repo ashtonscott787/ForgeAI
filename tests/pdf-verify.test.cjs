@@ -77,6 +77,30 @@ test("the check notices when the expected text is absent", async () => {
   }
 });
 
+test("the PDF window allows the JavaScript printToPDF needs", () => {
+  // Disabling JavaScript here aborts with DisallowJavascriptExecutionScope,
+  // because printToPDF drives printing through the renderer. This is the bug
+  // that stopped PDF generation working at all.
+  const { PDF_WINDOW, PDF_OPTIONS } = require("../electron/documents.cjs");
+  assert.equal(PDF_WINDOW.webPreferences.javascript, undefined, "JavaScript is not switched off");
+  assert.equal(PDF_WINDOW.webPreferences.offscreen, undefined, "offscreen is not used with printToPDF");
+  assert.equal(PDF_WINDOW.show, false, "the window stays hidden");
+  assert.equal(PDF_WINDOW.webPreferences.sandbox, true, "the renderer is still sandboxed");
+  assert.equal(PDF_WINDOW.webPreferences.nodeIntegration, false, "and has no Node");
+  assert.equal(PDF_OPTIONS.printBackground, true);
+});
+
+test("the app and the verification script print with the same settings", () => {
+  // A script that verified different options would prove nothing about the app.
+  const main = fs.readFileSync(path.join(__dirname, "..", "electron", "main.cjs"), "utf8");
+  const script = fs.readFileSync(path.join(__dirname, "..", "scripts", "verify-pdf.cjs"), "utf8");
+  for (const src of [main, script]) {
+    assert.match(src, /PDF_WINDOW/, "both take the window options from one place");
+    assert.match(src, /PDF_OPTIONS/, "and the print options too");
+    assert.ok(!/javascript:\s*false/.test(src), "neither disables JavaScript");
+  }
+});
+
 test("the verification script exists and is runnable with Electron", () => {
   const p = path.join(__dirname, "..", "scripts", "verify-pdf.cjs");
   assert.ok(fs.existsSync(p), "the script is in the repository");
