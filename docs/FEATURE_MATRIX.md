@@ -154,6 +154,7 @@ tag's source). Not run on macOS or Windows.
 | Temporary chat (ghost button) | **Working (UI)** | 2 UI scenarios: it is marked, kept out of the chat list, never reaches localStorage, and ends when left. |
 | Regenerate an answer | **Working (UI)** | Rebuilds from before the question, so it is not duplicated. |
 | Find an old chat | **Working (UI)** | Searches titles and message bodies. |
-| Agents | **Missing** | Not started. See COMPETITIVE_PLAN.md for why it is last. |
-| The model operating the browser itself | **Missing** | The browser pane is driven by the person, not the model. |
+| Agents | **Working (unit + UI), untested on a real loop** | Saved workers with a name, role, standing instructions, model and an explicit permission list. 22 unit tests on the permission checks and 6 UI scenarios on the configuration. The loop itself has not been run against a real model here. |
+| Agent permissions enforced in the main process | **Working (unit)** | `agent_act` re-checks every call against what the agent was granted. The renderer's claim and the model's request are both ignored. |
+| The model operating the browser itself | **Partly** | An agent can search the web and read a page through its own tools. The browser *pane* is still driven by the person. |
 | Fine-tuning model weights | **Not planned for laptops** | Needs a training stack and far more memory than the target machines have. Knowledge packs are the supported route. |

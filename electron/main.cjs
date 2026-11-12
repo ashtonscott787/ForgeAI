@@ -161,6 +161,7 @@ const { resolveArtifact, resolveProjector } = require("./hf.cjs");
 const { missingEngineLibraries } = require("./engine-check.cjs");
 const share = require("./share-server.cjs");
 const knowledge = require("./knowledge.cjs");
+const agents = require("./agents.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
   const q = String(query || "").trim();
@@ -293,6 +294,23 @@ const packSummary = (p) => ({
   documents: (p.documents || []).map((d) => ({ id: d.id, name: d.name, chars: d.chars, chunks: d.chunks })),
   passages: (p.chunks || []).length,
 });
+
+// ── agents on disk ───────────────────────────────────────────
+const agentsDir = () => { const d = path.join(root(), "agents"); fs.mkdirSync(d, { recursive: true }); return d; };
+const agentPath = (id) => (/^[a-f0-9]{8,32}$/i.test(id) ? path.join(agentsDir(), `${id}.json`) : null);
+function readAgent(id) {
+  const f = agentPath(id);
+  if (!f || !fs.existsSync(f)) throw new Error("That agent is not on this computer.");
+  return agents.validateAgent(JSON.parse(fs.readFileSync(f, "utf8")));
+}
+const writeAgent = (a) => { fs.writeFileSync(path.join(agentsDir(), `${a.id}.json`), agents.exportAgent(a), "utf8"); return a; };
+function listAgents() {
+  try {
+    return fs.readdirSync(agentsDir()).filter((f) => f.endsWith(".json")).map((f) => {
+      try { return agents.validateAgent(JSON.parse(fs.readFileSync(path.join(agentsDir(), f), "utf8"))); } catch { return null; }
+    }).filter(Boolean);
+  } catch { return []; }
+}
 
 let idleTimer = null;
 function touchEngine() {
@@ -721,6 +739,108 @@ function register(win) {
     })(),
     total_memory_bytes: os.totalmem(),
   }));
+  // ── agents ───────────────────────────────────────────────
+  h("agent_tools", () => agents.TOOLS);
+  h("agent_list", () => listAgents());
+  h("agent_save", (a) => writeAgent(agents.validateAgent(a?.agent || a)));
+  h("agent_delete", (a) => {
+    const f = agentPath(String(a?.id || ""));
+    if (f && fs.existsSync(f)) fs.rmSync(f);
+    return { deleted: true };
+  });
+  h("agent_prompt", (a) => ({ system: agents.systemPromptFor(readAgent(String(a?.id || ""))) }));
+  h("agent_advice", (a) => agents.advice({ usableBytes: Number(a?.usable_bytes) || 0, modelBytes: Number(a?.model_bytes) || 0 }));
+  h("agent_export", async (a) => {
+    const agent = readAgent(String(a?.id || ""));
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("downloads"), `${agent.name.replace(/[^\w .-]+/g, "_")}.forgeagent.json`),
+      filters: [{ name: "Forge AI agent", extensions: ["json"] }],
+    });
+    if (canceled || !filePath) return { cancelled: true };
+    fs.writeFileSync(filePath, agents.exportAgent(agent), "utf8");
+    return { saved: filePath };
+  });
+  h("agent_import", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [{ name: "Forge AI agent", extensions: ["json"] }] });
+    if (canceled || !filePaths?.[0]) return { cancelled: true };
+    return writeAgent(agents.importAgent(fs.readFileSync(filePaths[0], "utf8")));
+  });
+
+  /**
+   * Runs one tool for an agent. Every call is checked here against what that
+   * agent was granted — the renderer's opinion is never taken, and neither is
+   * the model's. `approved` only covers a call this same check says needs it.
+   */
+  h("agent_act", async (a) => {
+    const agent = readAgent(String(a?.id || ""));
+    const tool = String(a?.tool || "");
+    const input = String(a?.input || "");
+    const verdict = agents.decide(agent, tool);
+    if (!verdict.allow) return { ok: false, refused: true, error: verdict.reason };
+    if (verdict.approval && a?.approved !== true) return { ok: false, needs_approval: true, error: verdict.reason };
+
+    try {
+      if (tool === "web_search") {
+        const r = await openWeb.wikipediaSearch(input);
+        return { ok: true, result: (r.sources || []).map((x) => `${x.title}: ${x.snippet} (${x.url})`).join("\n") || "Nothing matched." };
+      }
+      if (tool === "read_page") {
+        // checkPageUrl refuses local addresses, so an agent cannot be steered
+        // into reading something on this machine's own network.
+        const url = openWeb.checkPageUrl(input);
+        const res = await get(url, { Accept: "text/html,*/*" });
+        if (res.statusCode !== 200) { res.resume(); return { ok: false, error: `That page answered HTTP ${res.statusCode}.` }; }
+        let html = "";
+        let size = 0;
+        res.setEncoding("utf8");
+        await new Promise((resolve, reject) => {
+          res.on("data", (c) => { size += c.length; if (size > 3_000_000) { res.destroy(); resolve(); return; } html += c; });
+          res.on("end", resolve);
+          res.on("error", reject);
+        });
+        const text = openWeb.readablePageText(html);
+        return { ok: true, result: String(text || "").slice(0, 12000) || "That page had no readable text." };
+      }
+      if (tool === "knowledge") {
+        const active = settings.knowledge_active || [];
+        const parts = [];
+        for (const id of active) {
+          try { const t = knowledge.contextFor(readPack(id), input, 4); if (t) parts.push(t); } catch { /* skip an unreadable pack */ }
+        }
+        return { ok: true, result: parts.join("\n\n---\n\n") || "Nothing in your packs matched." };
+      }
+      if (tool === "create_reminder") {
+        const when = require("./when.cjs").parseWhen(input);
+        if (!when?.at) return { ok: false, error: "I could not work out a time from that." };
+        const r = reminders.create({ text: input, at: when.at, repeat: when.repeat || null });
+        return { ok: true, result: `Reminder set: ${r.text} at ${new Date(r.at).toLocaleString()}` };
+      }
+      if (tool === "write_memory") {
+        const m = memory.add({ text: input, scope: "personal" });
+        return { ok: true, result: `Saved to memory: ${m.text}` };
+      }
+      if (tool === "read_files") {
+        const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ["openFile", "multiSelections"] });
+        if (canceled || !filePaths?.length) return { ok: false, error: "No files were chosen." };
+        const out = [];
+        for (const f of filePaths) {
+          try { const r = await readAttachment(f); out.push(`--- ${path.basename(f)} ---\n${String(r?.text || "").slice(0, 8000)}`); }
+          catch (e) { out.push(`--- ${path.basename(f)} --- could not be read: ${e instanceof Error ? e.message : String(e)}`); }
+        }
+        return { ok: true, result: out.join("\n\n") };
+      }
+      if (tool === "write_file") {
+        const { canceled, filePath } = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath("downloads"), "forge-agent-output.txt") });
+        if (canceled || !filePath) return { ok: false, error: "No file was chosen, so nothing was written." };
+        fs.writeFileSync(filePath, input, "utf8");
+        return { ok: true, result: `Written to ${filePath}` };
+      }
+      return { ok: false, error: `There is no tool called "${tool}".` };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // ── knowledge packs ──────────────────────────────────────
   h("knowledge_list", () => listPacks().map(packSummary));
   h("knowledge_create", (a) => {

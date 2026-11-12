@@ -326,6 +326,25 @@ export interface KnowledgePack {
   passages: number;
 }
 
+export interface AgentTool { id: string; label: string; changes: boolean; note?: string }
+export interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  instructions: string;
+  model: string | null;
+  tools: string[];
+  preapproved: string[];
+  updated: number;
+}
+export interface AgentActResult {
+  ok: boolean;
+  result?: string;
+  error?: string;
+  refused?: boolean;
+  needs_approval?: boolean;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -369,6 +388,15 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  agentTools: () => invoke<AgentTool[]>("agent_tools"),
+  agentList: () => invoke<Agent[]>("agent_list"),
+  agentSave: (agent: Agent) => invoke<Agent>("agent_save", { agent }),
+  agentDelete: (id: string) => invoke<{ deleted: boolean }>("agent_delete", { id }),
+  agentPrompt: (id: string) => invoke<{ system: string }>("agent_prompt", { id }),
+  agentAdvice: (a: { usable_bytes: number; model_bytes?: number }) => invoke<{ ok: boolean; warn?: boolean; text: string }>("agent_advice", a),
+  agentExport: (id: string) => invoke<{ cancelled?: boolean; saved?: string }>("agent_export", { id }),
+  agentImport: () => invoke<Agent | { cancelled: true }>("agent_import"),
+  agentAct: (a: { id: string; tool: string; input: string; approved?: boolean }) => invoke<AgentActResult>("agent_act", a),
   knowledgeList: () => invoke<KnowledgePack[]>("knowledge_list"),
   knowledgeCreate: (a: { name: string; description?: string }) => invoke<KnowledgePack>("knowledge_create", a),
   knowledgeDelete: (id: string) => invoke<{ deleted: boolean }>("knowledge_delete", { id }),

@@ -15,7 +15,8 @@
     "test:e2e": "node tests/e2e/electron.e2e.cjs",
     "test:live": "node --test tests/live.test.cjs",
     "test:ui:browser": "node tests/ui/browser-ui.cjs",
-    "test:ui:chat": "node tests/ui/chat-ui.cjs"
+    "test:ui:chat": "node tests/ui/chat-ui.cjs",
+    "test:ui:agents": "node tests/ui/agents-ui.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",

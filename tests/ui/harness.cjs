@@ -65,6 +65,7 @@ const BRIDGE = `(() => {
   ];
   const cfg = window.__cfg || {};
   const find = (p) => providers.find((x) => x.provider === p);
+  const state = {};
   const handlers = {
     health: () => ({ runtime_available: Boolean(cfg.local), runtime_id: "test", models_dir: "/tmp", app_version: "0.5.2" }),
     installed_models: () => (cfg.local ? [{ file_name: "tiny-test.gguf", bytes: 2 * 2 ** 30 }] : []),
@@ -76,13 +77,31 @@ const BRIDGE = `(() => {
     share_status: () => ({ enabled: false, running: false, urls: [], port: 11435, token: null, mesh_enabled: false, mesh_address: null, error: null }),
     share_set: (a) => ({ enabled: Boolean(a.enabled), running: Boolean(a.enabled), urls: a.enabled ? ["http://127.0.0.1:11435"] : [], port: 11435, token: a.enabled ? "test-token" : null, mesh_enabled: Boolean(a.mesh), mesh_address: null, error: null }),
     knowledge_list: () => (cfg.packs || []),
+    agent_tools: () => ([
+      { id: "web_search", label: "Search the web", changes: false },
+      { id: "read_files", label: "Read files in a folder you choose", changes: false },
+      { id: "create_reminder", label: "Create a reminder", changes: true },
+      { id: "write_file", label: "Write or change a file", changes: true },
+    ]),
+    agent_list: () => (state.agents || (state.agents = [])),
+    agent_save: ({ agent }) => {
+      state.agents = state.agents || [];
+      const saved = Object.assign({}, agent, { id: agent.id || "a" + (state.agents.length + 1) });
+      const at = state.agents.findIndex((x) => x.id === saved.id);
+      if (at >= 0) state.agents[at] = saved; else state.agents.push(saved);
+      return saved;
+    },
+    agent_delete: ({ id }) => { state.agents = (state.agents || []).filter((a) => a.id !== id); return { deleted: true }; },
+    agent_advice: ({ usable_bytes }) => (usable_bytes / (1024 * 1024 * 1024) < 6
+      ? { ok: false, text: "This machine has about 5.0 GB usable. Agent loops need a 7B-class model; expect this to be unreliable here." }
+      : { ok: true, warn: false, text: "This machine has enough memory." }),
     knowledge_context: ({ query }) => {
       const packs = cfg.packs || [];
       const hit = packs.find((p) => (p.documents || []).some((d) => String(query).toLowerCase().includes((d.name || "").toLowerCase().split(".")[0])));
-      return hit ? { text: 'From "' + hit.documents[0].name + '":\nstub passage', packs: [hit.name] } : { text: "", packs: [] };
+      return hit ? { text: 'From the document ' + hit.documents[0].name + ' - stub passage', packs: [hit.name] } : { text: "", packs: [] };
     },
     stop_engine: () => { calls.push({ cmd: "stop_engine", args: {} }); if (window.__engineStop) window.__engineStop(); return null; },
-    detect_hardware: () => ({ schema: 1, id: 1, name: "Test Mac", os: "macOS", backend: "metal", trust: "selfhost", ram_bytes: 16 * 2 ** 30, vram_bytes: 0, unified_memory: true, usable_model_bytes: 8 * 2 ** 30, runtimes: [], links: [], load: 0, online: true }),
+    detect_hardware: () => ({ schema: 1, id: 1, name: "Test Mac", os: "macOS", backend: "metal", trust: "selfhost", ram_bytes: 16 * 2 ** 30, vram_bytes: 0, unified_memory: true, usable_model_bytes: (cfg.usableGb || 8) * 2 ** 30, runtimes: [], links: [], load: 0, online: true }),
     catalogue: () => ({ schema: 1, generated_at: "2026-01-01", models: [] }),
     cpu_label: () => "Test CPU",
     link_readiness: () => ({ tailscale: "unavailable" }),

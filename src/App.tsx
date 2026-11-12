@@ -1,3 +1,4 @@
+import { Agents } from "./views/Agents";
 import { Browser } from "./views/Browser";
 import { GhostMark } from "./components/GhostMark";
 import type { BrowserActivity } from "./lib/chat";
@@ -34,7 +35,7 @@ import { UpdateCard } from "./components/UpdateCard";
 import { markFor } from "./components/Marks";
 import "./styles.css";
 
-type View = "chat" | "browser" | "models" | "reminders" | "memory" | "integrations" | "setup" | "settings";
+type View = "chat" | "browser" | "agents" | "models" | "reminders" | "memory" | "integrations" | "setup" | "settings";
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -371,6 +372,7 @@ export default function App() {
               [
                 ["chat", "Chat"],
                 ["browser", "Browser"],
+                ["agents", "Agents"],
                 ["models", "Models"],
                 ["reminders", "Reminders"],
                 ["memory", "Memory"],
@@ -485,6 +487,10 @@ export default function App() {
               </aside>
             )}
             </div>
+          </section>
+
+          <section className={`view${view === "agents" ? " active" : ""}`}>
+            <Agents installed={installed} self={self} />
           </section>
 
           <section className={`view${view === "browser" ? " active" : ""}`}>

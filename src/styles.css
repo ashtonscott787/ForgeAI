@@ -797,3 +797,11 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .packedit input, .packedit textarea { width: 100%; margin: 6px 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; }
 .packdocs li { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 12.5px; border-top: 1px solid var(--line); }
 .packdocs li span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Agents: the run log, and the approval row that stops it. */
+.agentlog { list-style: none; margin: 10px 0 0; padding: 0; }
+.agentrow { padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.agentrow.note { color: var(--fg-3); }
+.agentresult { margin-top: 4px; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
+.approvalrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.packedit select { width: 100%; margin: 6px 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; }

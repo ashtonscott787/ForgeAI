@@ -27,7 +27,7 @@ Ordered by what a Forge AI user would miss first, not by how interesting it is.
 | 7 | Voice | Both | Missing | Medium |
 | 8 | Keyboard-driven quick entry from anywhere | Both | Missing | Small |
 | 9 | MCP / connectors to outside tools | Both | Partial: a connector and skill system exists; no MCP | Large |
-| 10 | Agentic work: using a computer or browser on your behalf | Both | Missing, deliberately | Large |
+| 10 | Agentic work: using a computer or browser on your behalf | Both | **Built, in the smaller form**: named workers, one task at a time, with web search, page reading, files, reminders and memory. No mail, no parallel runs, no computer control. | Large |
 
 ## What Forge AI has that they do not
 
