@@ -1,7 +1,7 @@
 {
   "name": "forge-ai",
   "private": true,
-  "version": "0.5.4",
+  "version": "0.5.5",
   "packageManager": "pnpm@10.28.0",
   "type": "module",
   "scripts": {
