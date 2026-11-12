@@ -75,3 +75,27 @@ Work on a branch and open a pull request. `main` should always build.
 
 Tagging a commit `v0.3.0` (or whatever is next) triggers the installer build and
 attaches the results to a draft release.
+
+## Setting up a checkout
+
+Node 22 or newer. pnpm comes from corepack, which ships with Node, so there is
+nothing to install globally:
+
+```bash
+corepack enable
+pnpm install
+```
+
+`packageManager` in package.json pins the pnpm version the lockfile was written
+with, so corepack fetches that one rather than whatever is on the machine.
+
+Run Electron through pnpm, never through `npx electron`: npx will download a
+different Electron (it has no idea this project pins 38) and you would be
+testing a runtime the app never ships with.
+
+```bash
+pnpm exec electron scripts/verify-pdf.cjs   # proves PDF generation end to end
+pnpm test                                    # unit tests
+pnpm build                                   # type-check and bundle
+pnpm test:all                                # everything, and fails if anything failed
+```

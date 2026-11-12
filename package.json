@@ -2,6 +2,7 @@
   "name": "forge-ai",
   "private": true,
   "version": "0.5.4",
+  "packageManager": "pnpm@10.28.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
