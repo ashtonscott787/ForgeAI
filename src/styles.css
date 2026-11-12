@@ -786,3 +786,14 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
   padding: 7px 12px; font-size: 12.5px; color: var(--fg-3);
   border-bottom: 1px solid var(--line);
 }
+
+/* Knowledge packs. */
+.packlist, .packdocs { list-style: none; margin: 8px 0; padding: 0; }
+.packrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 7px 0; border-top: 1px solid var(--line); }
+.packmain { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.packname { font-weight: 600; font-size: 13px; }
+.packacts { display: flex; gap: 6px; }
+.packedit { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.packedit input, .packedit textarea { width: 100%; margin: 6px 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; }
+.packdocs li { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 12.5px; border-top: 1px solid var(--line); }
+.packdocs li span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

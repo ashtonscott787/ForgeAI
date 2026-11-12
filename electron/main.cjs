@@ -95,6 +95,8 @@ const DEFAULTS = {
   share_token: null,
   /** Show the model's own reasoning, and how long the answer took. */
   show_thinking: false,
+  /** Ids of the knowledge packs whose material may be used in answers. */
+  knowledge_active: [],
 };
 function loadSettings() { try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) }; } catch { return { ...DEFAULTS }; } }
 function saveSettings(s) { const t = settingsFile() + ".tmp"; fs.writeFileSync(t, JSON.stringify(s, null, 2)); fs.renameSync(t, settingsFile()); }
@@ -158,6 +160,7 @@ function get(url, headers, redirects = 0) {
 const { resolveArtifact, resolveProjector } = require("./hf.cjs");
 const { missingEngineLibraries } = require("./engine-check.cjs");
 const share = require("./share-server.cjs");
+const knowledge = require("./knowledge.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
   const q = String(query || "").trim();
@@ -264,6 +267,32 @@ async function restartShare() {
     shareError = e instanceof Error ? e.message : String(e);
   }
 }
+
+// ── knowledge packs on disk ──────────────────────────────────
+// One JSON file per pack, so exporting is a copy and importing is a read.
+const knowledgeDir = () => { const d = path.join(root(), "knowledge"); fs.mkdirSync(d, { recursive: true }); return d; };
+const packPath = (id) => (/^[a-f0-9]{8,32}$/i.test(id) ? path.join(knowledgeDir(), `${id}.json`) : null);
+function readPack(id) {
+  const f = packPath(id);
+  if (!f || !fs.existsSync(f)) throw new Error("That knowledge pack is not on this computer.");
+  return JSON.parse(fs.readFileSync(f, "utf8"));
+}
+const writePack = (pack) => fs.writeFileSync(path.join(knowledgeDir(), `${pack.id}.json`), knowledge.exportPack(pack), "utf8");
+function listPacks() {
+  try {
+    return fs.readdirSync(knowledgeDir()).filter((f) => f.endsWith(".json")).map((f) => {
+      try { return JSON.parse(fs.readFileSync(path.join(knowledgeDir(), f), "utf8")); } catch { return null; }
+    }).filter(Boolean);
+  } catch { return []; }
+}
+const packSummary = (p) => ({
+  id: p.id,
+  name: p.name,
+  description: p.description,
+  updated: p.updated,
+  documents: (p.documents || []).map((d) => ({ id: d.id, name: d.name, chars: d.chars, chunks: d.chunks })),
+  passages: (p.chunks || []).length,
+});
 
 let idleTimer = null;
 function touchEngine() {
@@ -692,6 +721,90 @@ function register(win) {
     })(),
     total_memory_bytes: os.totalmem(),
   }));
+  // ── knowledge packs ──────────────────────────────────────
+  h("knowledge_list", () => listPacks().map(packSummary));
+  h("knowledge_create", (a) => {
+    const pack = knowledge.emptyPack(a?.name, a?.description);
+    writePack(pack);
+    return packSummary(pack);
+  });
+  h("knowledge_delete", (a) => {
+    const f = packPath(String(a?.id || ""));
+    if (f && fs.existsSync(f)) fs.rmSync(f);
+    settings = { ...settings, knowledge_active: (settings.knowledge_active || []).filter((x) => x !== a?.id) };
+    saveSettings(settings);
+    return { deleted: true };
+  });
+  h("knowledge_add_text", (a) => {
+    const pack = readPack(String(a?.id || ""));
+    const next = knowledge.addDocument(pack, { name: a?.name || "Pasted text", text: String(a?.text || ""), source: "typed" });
+    writePack(next);
+    return packSummary(next);
+  });
+  h("knowledge_add_files", async (a) => {
+    const pack = readPack(String(a?.id || ""));
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ["openFile", "multiSelections"] });
+    if (canceled || !filePaths?.length) return { cancelled: true, pack: packSummary(pack) };
+    let next = pack;
+    const failed = [];
+    for (const f of filePaths) {
+      try {
+        const read = await readAttachment(f);
+        if (!read?.text?.trim()) { failed.push(`${path.basename(f)} (nothing readable in it)`); continue; }
+        next = knowledge.addDocument(next, { name: path.basename(f), text: read.text, source: f });
+      } catch (e) {
+        failed.push(`${path.basename(f)} (${e instanceof Error ? e.message : String(e)})`);
+      }
+    }
+    writePack(next);
+    return { pack: packSummary(next), failed };
+  });
+  h("knowledge_remove_doc", (a) => {
+    const next = knowledge.removeDocument(readPack(String(a?.id || "")), String(a?.doc_id || ""));
+    writePack(next);
+    return packSummary(next);
+  });
+  h("knowledge_export", async (a) => {
+    const pack = readPack(String(a?.id || ""));
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("downloads"), `${pack.name.replace(/[^\w .-]+/g, "_")}.forgepack.json`),
+      filters: [{ name: "Forge AI knowledge pack", extensions: ["json"] }],
+    });
+    if (canceled || !filePath) return { cancelled: true };
+    fs.writeFileSync(filePath, knowledge.exportPack(pack), "utf8");
+    return { saved: filePath };
+  });
+  h("knowledge_import", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ["openFile"],
+      filters: [{ name: "Forge AI knowledge pack", extensions: ["json"] }],
+    });
+    if (canceled || !filePaths?.[0]) return { cancelled: true };
+    // Someone else's file: knowledge.importPack validates every field.
+    const pack = knowledge.importPack(fs.readFileSync(filePaths[0], "utf8"));
+    writePack(pack);
+    return { pack: packSummary(pack) };
+  });
+  h("knowledge_search", (a) => {
+    const id = String(a?.id || "");
+    return knowledge.search(readPack(id), String(a?.query || ""), Number(a?.k) || 5);
+  });
+  /** The passages from every switched-on pack that match this question. */
+  h("knowledge_context", (a) => {
+    const active = settings.knowledge_active || [];
+    if (!active.length) return { text: "", packs: [] };
+    const used = [];
+    const parts = [];
+    for (const id of active) {
+      try {
+        const pack = readPack(id);
+        const text = knowledge.contextFor(pack, String(a?.query || ""), Number(a?.k) || 4);
+        if (text) { parts.push(text); used.push(pack.name); }
+      } catch { /* a pack that will not read must not break the chat */ }
+    }
+    return { text: parts.join("\n\n---\n\n"), packs: used };
+  });
+
   // ── sharing this machine's models ────────────────────────
   h("share_status", () => shareStatus());
   h("share_set", async (a) => {

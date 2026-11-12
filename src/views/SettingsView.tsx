@@ -1,6 +1,7 @@
 import { CloudPanel } from "../components/CloudPanel";
 import { SkillsPanel, ConnectorsPanel, DefaultBrowserPanel } from "../components/Extensions";
 import { SharePanel } from "../components/SharePanel";
+import { KnowledgePanel } from "../components/KnowledgePanel";
 import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
@@ -52,6 +53,7 @@ export function SettingsView({
         <div className="pbody">
           <DefaultBrowserPanel />
           <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
+          <KnowledgePanel settings={settings} onChange={onChange} />
           <SharePanel />
           <div className="panel">
             <div className="panel-h"><span className="t">While it answers</span></div>

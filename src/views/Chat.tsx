@@ -330,6 +330,20 @@ export function Chat(props: Props) {
       }
     }
 
+    // Material from switched-on knowledge packs, found by this question. It goes
+    // to the model, never into the shown message, and is labelled as the person's
+    // own material so the model does not present it as something it already knew.
+    try {
+      const found = await api.knowledgeContext(body);
+      if (run.stopped) return;
+      if (found?.text) {
+        contextChars += found.text.length;
+        sendContent = `From your own notes (${(found.packs ?? []).join(", ")}). Use this where it answers the question, and say when it does not:\n\n${found.text}\n\n${sendContent}`;
+      }
+    } catch {
+      // A pack that will not read must not stop the answer; the chat goes on without it.
+    }
+
     const memories = await api.memoryForPrompt().catch(() => [] as string[]);
     if (run.stopped) return;
     const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);

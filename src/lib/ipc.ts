@@ -135,6 +135,7 @@ export interface Settings {
   share_token?: string | null;
   /** Show the model's own reasoning, and how long the answer took. */
   show_thinking?: boolean;
+  knowledge_active?: string[];
 }
 
 export interface EngineStatus {
@@ -315,6 +316,16 @@ export interface ShareStatus {
   error: string | null;
 }
 
+export interface PackDoc { id: string; name: string; chars: number; chunks: number }
+export interface KnowledgePack {
+  id: string;
+  name: string;
+  description: string;
+  updated: number;
+  documents: PackDoc[];
+  passages: number;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -358,6 +369,15 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  knowledgeList: () => invoke<KnowledgePack[]>("knowledge_list"),
+  knowledgeCreate: (a: { name: string; description?: string }) => invoke<KnowledgePack>("knowledge_create", a),
+  knowledgeDelete: (id: string) => invoke<{ deleted: boolean }>("knowledge_delete", { id }),
+  knowledgeAddText: (a: { id: string; name: string; text: string }) => invoke<KnowledgePack>("knowledge_add_text", a),
+  knowledgeAddFiles: (id: string) => invoke<{ cancelled?: boolean; pack?: KnowledgePack; failed?: string[] }>("knowledge_add_files", { id }),
+  knowledgeRemoveDoc: (a: { id: string; doc_id: string }) => invoke<KnowledgePack>("knowledge_remove_doc", a),
+  knowledgeExport: (id: string) => invoke<{ cancelled?: boolean; saved?: string }>("knowledge_export", { id }),
+  knowledgeImport: () => invoke<{ cancelled?: boolean; pack?: KnowledgePack }>("knowledge_import"),
+  knowledgeContext: (query: string) => invoke<{ text: string; packs: string[] }>("knowledge_context", { query }),
   shareSet: (a: { enabled: boolean; port?: number; mesh?: boolean }) => invoke<ShareStatus>("share_set", a),
   shareNewToken: () => invoke<ShareStatus>("share_new_token"),
   parseWhen: (text: string) =>

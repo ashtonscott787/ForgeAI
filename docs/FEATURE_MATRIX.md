@@ -141,3 +141,19 @@ tag's source). Not run on macOS or Windows.
 | macOS engine loads | **Working in v0.5.3 (CI)** | On a macOS runner: the app was installed into Applications, every library checked, `llama-server --version` loaded them all. |
 | Engine runs Gemma 2 2B on macOS | **Working (CI)** | `scripts/smoke-engine.sh` against the installed app on a macOS runner: the engine started, became ready, and returned a non-empty reply. Not run on user hardware. |
 | Engine runs Gemma 2 2B on Linux | **Working** | Real llama-server, `/v1/chat/completions` answered. |
+
+## Added this round
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Other apps can use this machine's models | **Working (unit)** | OpenAI-compatible endpoint, off by default. `tests/share-server.test.cjs`: 13 tests, mostly refusals. Not yet pointed at by a real Claude or ChatGPT install. |
+| Another computer over a private mesh | **Partly verified** | The endpoint binds a Tailscale address and refuses any non-mesh one (unit-tested). Two real machines have not been joined — that needs two machines. |
+| Knowledge packs (your own material) | **Working (unit)** | `tests/knowledge.test.cjs`: 16 tests covering chunking, BM25 ranking, export/import round-trip and hostile import files. Retrieval, not weight training; the panel says so. |
+| Show the model's working | **Working (unit + UI)** | `<think>` blocks parsed out before rendering: `tests/thinking.test.cjs`, 6 tests. Off by default in Settings. |
+| Finish time under an answer | **Working** | `finished_at` recorded at both completion sites and shown in the timing panel. |
+| Temporary chat (ghost button) | **Working (UI)** | 2 UI scenarios: it is marked, kept out of the chat list, never reaches localStorage, and ends when left. |
+| Regenerate an answer | **Working (UI)** | Rebuilds from before the question, so it is not duplicated. |
+| Find an old chat | **Working (UI)** | Searches titles and message bodies. |
+| Agents | **Missing** | Not started. See COMPETITIVE_PLAN.md for why it is last. |
+| The model operating the browser itself | **Missing** | The browser pane is driven by the person, not the model. |
+| Fine-tuning model weights | **Not planned for laptops** | Needs a training stack and far more memory than the target machines have. Knowledge packs are the supported route. |

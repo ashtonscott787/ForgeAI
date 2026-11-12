@@ -73,6 +73,14 @@ const BRIDGE = `(() => {
       ? new Promise((resolve, reject) => { window.__engineStop = () => reject(new Error("The AI engine was stopped while it was starting.")); })
       : { running: true, port: cfg.enginePort || 0, model_file: modelFile, base_url: cfg.engineBase }),
     default_browser_status: () => ({ is_default: false, platform: "darwin" }),
+    share_status: () => ({ enabled: false, running: false, urls: [], port: 11435, token: null, mesh_enabled: false, mesh_address: null, error: null }),
+    share_set: (a) => ({ enabled: Boolean(a.enabled), running: Boolean(a.enabled), urls: a.enabled ? ["http://127.0.0.1:11435"] : [], port: 11435, token: a.enabled ? "test-token" : null, mesh_enabled: Boolean(a.mesh), mesh_address: null, error: null }),
+    knowledge_list: () => (cfg.packs || []),
+    knowledge_context: ({ query }) => {
+      const packs = cfg.packs || [];
+      const hit = packs.find((p) => (p.documents || []).some((d) => String(query).toLowerCase().includes((d.name || "").toLowerCase().split(".")[0])));
+      return hit ? { text: 'From "' + hit.documents[0].name + '":\nstub passage', packs: [hit.name] } : { text: "", packs: [] };
+    },
     stop_engine: () => { calls.push({ cmd: "stop_engine", args: {} }); if (window.__engineStop) window.__engineStop(); return null; },
     detect_hardware: () => ({ schema: 1, id: 1, name: "Test Mac", os: "macOS", backend: "metal", trust: "selfhost", ram_bytes: 16 * 2 ** 30, vram_bytes: 0, unified_memory: true, usable_model_bytes: 8 * 2 ** 30, runtimes: [], links: [], load: 0, online: true }),
     catalogue: () => ({ schema: 1, generated_at: "2026-01-01", models: [] }),
