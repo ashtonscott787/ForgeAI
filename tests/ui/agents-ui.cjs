@@ -6,6 +6,9 @@ const { serve, BRIDGE } = require("./harness.cjs");
 
 const results = [];
 
+/** The agent editor, so a label cannot match a field in another view. */
+const editor = (page) => page.getByLabel("Agent settings");
+
 async function scenario(name, server, fn, cfg = { local: true }) {
   const browser = await chromium.launch({ executablePath: process.env.FORGE_CHROMIUM || undefined, args: ["--no-sandbox"] });
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
@@ -45,11 +48,11 @@ async function scenario(name, server, fn, cfg = { local: true }) {
 
   await scenario("An agent is created with a name, a job and explicit permissions", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Bea");
-    await page.getByLabel("What it is for").fill("handles supplier email");
-    await page.getByLabel("Standing instructions").fill("Be brief. Never promise a delivery date.");
-    await page.getByLabel("Search the web", { exact: true }).check();
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await editor(page).getByLabel("Name", { exact: true }).fill("Bea");
+    await editor(page).getByLabel("What it is for").fill("handles supplier email");
+    await editor(page).getByLabel("Standing instructions").fill("Be brief. Never promise a delivery date.");
+    await editor(page).getByLabel("Search the web", { exact: true }).check();
+    await editor(page).getByRole("button", { name: "Save", exact: true }).click();
     const row = page.locator(".packrow", { hasText: "Bea" });
     await row.waitFor({ timeout: 4000 });
     assert.match(await row.innerText(), /handles supplier email/);
@@ -58,36 +61,36 @@ async function scenario(name, server, fn, cfg = { local: true }) {
 
   await scenario("Nothing is pre-approved until it is ticked, and only changing tools offer it", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Carl");
+    await editor(page).getByLabel("Name", { exact: true }).fill("Carl");
     // A read-only tool never offers "without asking me": it never stops anyway.
-    await page.getByLabel("Search the web", { exact: true }).check();
-    assert.equal(await page.getByLabel("Allow Search the web without asking").count(), 0,
+    await editor(page).getByLabel("Search the web", { exact: true }).check();
+    assert.equal(await editor(page).getByLabel("Allow Search the web without asking").count(), 0,
       "a read-only tool has nothing to pre-approve");
     // A changing tool does.
-    await page.getByLabel("Create a reminder", { exact: true }).check();
-    const pre = page.getByLabel("Allow Create a reminder without asking");
+    await editor(page).getByLabel("Create a reminder", { exact: true }).check();
+    const pre = editor(page).getByLabel("Allow Create a reminder without asking");
     await pre.waitFor({ timeout: 4000 });
     assert.equal(await pre.isChecked(), false, "it starts off, so the default is to ask");
   });
 
   await scenario("Unticking a permission takes its pre-approval with it", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Dot");
-    await page.getByLabel("Create a reminder", { exact: true }).check();
-    await page.getByLabel("Allow Create a reminder without asking").check();
-    assert.equal(await page.getByLabel("Allow Create a reminder without asking").isChecked(), true);
+    await editor(page).getByLabel("Name", { exact: true }).fill("Dot");
+    await editor(page).getByLabel("Create a reminder", { exact: true }).check();
+    await editor(page).getByLabel("Allow Create a reminder without asking").check();
+    assert.equal(await editor(page).getByLabel("Allow Create a reminder without asking").isChecked(), true);
     // Remove the permission, then grant it again: it must not come back pre-approved.
-    await page.getByLabel("Create a reminder", { exact: true }).uncheck();
-    await page.getByLabel("Create a reminder", { exact: true }).check();
-    const pre = page.getByLabel("Allow Create a reminder without asking");
+    await editor(page).getByLabel("Create a reminder", { exact: true }).uncheck();
+    await editor(page).getByLabel("Create a reminder", { exact: true }).check();
+    const pre = editor(page).getByLabel("Allow Create a reminder without asking");
     await pre.waitFor({ timeout: 4000 });
     assert.equal(await pre.isChecked(), false, "granting a tool again does not restore a stale pre-approval");
   });
 
   await scenario("An agent with nothing ticked says so, rather than looking capable", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Empty");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await editor(page).getByLabel("Name", { exact: true }).fill("Empty");
+    await editor(page).getByRole("button", { name: "Save", exact: true }).click();
     const row = page.locator(".packrow", { hasText: "Empty" });
     await row.waitFor({ timeout: 4000 });
     assert.match(await row.innerText(), /0 permissions/);
@@ -95,13 +98,13 @@ async function scenario(name, server, fn, cfg = { local: true }) {
 
   await scenario("An agent carries an icon and a description, so it can be told apart", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Mail");
-    await page.getByLabel("Description").fill("drafts replies to suppliers");
-    const icons = page.locator(".iconopt");
+    await editor(page).getByLabel("Name", { exact: true }).fill("Mail");
+    await editor(page).getByLabel("Description").fill("drafts replies to suppliers");
+    const icons = editor(page).locator(".iconopt");
     await icons.first().waitFor({ timeout: 4000 });
     await icons.nth(1).click();
     assert.equal(await icons.nth(1).getAttribute("aria-checked"), "true", "the chosen icon is marked");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await editor(page).getByRole("button", { name: "Save", exact: true }).click();
     const row = page.locator(".packrow", { hasText: "Mail" });
     await row.waitFor({ timeout: 4000 });
     assert.match(await row.innerText(), /drafts replies to suppliers/, "the description is what the list shows");
@@ -110,9 +113,9 @@ async function scenario(name, server, fn, cfg = { local: true }) {
 
   await scenario("An agent can be duplicated without touching the original", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Bea");
-    await page.getByLabel("Search the web", { exact: true }).check();
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await editor(page).getByLabel("Name", { exact: true }).fill("Bea");
+    await editor(page).getByLabel("Search the web", { exact: true }).check();
+    await editor(page).getByRole("button", { name: "Save", exact: true }).click();
     await page.locator(".packrow", { hasText: "Bea" }).first().waitFor({ timeout: 4000 });
     await page.locator(".packrow", { hasText: "Bea" }).first().getByRole("button", { name: "Duplicate" }).click();
     await page.locator(".packrow", { hasText: "Bea copy" }).waitFor({ timeout: 4000 });
@@ -122,8 +125,8 @@ async function scenario(name, server, fn, cfg = { local: true }) {
 
   await scenario("An agent can be tested without it doing anything", server, async (page) => {
     await page.getByRole("button", { name: "New agent" }).click();
-    await page.getByLabel("Name").fill("Tester");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await editor(page).getByLabel("Name", { exact: true }).fill("Tester");
+    await editor(page).getByRole("button", { name: "Save", exact: true }).click();
     await page.locator(".packrow", { hasText: "Tester" }).first().getByRole("button", { name: "Run" }).click();
     const test = page.getByRole("button", { name: "Test this agent" });
     await test.waitFor({ timeout: 4000 });

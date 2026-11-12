@@ -20,7 +20,8 @@
     "test:ui:documents": "node tests/ui/documents-ui.cjs",
     "test:ui:search": "node tests/ui/search-ui.cjs",
     "test:ui:responsive": "node tests/ui/responsive-ui.cjs",
-    "test:ui:mail": "node tests/ui/mail-ui.cjs"
+    "test:ui:mail": "node tests/ui/mail-ui.cjs",
+    "test:all": "bash scripts/test-all.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
