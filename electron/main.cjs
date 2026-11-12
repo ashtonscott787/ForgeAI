@@ -772,6 +772,12 @@ function register(win) {
   // ── agents ───────────────────────────────────────────────
   h("agent_tools", () => agents.TOOLS);
   h("agent_list", () => listAgents());
+  /** Creates the built-in assistant over a model that is installed here. */
+  h("agent_create_forge", (a) => {
+    const file = String(a?.model_file || "") || (installed()[0]?.file_name ?? "");
+    if (!file) throw new Error("No model is installed yet, so there is nothing to build the assistant on.");
+    return writeAgent(agents.forgeAssistant(file));
+  });
   h("agent_save", (a) => writeAgent(agents.validateAgent(a?.agent || a)));
   h("agent_delete", (a) => {
     const f = agentPath(String(a?.id || ""));

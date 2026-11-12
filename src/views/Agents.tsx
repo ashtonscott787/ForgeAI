@@ -137,9 +137,23 @@ export function Agents({
           <div className="sharerow">
             <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", role: "", instructions: "", model: null, tools: [], preapproved: [], updated: 0 } as Agent)}>New agent</button>
             <button className="ghostbtn" onClick={() => void api.agentImport().then(load)}>Import</button>
+            {!list.some((x) => x.name.startsWith("Forge AI")) && installed.length > 0 && (
+              <button
+                className="ghostbtn"
+                onClick={() => void api.agentCreateForge(installed[0]?.file_name).then(load).catch(() => undefined)}
+              >
+                Add the Forge AI assistant
+              </button>
+            )}
           </div>
 
-          {list.length === 0 && <p className="hint">No agents yet. One is a model you already have, with a job and a list of what it may do.</p>}
+          {list.length === 0 && (
+            <p className="hint">
+              No agents yet. An agent is a model you already have, with a job and a list of what it
+              may do. “Add the Forge AI assistant” sets one up over your installed model, named after
+              its size — it is a configuration, not a model that has been trained on anything.
+            </p>
+          )}
 
           <ul className="packlist">
             {list.map((a) => (
@@ -255,7 +269,7 @@ function AgentEditor({
 
   return (
     <div className="packedit" aria-label="Agent settings">
-      <div className="panel-h"><span className="t">{agent.id ? "Edit agent" : "New agent"}</span></div>
+      <div className="panel-h"><span className="t">{agent.id ? `Edit ${agent.name}` : "New agent"}</span></div>
       <label className="fl" htmlFor="ag-name">Name</label>
       <input id="ag-name" value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} placeholder="Bea" />
       <label className="fl" htmlFor="ag-role">What it is for</label>
@@ -269,25 +283,32 @@ function AgentEditor({
         {models.map((m) => <option key={m.file_name} value={m.file_name}>{m.label}</option>)}
       </select>
 
-      <p className="fl">What it may do</p>
+      <h4 className="perm-head">What it may do</h4>
       <p className="hint">Nothing is implied. Anything left unticked, it cannot do.</p>
-      <ul className="packdocs">
-        {tools.map((t) => (
-          <li key={t.id}>
-            <label className="packmain">
-              <input type="checkbox" checked={a.tools.includes(t.id)} onChange={() => toggle(t.id)} aria-label={t.label} />
-              <span>{t.label}</span>
-              {t.changes && <span className="hint">changes something</span>}
-            </label>
-            {t.changes && a.tools.includes(t.id) && (
-              <label className="hint">
-                <input type="checkbox" checked={a.preapproved.includes(t.id)} onChange={() => togglePre(t.id)}
-                  aria-label={`Allow ${t.label} without asking`} />
-                {" "}without asking me
+      <ul className="permlist">
+        {tools.map((t) => {
+          const on = a.tools.includes(t.id);
+          return (
+            <li key={t.id} className={`permrow${on ? " on" : ""}`}>
+              <label className="perm-main">
+                <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={t.label} />
+                <span className="perm-label">{t.label}</span>
+                {t.changes && <span className="perm-tag">changes something</span>}
               </label>
-            )}
-          </li>
-        ))}
+              {t.changes && on && (
+                <label className="perm-pre">
+                  <input
+                    type="checkbox"
+                    checked={a.preapproved.includes(t.id)}
+                    onChange={() => togglePre(t.id)}
+                    aria-label={`Allow ${t.label} without asking`}
+                  />
+                  <span>Do this without asking me</span>
+                </label>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="sharerow">

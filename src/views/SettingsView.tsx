@@ -1,10 +1,23 @@
 import { CloudPanel } from "../components/CloudPanel";
-import { SkillsPanel, ConnectorsPanel, DefaultBrowserPanel } from "../components/Extensions";
+import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
 import { SharePanel } from "../components/SharePanel";
 import { KnowledgePanel } from "../components/KnowledgePanel";
 import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
+
+/** A labelled group of panels, so a long page can be scanned rather than read. */
+function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+  return (
+    <section className="setgroup" aria-label={title}>
+      <div className="setgroup-h">
+        <h3>{title}</h3>
+        {note && <p className="hint">{note}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export function SettingsView({
   settings,
@@ -51,13 +64,10 @@ export function SettingsView({
       </div>
       <div className="scroll">
         <div className="pbody">
-          <DefaultBrowserPanel />
-          <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
-          <KnowledgePanel settings={settings} onChange={onChange} />
-          <SharePanel />
-          <div className="panel">
-            <div className="panel-h"><span className="t">While it answers</span></div>
-            <div className="panel-b">
+          <Group title="Answering" note="How replies are produced, and what you see while they are.">
+            <div className="panel">
+              <div className="panel-h"><span className="t">While it answers</span></div>
+              <div className="panel-b">
               <Field
                 label="Show its thinking and how long it took"
                 hint="Models that reason out loud put that working in the reply. Shown as a separate, collapsed section, with the time the answer finished and how long it took."
@@ -65,9 +75,26 @@ export function SettingsView({
                 <Toggle on={settings.show_thinking === true} onChange={(v) => save({ show_thinking: v })} />
               </Field>
             </div>
-          </div>
-          <SkillsPanel />
-          <ConnectorsPanel />
+            </div>
+          </Group>
+
+          <Group title="Models" note="Where models come from, and which ones you can use.">
+            <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
+          </Group>
+
+          <Group title="Your own material" note="Documents and notes Forge AI can answer from. They stay on this computer.">
+            <KnowledgePanel settings={settings} onChange={onChange} />
+          </Group>
+
+          <Group title="Sharing" note="Letting other apps, and other computers, use the models here.">
+            <SharePanel />
+          </Group>
+
+          <Group title="Extensions" note="Skills you write, and connectors to other tools.">
+            <SkillsPanel />
+            <ConnectorsPanel />
+          </Group>
+          <Group title="This app" note="Updates, how models run on this machine, and how it looks.">
           <div className="panel">
             <div className="panel-h"><span className="t">Updates</span></div>
             <div className="panel-b">
@@ -211,6 +238,7 @@ export function SettingsView({
               </Field>
             </div>
           </div>
+          </Group>
         </div>
       </div>
     </>

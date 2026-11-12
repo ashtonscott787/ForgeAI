@@ -11,7 +11,6 @@ import { Chat } from "./views/Chat";
 import { Integrations } from "./views/Integrations";
 import { MemoryView } from "./views/MemoryView";
 import { Models } from "./views/Models";
-import { Reminders } from "./views/Reminders";
 import { Setup } from "./views/Setup";
 import { SettingsView } from "./views/SettingsView";
 import {
@@ -35,7 +34,7 @@ import { UpdateCard } from "./components/UpdateCard";
 import { markFor } from "./components/Marks";
 import "./styles.css";
 
-type View = "chat" | "browser" | "agents" | "models" | "reminders" | "memory" | "integrations" | "setup" | "settings";
+type View = "chat" | "agents" | "models" | "memory" | "integrations" | "setup" | "settings";
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -372,10 +371,8 @@ export default function App() {
             {(
               [
                 ["chat", "Chat"],
-                ["browser", "Browser"],
                 ["agents", "Agents"],
                 ["models", "Models"],
-                ["reminders", "Reminders"],
                 ["memory", "Memory"],
                 ["integrations", "Integrations"],
                 ["setup", "Hardware"],
@@ -499,15 +496,6 @@ export default function App() {
             <Agents installed={installed} self={self} />
           </section>
 
-          <section className={`view${view === "browser" ? " active" : ""}`}>
-            <Browser
-              onSendToChat={(text, images = [], browser) => {
-                setHandoff({ text, images, browser });
-                setView("chat");
-              }}
-            />
-          </section>
-
           <section className={`view${view === "models" ? " active" : ""}`}>
             <Models
               self={self}
@@ -522,10 +510,6 @@ export default function App() {
                 setView("chat");
               }}
             />
-          </section>
-
-          <section className={`view${view === "reminders" ? " active" : ""}`}>
-            <Reminders />
           </section>
 
           <section className={`view${view === "memory" ? " active" : ""}`}>

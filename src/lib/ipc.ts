@@ -391,6 +391,7 @@ export const api = {
   readUrl: (url: string) => invoke<{ ok: boolean; url?: string; text?: string; error?: string }>("read_url", { url }),
   agentTools: () => invoke<AgentTool[]>("agent_tools"),
   agentList: () => invoke<Agent[]>("agent_list"),
+  agentCreateForge: (modelFile?: string) => invoke<Agent>("agent_create_forge", { model_file: modelFile ?? "" }),
   agentSave: (agent: Agent) => invoke<Agent>("agent_save", { agent }),
   agentDelete: (id: string) => invoke<{ deleted: boolean }>("agent_delete", { id }),
   agentPrompt: (id: string) => invoke<{ system: string }>("agent_prompt", { id }),

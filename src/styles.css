@@ -794,7 +794,9 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .packname { font-weight: 600; font-size: 13px; }
 .packacts { display: flex; gap: 6px; }
 .packedit { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
-.packedit input, .packedit textarea { width: 100%; margin: 6px 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; }
+/* Text fields fill the row; a checkbox must not, or it swallows the row and
+   squeezes its own label into a sliver. */
+.packedit input:not([type="checkbox"]):not([type="radio"]), .packedit textarea { width: 100%; margin: 6px 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; }
 .packdocs li { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 12.5px; border-top: 1px solid var(--line); }
 .packdocs li span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -811,3 +813,25 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .browsecard-h { display: flex; align-items: center; gap: 8px; }
 .browsecard-t { flex: 1; font-size: 13px; }
 .browsecard-url { display: block; margin-top: 6px; font-size: 11.5px; opacity: .7; overflow-x: auto; white-space: nowrap; }
+
+/* Settings, grouped so a long page can be scanned. */
+.setgroup { margin: 0 0 22px; }
+.setgroup-h { margin: 0 0 8px; }
+.setgroup-h h3 { margin: 0; font-size: 13px; letter-spacing: .02em; text-transform: uppercase; color: var(--fg-3); }
+.setgroup-h .hint { margin: 2px 0 0; }
+
+/* Agent permissions. Each row is one decision, on one line, with room for it. */
+.perm-head { margin: 14px 0 2px; font-size: 13px; }
+.permlist { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.permrow { padding: 10px 12px; border-top: 1px solid var(--line); }
+.permrow:first-child { border-top: 0; }
+.permrow.on { background: var(--card, rgba(255, 255, 255, .03)); }
+.perm-main { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.perm-main input { flex: none; width: auto; margin: 0; }
+.perm-label { flex: 1; min-width: 0; font-size: 13px; }
+.perm-tag {
+  flex: none; font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line-strong); color: var(--fg-3); white-space: nowrap;
+}
+.perm-pre { display: flex; align-items: center; gap: 8px; margin: 8px 0 0 28px; font-size: 12px; color: var(--fg-3); cursor: pointer; }
+.perm-pre input { flex: none; width: auto; margin: 0; }

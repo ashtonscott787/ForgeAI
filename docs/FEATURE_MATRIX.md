@@ -159,3 +159,28 @@ tag's source). Not run on macOS or Windows.
 | The model operating the browser | **Working (unit)** | In chat the model emits a `forge-browse` block naming a page; the address is shown and a person presses the button, then the pane opens there and the page's text goes back to the model. Agents do the same through their own tools. The model never fetches on its own. |
 | A model cannot steer the app at this machine | **Working (unit)** | `parseBrowse` refuses file:, ftp:, javascript:, data:, localhost, 127.0.0.1 and .local, and upgrades http to https. Tested against each. |
 | Fine-tuning model weights | **Not planned for laptops** | Needs a training stack and far more memory than the target machines have. Knowledge packs are the supported route. |
+
+## Changed this round
+
+| Item | Status | Note |
+| --- | --- | --- |
+| Browser page | **Removed** | The browser is the pane inside each chat. A second, full-screen copy of it was redundant. |
+| Reminders page | **Removed** | Reminders are still created from chat and still fire; only the page for managing them is gone. |
+| "Make Forge AI the default browser" | **Removed** | The app is not a browser, and asking to own every link was the wrong thing to offer. |
+| Settings | **Grouped** | Answering, Models, Your own material, Sharing, Extensions, This app. |
+| Agent permission list | **Fixed (visual)** | A `width: 100%` rule meant for text fields also matched checkboxes, so each one filled its row and squeezed its own label into a one-character column. Scoped to text inputs. |
+| Forge AI assistant | **Working (unit)** | One button sets up an agent over the installed model, named after its real parameter count. A configuration, not a trained model. |
+| Training model weights | **Not possible here** | See below. |
+
+## On "training a model"
+
+Forge AI runs open-weight models; it does not train them, and on a laptop it
+cannot. Fine-tuning even a 2B model needs a training stack, a GPU and many
+gigabytes of memory, and a poorly fine-tuned model is worse than the one it
+started as.
+
+What makes a model answer from your material is retrieval (knowledge packs) and
+instruction (the assistant's standing instructions). Both are in the app, both
+take effect at once, and both are undone by switching them off. The assistant is
+named after the base model's parameter count — "Forge AI 2B" — precisely so it
+is never mistaken for something larger or for something that was trained.

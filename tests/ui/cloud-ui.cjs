@@ -47,6 +47,13 @@ async function connectAnthropic(page) {
   await card.getByText("Connected · 2 models").waitFor({ timeout: 5000 });
 }
 
+/** The browser lives beside the conversation now, not on a page of its own. */
+async function openBrowserPane(page) {
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page.getByRole("button", { name: "Open the browser" }).click();
+  await page.waitForSelector(".chat-pane", { timeout: 5000 });
+}
+
 async function sendInChat(page, text) {
   await page.getByRole("button", { name: "Chat", exact: true }).click();
   await page.getByRole("button", { name: "New chat" }).first().click().catch(() => {});
@@ -238,21 +245,6 @@ async function sendInChat(page, text) {
     assert.equal(await page.locator(".banner.err").count(), 0, "a stopped start shows no error: " + (await page.locator(".banner.err").allInnerTexts()).join(" | "));
   }, { local: true, engineBase, stallEngine: true });
 
-  await scenario("reminders: add, edit, mark done, and clear the past", server, async (page) => {
-    await page.getByRole("button", { name: "Reminders", exact: true }).click();
-    await page.getByLabel("What to remind you about").fill("Call Sam");
-    await page.getByLabel("When").fill("in an hour");
-    await page.getByRole("button", { name: "Add reminder" }).click();
-    await page.getByText("Call Sam").first().waitFor({ timeout: 5000 });
-    await page.getByRole("button", { name: "Edit" }).first().click();
-    await page.getByLabel("Reminder text").fill("Call Sam about the invoice");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-    await page.getByText("Call Sam about the invoice").waitFor({ timeout: 5000 });
-    await page.getByRole("button", { name: "Done" }).first().click();
-    await page.getByText("Past · 1").waitFor({ timeout: 5000 });
-    await page.getByRole("button", { name: "Clear past" }).click().catch(() => undefined);
-  });
-
   await scenario("a generated web page runs its own script inside its frame", server, async (page) => {
     await page.getByRole("button", { name: "Chat", exact: true }).click();
     const box = page.locator('textarea[placeholder^="Ask anything"]');
@@ -267,7 +259,7 @@ async function sendInChat(page, text) {
   }, { local: true, engineBase });
 
   await scenario("the browser searches open sources and opens a result in a new tab", server, async (page) => {
-    await page.getByRole("button", { name: "Browser", exact: true }).click();
+    await openBrowserPane(page);
     // Every tab now starts on a real page, so words typed in the address bar are
     // the way to search open sources, and the results appear over the page.
     await page.getByLabel("Address or search").fill("Forge AI");
@@ -281,7 +273,7 @@ async function sendInChat(page, text) {
   });
 
   await scenario("the address bar opens https addresses and never loads plain http", server, async (page) => {
-    await page.getByRole("button", { name: "Browser", exact: true }).click();
+    await openBrowserPane(page);
     const bar = page.getByLabel("Address or search");
     await bar.fill("example.com");
     await page.getByRole("button", { name: "Go", exact: true }).click();
@@ -300,10 +292,11 @@ async function sendInChat(page, text) {
       el.executeJavaScript = function () { return Promise.resolve("Forge AI is a private assistant. It runs models on your computer."); };
       el.getURL = function () { return this.getAttribute("src"); };
     });
-    await page.getByRole("button", { name: "Browser", exact: true }).click();
+    await openBrowserPane(page);
     await page.getByLabel("Address or search").fill("example.com");
     await page.getByRole("button", { name: "Go", exact: true }).click();
-    await page.getByRole("button", { name: "Send page to chat", exact: true }).click();
+    // The pane shortens the label to "Send page"; the title is the same in both.
+    await page.getByTitle("Send page to chat").click();
     // Wait for the hand-off to land in the composer, rather than reading it too early.
     await page.waitForFunction(() => Array.from(document.querySelectorAll("textarea")).some((t) => t.value.includes("Forge AI is a private assistant")), null, { timeout: 5000 });
     assert.equal(await page.locator('textarea[placeholder^="Ask anything"]').inputValue().then((v) => v.includes("Forge AI is a private assistant")), true, "the page text is in the composer");

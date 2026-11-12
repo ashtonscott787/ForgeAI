@@ -189,6 +189,56 @@ function advice({ usableBytes = 0, modelBytes = 0 } = {}) {
   return { ok: true, warn: false, text: "This machine has enough memory for a 7B-class model, which is what an agent loop needs." };
 }
 
+/**
+ * Reads the parameter count out of a model's file name, so the assistant can be
+ * called what it actually is. Returns "" when the name does not say, rather
+ * than guessing a number that would then be wrong on the label.
+ */
+function paramsOf(fileName) {
+  const m = String(fileName || "").match(/(?:^|[-_.])(\d+(?:\.\d+)?)\s*([bBmM])(?=[-_.]|$)/);
+  return m ? `${m[1]}${m[2].toUpperCase()}` : "";
+}
+
+/**
+ * The built-in assistant: one agent, set up to do the things people expect of
+ * a general assistant, over whichever model is installed.
+ *
+ * It is a configuration, not a trained model. Nothing here changes any weights,
+ * and the name carries the base model's parameter count so it is never mistaken
+ * for something larger than it is.
+ *
+ * The instructions lean hard on admitting ignorance, because that is the single
+ * failure that makes a small model useless: a 2B model asked for a fact it does
+ * not have will invent one fluently.
+ */
+function forgeAssistant(modelFile) {
+  const params = paramsOf(modelFile);
+  return validateAgent({
+    name: `Forge AI${params ? ` ${params}` : ""}`,
+    role: "general assistant on this computer",
+    model: modelFile || null,
+    tools: ["web_search", "read_page", "read_files", "knowledge", "write_file", "create_reminder", "write_memory"],
+    preapproved: [],
+    instructions: [
+      "You are a general assistant running on this person's own computer. Nothing they say leaves the machine unless a tool you call sends it.",
+      "",
+      "Being right matters more than being helpful. If you do not know something, say so in one plain sentence and stop. If you are unsure, say which part you are unsure about. Never invent a fact, a name, a number, a quotation or an address. If a question needs something recent or specific, look it up with search or by reading the page rather than answering from memory.",
+      "",
+      "When you look something up, say where it came from. When you cannot check something, say that it is unchecked.",
+      "",
+      "Work in steps for anything with more than one part: say what you are going to do, do it, and say what came back, including when it failed.",
+      "",
+      "You can read images that are attached, if the model running you supports it. If you cannot see an attached image, say so rather than describing what you imagine is in it.",
+      "",
+      "For a web page, write complete HTML in a fenced html block, with its CSS in a <style> tag and any script inline — it is rendered in a sandboxed frame, so it cannot load outside files. For more than one page, write each page in its own html block, say which file each one is, and link them with plain relative hrefs such as about.html.",
+      "",
+      "For an email, start with a line 'To: ', then 'Subject: ', then a blank line, then the body. Do not send it; the person does.",
+      "",
+      "Say plainly when something is beyond you: you cannot send email, open other applications, or use anything that is not in your permissions.",
+    ].join("\n"),
+  });
+}
+
 const exportAgent = (a) => JSON.stringify({ ...a, format: FORMAT, version: VERSION }, null, 2);
 
 function importAgent(text) {
@@ -206,4 +256,5 @@ module.exports = {
   FORMAT, VERSION, TOOLS, TOOL_IDS, LIMITS,
   emptyAgent, validateAgent, can, needsApproval, decide,
   systemPromptFor, parseActions, parsePlan, advice, exportAgent, importAgent,
+  forgeAssistant, paramsOf,
 };

@@ -150,6 +150,34 @@ test("an imported agent cannot smuggle in a permission that does not exist", () 
   assert.equal(A.decide(a, "run_shell").allow, false);
 });
 
+test("the assistant is named after the model it actually runs on", () => {
+  assert.equal(A.paramsOf("gemma-2-2b-it-Q4_K_M.gguf"), "2B");
+  assert.equal(A.paramsOf("Qwen2.5-7B-Instruct-Q4_K_M.gguf"), "7B");
+  assert.equal(A.paramsOf("SmolVLM-256M.gguf"), "256M");
+  assert.equal(A.paramsOf("Llama-3.2-1B.gguf"), "1B");
+  assert.equal(A.paramsOf("mystery.gguf"), "", "a name that does not say is not guessed at");
+  assert.equal(A.forgeAssistant("gemma-2-2b-it-Q4_K_M.gguf").name, "Forge AI 2B");
+  assert.equal(A.forgeAssistant("mystery.gguf").name, "Forge AI", "no size is better than a wrong one");
+});
+
+test("the assistant gets every tool, and none of them pre-approved", () => {
+  const f = A.forgeAssistant("gemma-2-2b-it-Q4_K_M.gguf");
+  assert.deepEqual([...f.tools].sort(), [...A.TOOL_IDS].sort(), "it can do everything the app can");
+  assert.deepEqual(f.preapproved, [], "but nothing happens without a yes the first time");
+  assert.equal(f.model, "gemma-2-2b-it-Q4_K_M.gguf");
+  for (const t of A.TOOLS.filter((x) => x.changes)) {
+    assert.equal(A.decide(f, t.id).approval, true, `${t.id} still waits for a person`);
+  }
+});
+
+test("the assistant is told to admit what it does not know", () => {
+  const p = A.systemPromptFor(A.forgeAssistant("gemma-2-2b-it-Q4_K_M.gguf"));
+  assert.match(p, /do not know/i, "it is told to say so");
+  assert.match(p, /Never invent/i, "and told not to fill the gap");
+  assert.match(p, /cannot send email/i, "and what is beyond it");
+  assert.match(p, /sandboxed frame/i, "how to write a page that will actually render");
+});
+
 test("overlong text is cut to the limit rather than stored whole", () => {
   const a = A.validateAgent({ name: "x".repeat(500), role: "y".repeat(500), instructions: "z".repeat(20000), tools: [] });
   assert.equal(a.name.length, A.LIMITS.name);
