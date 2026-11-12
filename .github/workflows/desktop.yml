@@ -258,6 +258,15 @@ jobs:
         shell: bash
         run: scripts/smoke-engine.sh "/Applications/Forge AI.app/Contents/Resources/engine" "$RUNNER_TEMP/gemma.gguf" 18766
 
+      # PDF generation needs Electron, which the development environment does
+      # not have, so it has never been run there. The macOS runner does have
+      # it: this renders a document, writes it, reopens it with pdf.js and
+      # checks the passages come back, and fails the build if they do not.
+      - name: "Verify PDF generation really works"
+        if: runner.os == 'macOS'
+        shell: bash
+        run: xvfb-run -a pnpm exec electron scripts/verify-pdf.cjs || pnpm exec electron scripts/verify-pdf.cjs
+
       - uses: actions/upload-artifact@v4
         with:
           name: forge-ai-${{ matrix.os }}
