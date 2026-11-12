@@ -77,6 +77,58 @@ const BRIDGE = `(() => {
     share_status: () => ({ enabled: false, running: false, urls: [], port: 11435, token: null, mesh_enabled: false, mesh_address: null, error: null }),
     share_set: (a) => ({ enabled: Boolean(a.enabled), running: Boolean(a.enabled), urls: a.enabled ? ["http://127.0.0.1:11435"] : [], port: 11435, token: a.enabled ? "test-token" : null, mesh_enabled: Boolean(a.mesh), mesh_address: null, error: null }),
     knowledge_list: () => (cfg.packs || []),
+    site_parse: ({ text }) => {
+      // The real parser is in the main process and is unit-tested; this
+      // stand-in splits on fences, with no escapes, because this whole file is
+      // injected as a template literal and would eat them.
+      const files = {};
+      // A literal backtick would close the template this file is injected as.
+      const FENCE = String.fromCharCode(96, 96, 96);
+      const parts = String(text).split(FENCE);
+      let page = 0;
+      for (let i = 1; i < parts.length; i += 2) {
+        const chunk = parts[i];
+        const nl = chunk.indexOf(String.fromCharCode(10));
+        if (nl < 0) continue;
+        const head = chunk.slice(0, nl).trim();
+        const body = chunk.slice(nl + 1);
+        const sp = head.indexOf(" ");
+        const lang = (sp < 0 ? head : head.slice(0, sp)).toLowerCase();
+        const info = sp < 0 ? "" : head.slice(sp + 1).trim();
+        if (lang !== "html" && lang !== "css") continue;
+        let name = info;
+        if (!name) name = lang === "css" ? "styles.css" : page === 0 ? "index.html" : "page-" + (page + 1) + ".html";
+        if (lang === "html") page++;
+        files[name] = body;
+      }
+      const names = Object.keys(files);
+      const pages = names.filter((n) => n.endsWith(".html"));
+      const broken = [];
+      for (const n of pages) {
+        let rest = files[n];
+        while (true) {
+          const at = rest.indexOf('href="');
+          if (at < 0) break;
+          rest = rest.slice(at + 6);
+          const q = rest.indexOf('"');
+          if (q < 0) break;
+          const t = rest.slice(0, q);
+          rest = rest.slice(q + 1);
+          const external = t.indexOf(":") >= 0 || t.charAt(0) === "#" || t.slice(0, 2) === "//";
+          if (!external && names.indexOf(t) < 0) broken.push({ from: n, href: t, target: t });
+        }
+      }
+      return {
+        files,
+        report: { ok: !broken.length, pages: pages.length, files: names.length, broken, orphans: [], hasIndex: names.indexOf("index.html") >= 0 },
+        summary: broken.length
+          ? pages.length + " pages. " + broken.length + " broken link(s): " + broken[0].from + " to " + broken[0].href
+          : pages.length + " pages, every internal link resolves.",
+      };
+    },
+    site_preview: ({ files }) => ({ url: "about:blank#", served: Object.keys(files || {}), report: { ok: true, pages: 1, files: 1, broken: [], orphans: [], hasIndex: true }, summary: "" }),
+    site_export: () => ({ ok: true, path: "/tmp/website.zip", bytes: 2048, files: 3 }),
+    save_document: ({ kind }) => ({ ok: true, path: "/tmp/Report." + kind, bytes: 4096 }),
     agent_tools: () => ([
       { id: "web_search", label: "Search the web", changes: false },
       { id: "read_files", label: "Read files in a folder you choose", changes: false },

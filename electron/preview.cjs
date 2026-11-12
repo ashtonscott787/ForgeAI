@@ -49,11 +49,58 @@ const pages = new Map();
 function register(html) {
   if (typeof html !== "string" || html.length === 0) throw new Error("There is no page to show.");
   if (Buffer.byteLength(html) > MAX_BYTES) throw new Error("That page is too large to preview.");
+  return registerSite({ "index.html": html });
+}
+
+/**
+ * Stores a whole site, so a link from one page to another resolves inside the
+ * frame instead of dying. Without this a multipage site can be generated but
+ * never walked through, which is the only way to find out it is wrong.
+ *
+ * Names are flattened to a safe relative path: no leading slash, no "..", no
+ * backslashes. A page cannot reach outside its own site, and one site cannot
+ * reach another.
+ */
+function registerSite(files) {
+  const entries = Object.entries(files || {});
+  if (!entries.length) throw new Error("There is no page to show.");
+  const clean = new Map();
+  let total = 0;
+  for (const [rawName, content] of entries) {
+    const name = safeName(rawName);
+    if (!name) continue;
+    const body = String(content ?? "");
+    total += Buffer.byteLength(body);
+    if (total > MAX_BYTES) throw new Error("That site is too large to preview.");
+    clean.set(name, body);
+  }
+  if (!clean.size) throw new Error("There is no page to show.");
+  if (!clean.has("index.html")) {
+    // Something has to answer the root, or the frame opens on nothing.
+    const first = [...clean.keys()].find((n) => n.endsWith(".html"));
+    if (first) clean.set("index.html", clean.get(first));
+  }
   const id = crypto.randomBytes(16).toString("hex");
   if (pages.size >= MAX_PAGES) pages.delete(pages.keys().next().value);
-  pages.set(id, html);
-  return { id, url: `${SCHEME}://${id}/` };
+  pages.set(id, clean);
+  return { id, url: `${SCHEME}://${id}/`, files: [...clean.keys()] };
 }
+
+/** A relative path with no way out of the site. */
+function safeName(raw) {
+  const n = String(raw ?? "").replace(/\\/g, "/").replace(/^\/+/, "").trim();
+  if (!n || n.includes("..") || n.startsWith("/")) return "";
+  return n.split("/").filter(Boolean).join("/");
+}
+
+const TYPES = {
+  html: "text/html; charset=utf-8",
+  css: "text/css; charset=utf-8",
+  js: "text/javascript; charset=utf-8",
+  json: "application/json; charset=utf-8",
+  svg: "image/svg+xml",
+  txt: "text/plain; charset=utf-8",
+};
 
 function forget(id) {
   if (typeof id === "string") pages.delete(id);
@@ -62,13 +109,31 @@ function forget(id) {
 /** The response for a preview request: the page, or nothing for an unknown id. */
 function respond(url) {
   let id;
-  try { id = new URL(url).hostname; } catch { return { status: 404, headers: {}, body: "" }; }
-  const html = pages.get(id);
-  if (html === undefined) return { status: 404, headers: {}, body: "" };
+  let file = "index.html";
+  try {
+    const u = new URL(url);
+    id = u.hostname;
+    const p = safeName(decodeURIComponent(u.pathname));
+    if (p) file = p;
+  } catch { return { status: 404, headers: {}, body: "" }; }
+  const site = pages.get(id);
+  if (site === undefined) return { status: 404, headers: {}, body: "" };
+  const html = site.get(file);
+  if (html === undefined) {
+    return {
+      status: 404,
+      headers: { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": PREVIEW_CSP },
+      // A broken internal link is a fact about the site, so it is shown rather than hidden.
+      body: `<!doctype html><meta charset="utf-8"><body style="font:15px system-ui;padding:2em">
+<h1>No page called ${file.replace(/[<&]/g, "")}</h1>
+<p>This site has: ${[...site.keys()].map((k) => k.replace(/[<&]/g, "")).join(", ")}</p></body>`,
+    };
+  }
+  const ext = (file.split(".").pop() || "html").toLowerCase();
   return {
     status: 200,
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
+      "Content-Type": TYPES[ext] || "text/plain; charset=utf-8",
       "Content-Security-Policy": PREVIEW_CSP,
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
@@ -77,4 +142,4 @@ function respond(url) {
   };
 }
 
-module.exports = { SCHEME, APP_CSP, PREVIEW_CSP, register, forget, respond, MAX_BYTES, MAX_PAGES };
+module.exports = { SCHEME, APP_CSP, PREVIEW_CSP, register, registerSite, forget, respond, safeName, MAX_BYTES, MAX_PAGES };

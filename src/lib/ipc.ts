@@ -345,6 +345,15 @@ export interface AgentActResult {
   needs_approval?: boolean;
 }
 
+export interface SiteReport {
+  ok: boolean;
+  pages: number;
+  files: number;
+  broken: { from: string; href: string; target: string }[];
+  orphans: string[];
+  hasIndex: boolean;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -388,6 +397,14 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  saveDocument: (a: { kind: "pdf" | "docx" | "md" | "txt" | "csv" | "html"; title: string; text: string }) =>
+    invoke<{ ok: boolean; path?: string; bytes?: number; error?: string; cancelled?: boolean }>("save_document", a),
+  siteParse: (text: string) =>
+    invoke<{ files: Record<string, string>; report: SiteReport; summary: string }>("site_parse", { text }),
+  sitePreview: (files: Record<string, string>) =>
+    invoke<{ url: string; served: string[]; report: SiteReport; summary: string }>("site_preview", { files }),
+  siteExport: (a: { files: Record<string, string>; name?: string }) =>
+    invoke<{ ok: boolean; path?: string; bytes?: number; files?: number; error?: string; cancelled?: boolean }>("site_export", a),
   readUrl: (url: string) => invoke<{ ok: boolean; url?: string; text?: string; error?: string }>("read_url", { url }),
   agentTools: () => invoke<AgentTool[]>("agent_tools"),
   agentList: () => invoke<Agent[]>("agent_list"),

@@ -162,6 +162,8 @@ const { missingEngineLibraries } = require("./engine-check.cjs");
 const share = require("./share-server.cjs");
 const knowledge = require("./knowledge.cjs");
 const agents = require("./agents.cjs");
+const documents = require("./documents.cjs");
+const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
   const q = String(query || "").trim();
@@ -330,6 +332,25 @@ async function fetchReadable(rawUrl) {
     res.on("error", reject);
   });
   return { url, text: String(openWeb.readablePageText(html) || "").slice(0, 12000) };
+}
+
+/**
+ * Renders HTML to PDF with Electron's print engine. Writing a PDF by hand would
+ * produce a worse file than the browser already makes, and this way the output
+ * matches what the preview shows.
+ */
+async function renderPdf(html) {
+  const { BrowserWindow: BW } = require("electron");
+  const w = new BW({
+    show: false,
+    webPreferences: { offscreen: true, javascript: false, sandbox: true, contextIsolation: true, nodeIntegration: false },
+  });
+  try {
+    await w.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    return await w.webContents.printToPDF({ printBackground: true, margins: { marginType: "default" } });
+  } finally {
+    try { w.destroy(); } catch { /* already gone */ }
+  }
 }
 
 let idleTimer = null;
@@ -759,6 +780,83 @@ function register(win) {
     })(),
     total_memory_bytes: os.totalmem(),
   }));
+  // ── documents and websites ───────────────────────────────
+  /**
+   * Writes a real file of the kind asked for. The person always chooses where
+   * it goes, so nothing is ever written somewhere they did not pick.
+   */
+  h("save_document", async (a) => {
+    const kind = String(a?.kind || "md").toLowerCase();
+    const title = String(a?.title || "Document").slice(0, 120);
+    const text = String(a?.text || "");
+    const safe = title.replace(/[^\w .-]+/g, "_").trim() || "Document";
+    const exts = { pdf: "pdf", docx: "docx", md: "md", txt: "txt", csv: "csv", html: "html" };
+    const ext = exts[kind];
+    if (!ext) return { ok: false, error: `Forge AI cannot write a ${kind} file.` };
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("downloads"), `${safe}.${ext}`),
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (canceled || !filePath) return { ok: false, cancelled: true };
+
+    try {
+      const blocks = documents.blocksFromMarkdown(text);
+      if (kind === "md" || kind === "txt") {
+        fs.writeFileSync(filePath, kind === "md" ? text : blocks.map((b) => b.text).join("\n"), "utf8");
+      } else if (kind === "csv") {
+        // Rows come as JSON when the caller has them; otherwise each line is a row.
+        let rows;
+        try { rows = JSON.parse(text); } catch { rows = null; }
+        if (!Array.isArray(rows)) rows = text.split(/\r?\n/).filter(Boolean).map((l) => l.split(","));
+        fs.writeFileSync(filePath, documents.csv(rows), "utf8");
+      } else if (kind === "html") {
+        fs.writeFileSync(filePath, documents.htmlDocument(title, blocks), "utf8");
+      } else if (kind === "docx") {
+        fs.writeFileSync(filePath, documents.docx(blocks));
+      } else if (kind === "pdf") {
+        const pdf = await renderPdf(documents.htmlDocument(title, blocks));
+        fs.writeFileSync(filePath, pdf);
+      }
+      const bytes = fs.statSync(filePath).size;
+      if (!bytes) { fs.rmSync(filePath, { force: true }); return { ok: false, error: "The file came out empty, so it was not kept." }; }
+      return { ok: true, path: filePath, bytes };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  /** Finds the pages in a reply. One parser, in one place, for the whole app. */
+  h("site_parse", (a) => {
+    const files = website.parseSite(String(a?.text || ""));
+    const report = website.validateSite(files);
+    return { files, report, summary: website.describe(report) };
+  });
+
+  /** Shows a whole site in the preview frame, with its internal links working. */
+  h("site_preview", (a) => {
+    const files = a?.files && typeof a.files === "object" ? a.files : {};
+    const report = website.validateSite(files);
+    const { id, url, files: served } = preview.registerSite(files);
+    return { id, url, served, report, summary: website.describe(report) };
+  });
+
+  h("site_export", async (a) => {
+    const files = a?.files && typeof a.files === "object" ? a.files : {};
+    if (!Object.keys(files).length) return { ok: false, error: "There are no files to export." };
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath("downloads"), `${String(a?.name || "website").replace(/[^\w .-]+/g, "_")}.zip`),
+      filters: [{ name: "ZIP", extensions: ["zip"] }],
+    });
+    if (canceled || !filePath) return { ok: false, cancelled: true };
+    try {
+      fs.writeFileSync(filePath, website.siteZip(files));
+      return { ok: true, path: filePath, bytes: fs.statSync(filePath).size, files: Object.keys(files).length };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   /** Reads a page for the chat, when the model asks to look one up. */
   h("read_url", async (a) => {
     try {

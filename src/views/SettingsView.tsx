@@ -78,23 +78,23 @@ export function SettingsView({
             </div>
           </Group>
 
-          <Group title="Models" note="Where models come from, and which ones you can use.">
+          <Group title="AI models" note="Where models come from, and which ones you can use.">
             <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
           </Group>
 
-          <Group title="Your own material" note="Documents and notes Forge AI can answer from. They stay on this computer.">
+          <Group title="Files and documents" note="Your own documents and notes, which Forge AI can answer from. They stay on this computer.">
             <KnowledgePanel settings={settings} onChange={onChange} />
           </Group>
 
-          <Group title="Sharing" note="Letting other apps, and other computers, use the models here.">
+          <Group title="Sharing and privacy" note="Letting other apps, and other computers, use the models here. Off until you switch it on.">
             <SharePanel />
           </Group>
 
-          <Group title="Extensions" note="Skills you write, and connectors to other tools.">
+          <Group title="Agents and tools" note="Skills you write, and connectors to other tools. Agents themselves live on the Agents page.">
             <SkillsPanel />
             <ConnectorsPanel />
           </Group>
-          <Group title="This app" note="Updates, how models run on this machine, and how it looks.">
+          <Group title="Inference, appearance and updates" note="How models run on this machine, how Forge AI looks, and how it updates.">
           <div className="panel">
             <div className="panel-h"><span className="t">Updates</span></div>
             <div className="panel-b">

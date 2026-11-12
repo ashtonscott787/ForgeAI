@@ -184,3 +184,25 @@ instruction (the assistant's standing instructions). Both are in the app, both
 take effect at once, and both are undone by switching them off. The assistant is
 named after the base model's parameter count — "Forge AI 2B" — precisely so it
 is never mistaken for something larger or for something that was trained.
+
+## Documents and websites
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| DOCX files | **Working (unit)** | Written by hand as OOXML in a ZIP, then read back by the app's own .docx extractor, and separately opened by Python's `zipfile` (`testzip()` clean) with the text runs checked. |
+| ZIP archives | **Working (unit)** | Deflate or store, whichever is smaller, with real CRC32. Round-trips binary data byte for byte; validated by an independent reader. |
+| CSV files | **Working (unit)** | Quotes exactly the cells that need it, doubles inner quotes, keeps newlines inside quotes. |
+| Markdown, TXT, HTML | **Working (unit)** | HTML is a complete page; a title or body containing markup is escaped, not injected. |
+| PDF files | **Implemented, not run here** | Rendered by Electron's own `printToPDF` in an offscreen window. There is no Electron in this environment, so this path has not been executed. |
+| Multipage websites | **Working (unit + UI)** | Each page parsed from its own fenced block with its file name, every internal link resolved against the files present, broken links and unreachable pages both reported. |
+| Website preview with working links | **Working (unit)** | The preview scheme now serves a whole site, so a nav link reaches the other page. One site cannot read another, and no page can escape its own site. |
+| Website ZIP export | **Working (unit + UI)** | Exports every file; the archive is read back in tests. |
+| "Save as" on a reply | **Working (UI)** | Offered only when there is enough prose to be worth keeping; the result names the file and its size, so an empty file cannot read as success. |
+
+### A bug this uncovered
+
+The fenced-block parser required the language to be the last thing on the fence
+line, so ```` ```html about.html ```` — which is how a model names a file — was
+not recognised as a code block at all and fell through to prose. Multipage
+output could never have worked before this was fixed, and single-page replies
+that happened to carry an info string were being rendered as raw text.

@@ -34,8 +34,8 @@ export interface ReminderAsk { text: string; when: string }
 
 export type Segment =
   | { kind: "text"; text: string }
-  | { kind: "code"; lang: string; code: string }
-  | { kind: "html"; code: string }
+  | { kind: "code"; lang: string; code: string; name?: string }
+  | { kind: "html"; code: string; name?: string }
   | { kind: "ui"; spec: UiSpec }
   | { kind: "email"; email: EmailParts }
   | { kind: "search"; ask: SearchAsk }
@@ -46,7 +46,10 @@ export type Segment =
   /** The model asking to look at a page in the built-in browser. */
   | { kind: "browse"; url: string };
 
-const FENCE = /```([A-Za-z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g;
+// The text after the language is the info string, which is where a model puts
+// a file name (```html about.html). Ignoring it made every such block parse as
+// plain prose, so a multipage site was never recognised at all.
+const FENCE = /```([A-Za-z0-9_-]*)[ \t]*([^\n]*)\r?\n([\s\S]*?)```/g;
 
 /**
  * Reasoning models wrap their working in <think> tags. It is pulled out before
@@ -79,7 +82,7 @@ function parseBody(content: string): Segment[] {
   const out: Segment[] = [];
   let last = 0;
   for (const m of content.matchAll(FENCE)) {
-    const [whole, rawLang = "", code = ""] = m;
+    const [whole, rawLang = "", info = "", code = ""] = m;
     const at = m.index ?? 0;
     if (at > last) pushText(out, content.slice(last, at));
     last = at + whole.length;
@@ -100,9 +103,9 @@ function parseBody(content: string): Segment[] {
       const spec = parseUi(code);
       out.push(spec ? { kind: "ui", spec } : { kind: "code", lang: "json", code: code.trimEnd() });
     } else if (lang === "html" && /<[a-z!]/i.test(code)) {
-      out.push({ kind: "html", code: code.trimEnd() });
+      out.push({ kind: "html", code: code.trimEnd(), name: info.trim() || undefined });
     } else {
-      out.push({ kind: "code", lang: rawLang || "text", code: code.replace(/\n$/, "") });
+      out.push({ kind: "code", lang: rawLang || "text", code: code.replace(/\n$/, ""), name: info.trim() || undefined });
     }
   }
   if (last < content.length) pushText(out, content.slice(last));

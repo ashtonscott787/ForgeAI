@@ -10,6 +10,8 @@ import { GenUI } from "./GenUI";
 import { HtmlPreview } from "./HtmlPreview";
 import { Markdown } from "./Markdown";
 import { BrowseCard } from "./BrowseCard";
+import { SaveAs } from "./SaveAs";
+import { SiteCard } from "./SiteCard";
 
 /**
  * The model's own working. Collapsed once it is finished, and shown open while
@@ -52,6 +54,25 @@ export function AssistantMessage({
   const segments = parseSegments(content);
   const openLink = (url: string) => void api.openExternal(url).catch(() => undefined);
 
+  // Two or more pages in one reply is a website, and showing it as a row of
+  // unrelated preview cards hides the thing that matters: whether its links work.
+  const htmlBlocks = segments.filter((s) => s.kind === "html").length;
+  const isSite = !streaming && htmlBlocks > 1;
+
+  // Prose long enough to be worth keeping can be saved as a real file.
+  const prose = segments.filter((s) => s.kind === "text").map((s) => s.text).join("\n").trim();
+  const canSave = !streaming && prose.length > 400;
+  const title = (prose.match(/^#+\s*(.+)$/m)?.[1] ?? prose.split("\n")[0] ?? "Document").slice(0, 80);
+
+  if (isSite) {
+    return (
+      <>
+        {segments.map((s, i) => (s.kind === "text" ? <Markdown key={i} text={s.text} onLink={openLink} /> : null))}
+        <SiteCard text={content} />
+      </>
+    );
+  }
+
   return (
     <>
       {segments.map((s, i) => {
@@ -93,6 +114,7 @@ export function AssistantMessage({
           </div>
         );
       })}
+      {canSave && <SaveAs text={prose} title={title} />}
     </>
   );
 }
