@@ -96,3 +96,12 @@ test("no platform is promised a build that is not published", () => {
   assert.ok(!("linux-x64" in ASSETS), "linux is not claimed, because llama.cpp publishes no build for this tag");
   assert.deepEqual(Object.keys(ASSETS).sort(), ["darwin-arm64", "darwin-x64", "win32-x64"]);
 });
+
+test("CI does not also pin a pnpm version, which would conflict with packageManager", () => {
+  // pnpm/action-setup refuses to run when it is given a version AND
+  // package.json declares packageManager. Adding the pin broke both CI jobs.
+  const wf = fs.readFileSync(path.join(root, ".github/workflows/desktop.yml"), "utf8");
+  const setup = wf.slice(wf.indexOf("pnpm/action-setup"), wf.indexOf("pnpm/action-setup") + 220);
+  assert.ok(!/version:\s*\d/.test(setup), "the workflow lets packageManager decide the pnpm version");
+  assert.match(require(path.join(root, "package.json")).packageManager, /^pnpm@/, "and package.json declares one");
+});
