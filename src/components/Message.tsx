@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseSegments } from "../lib/blocks";
 import { MemoryAskCard } from "./MemoryAskCard";
 import { ReminderAskCard } from "./ReminderAskCard";
-import { ResearchCard } from "./ResearchCard";
+import { SearchCard } from "./SearchCard";
 import { api } from "../lib/ipc";
 import { CopyButton } from "./Copy";
 import { EmailCard } from "./EmailCard";
@@ -95,7 +95,7 @@ export function AssistantMessage({
           );
         if (s.kind === "search")
           return (
-            <ResearchCard
+            <SearchCard
               key={i}
               query={s.ask.query}
               disabled={streaming || !onResearch}

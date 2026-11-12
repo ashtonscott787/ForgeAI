@@ -47,6 +47,30 @@ openWeb.useTransport((url, { timeoutMs, maxBytes, userAgent }) => new Promise((r
   });
   req.end();
 }));
+// Search goes out the same way, so a corporate proxy is honoured and keys
+// never travel through a transport the app did not choose.
+search.useTransport((url, { headers = {}, method = "GET", body } = {}) => new Promise((resolve, reject) => {
+  const payload = body === undefined ? null : JSON.stringify(body);
+  const req = electronNet.request({ method, url });
+  req.setHeader("User-Agent", "ForgeAI/1.0 (local desktop assistant)");
+  for (const [k, v] of Object.entries(headers)) if (v) req.setHeader(k, String(v));
+  if (payload) req.setHeader("Content-Type", "application/json");
+  const timer = setTimeout(() => { req.abort(); reject(new Error("the search timed out")); }, search.LIMITS.timeoutMs);
+  req.on("response", (res) => {
+    let text = "";
+    let size = 0;
+    res.on("data", (c) => {
+      size += c.length;
+      if (size > search.LIMITS.bodyBytes) { res.destroy?.(); return; }
+      text += c.toString("utf8");
+    });
+    res.on("end", () => { clearTimeout(timer); resolve({ status: res.statusCode ?? 0, text }); });
+    res.on("error", (e) => { clearTimeout(timer); reject(e); });
+  });
+  req.on("error", (e) => { clearTimeout(timer); reject(e); });
+  if (payload) req.write(payload);
+  req.end();
+}));
 const providerState = require("./provider-state.cjs");
 const connectors = require("./connectors.cjs");
 const secrets = require("./secrets.cjs");
@@ -97,6 +121,9 @@ const DEFAULTS = {
   show_thinking: false,
   /** Ids of the knowledge packs whose material may be used in answers. */
   knowledge_active: [],
+  /** Which search engine answers a lookup, and the SearXNG address when that is chosen. */
+  search_provider: "wikipedia",
+  searxng_instance: "",
 };
 function loadSettings() { try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) }; } catch { return { ...DEFAULTS }; } }
 function saveSettings(s) { const t = settingsFile() + ".tmp"; fs.writeFileSync(t, JSON.stringify(s, null, 2)); fs.renameSync(t, settingsFile()); }
@@ -132,12 +159,45 @@ const safeName = (n) => { if (!n || n !== path.basename(n) || !n.endsWith(".gguf
 // Projectors are never listed as models of their own.
 const projectorName = (modelFile) => "mmproj-" + modelFile;
 const isProjector = (f) => f.startsWith("mmproj-");
+/**
+ * Reading a model's header costs tens of megabytes of disk, so the answer is
+ * kept against the file's size and modification time. A model that has not
+ * changed is described once per run, not once per listing.
+ */
+const metaCache = new Map();
+function modelMeta(file) {
+  let st;
+  try { st = fs.statSync(file); } catch { return null; }
+  const key = `${file}:${st.size}:${st.mtimeMs}`;
+  if (metaCache.has(key)) return metaCache.get(key);
+  let out = null;
+  try {
+    const d = gguf.describeFile(file);
+    out = {
+      parameters: d.parameters,
+      parameters_label: d.parameters_label,
+      parameters_source: d.parameters_source,
+      architecture: d.architecture,
+      model_name: d.name,
+      context_length: d.context_length,
+      block_count: d.block_count,
+    };
+  } catch {
+    // Not a readable GGUF: the app still lists the file, it just says nothing
+    // about it rather than guessing from the name.
+    out = null;
+  }
+  metaCache.set(key, out);
+  return out;
+}
+
 function installed() {
   return fs.readdirSync(modelsDir()).filter((f) => f.endsWith(".gguf") && !isProjector(f))
     .map((f) => ({
       file_name: f,
       bytes: fs.statSync(path.join(modelsDir(), f)).size,
       vision: fs.existsSync(path.join(modelsDir(), projectorName(f))),
+      meta: modelMeta(path.join(modelsDir(), f)),
     }));
 }
 function get(url, headers, redirects = 0) {
@@ -163,6 +223,8 @@ const share = require("./share-server.cjs");
 const knowledge = require("./knowledge.cjs");
 const agents = require("./agents.cjs");
 const documents = require("./documents.cjs");
+const gguf = require("./gguf.cjs");
+const search = require("./search.cjs");
 const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
@@ -692,7 +754,68 @@ function register(win) {
       : research.firecrawlSearch({ key, query });
   });
   // Keyless lookups: Wikipedia's public API. No key, and every result carries its source URL.
-  h("web_search", ({ query }) => openWeb.wikipediaSearch(query));
+  /**
+   * Saves a search key only after it has answered a real search. A key that is
+   * stored and then fails on first use is worse than one that was refused now.
+   */
+  h("search_key_save", async (a) => {
+    const provider = String(a?.provider || "");
+    const key = String(a?.key || "").trim();
+    if (!search.PROVIDERS[provider] || search.PROVIDERS[provider].needs !== "key") {
+      return { ok: false, error: `${provider} does not take a key.` };
+    }
+    if (!key) return { ok: false, error: "Paste a key first." };
+    try {
+      const run = await search.search(provider, "forge ai test query", { key });
+      secrets.set(provider, key);
+      secrets.markVerified(provider, true, `${run.found} result(s) on a test search`);
+      return { ok: true, detail: `Working: the test search returned ${run.found} result(s).` };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  h("search_key_clear", (a) => { secrets.set(String(a?.provider || ""), null); return { ok: true }; });
+
+  h("search_providers", () => ({
+    providers: Object.entries(search.PROVIDERS).map(([id, p]) => ({
+      id,
+      label: p.label,
+      keyless: p.keyless,
+      needs: p.needs,
+      // Whether it could actually run right now, so the UI never offers a
+      // provider that would fail the moment it is used.
+      ready: p.needs === null ? true : p.needs === "instance" ? Boolean(settings.searxng_instance) : Boolean(secrets.get(id)),
+    })),
+    chosen: settings.search_provider || "wikipedia",
+    instance: settings.searxng_instance || "",
+  }));
+
+  /**
+   * One search, with the chosen engine. A failure is returned as a failure —
+   * never as an empty success, and never by quietly trying a different engine.
+   */
+  h("web_search", async (a) => {
+    const provider = String(a?.provider || settings.search_provider || "wikipedia");
+    try {
+      const run = await search.search(provider, String(a?.query || ""), {
+        key: secrets.get(provider),
+        instance: settings.searxng_instance,
+        wikipedia: (q) => openWeb.wikipediaSearch(q),
+      });
+      return { ok: true, ...run, context: search.asContext(run) };
+    } catch (e) {
+      return {
+        ok: false,
+        provider,
+        query: String(a?.query || ""),
+        results: [],
+        found: 0,
+        error: e instanceof Error ? e.message : String(e),
+        kind: e?.kind || "failed",
+      };
+    }
+  });
   h("web_article", ({ title }) => openWeb.wikipediaSummary(title));
   h("research_scrape", ({ url }) => {
     const key = secrets.get("firecrawl");
@@ -872,9 +995,13 @@ function register(win) {
   h("agent_list", () => listAgents());
   /** Creates the built-in assistant over a model that is installed here. */
   h("agent_create_forge", (a) => {
-    const file = String(a?.model_file || "") || (installed()[0]?.file_name ?? "");
+    const list = installed();
+    const file = String(a?.model_file || "") || (list[0]?.file_name ?? "");
     if (!file) throw new Error("No model is installed yet, so there is nothing to build the assistant on.");
-    return writeAgent(agents.forgeAssistant(file));
+    // The label comes from the model's own tensor shapes when they could be
+    // read; only then does the name carry a size.
+    const label = list.find((m) => m.file_name === file)?.meta?.parameters_label || "";
+    return writeAgent(agents.forgeAssistant(file, label));
   });
   h("agent_save", (a) => writeAgent(agents.validateAgent(a?.agent || a)));
   h("agent_delete", (a) => {
@@ -915,8 +1042,13 @@ function register(win) {
 
     try {
       if (tool === "web_search") {
-        const r = await openWeb.wikipediaSearch(input);
-        return { ok: true, result: (r.sources || []).map((x) => `${x.title}: ${x.snippet} (${x.url})`).join("\n") || "Nothing matched." };
+        // The same engine the person chose, and the same honest failure.
+        const run = await search.search(settings.search_provider || "wikipedia", input, {
+          key: secrets.get(settings.search_provider || ""),
+          instance: settings.searxng_instance,
+          wikipedia: (q) => openWeb.wikipediaSearch(q),
+        });
+        return { ok: true, result: search.asContext(run), sources: run.results };
       }
       if (tool === "read_page") {
         // fetchReadable refuses local addresses, so an agent cannot be steered

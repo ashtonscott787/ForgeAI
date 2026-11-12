@@ -136,6 +136,8 @@ export interface Settings {
   /** Show the model's own reasoning, and how long the answer took. */
   show_thinking?: boolean;
   knowledge_active?: string[];
+  search_provider?: string;
+  searxng_instance?: string;
 }
 
 export interface EngineStatus {
@@ -269,12 +271,36 @@ export interface ConnectorInput {
   token?: string;
 }
 
-export interface WebResult {
+export interface SearchHit {
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
   provider: string;
+}
+
+/** One search. `ok: false` means it did not run — never an empty success. */
+export interface WebResult {
+  ok: boolean;
+  provider: string;
+  label?: string;
   query: string;
-  sources: { title: string; url: string; snippet: string }[];
-  answer: string;
-  fetched_at: number;
+  results: SearchHit[];
+  found: number;
+  context?: string;
+  note?: string;
+  fetched_at?: number;
+  took_ms?: number;
+  error?: string;
+  kind?: string;
+}
+
+export interface SearchProvider {
+  id: string;
+  label: string;
+  keyless: boolean;
+  needs: "key" | "instance" | null;
+  ready: boolean;
 }
 export type ProviderId = "anthropic" | "openai";
 export interface ProviderModel {
@@ -483,7 +509,11 @@ export const api = {
   defaultBrowserSettings: () => invoke<{ opened: boolean }>("default_browser_settings"),
   /** Links that arrive from outside Forge AI, to open in the built-in browser. */
   onBrowserOpen: (cb: (p: { url: string }) => void) => listen<{ url: string }>("browser://open", (e) => cb(e.payload)),
-  webSearch: (query: string) => invoke<WebResult>("web_search", { query }),
+  webSearch: (query: string, provider?: string) => invoke<WebResult>("web_search", { query, provider }),
+  searchKeySave: (provider: string, key: string) =>
+    invoke<{ ok: boolean; detail?: string; error?: string }>("search_key_save", { provider, key }),
+  searchKeyClear: (provider: string) => invoke<{ ok: boolean }>("search_key_clear", { provider }),
+  searchProviders: () => invoke<{ providers: SearchProvider[]; chosen: string; instance: string }>("search_providers"),
   webArticle: (title: string) => invoke<{ title: string; text: string; url: string }>("web_article", { title }),
   /** Saves a PNG the person chose a place for. Returns the path, or null if cancelled. */
   saveScreenshot: (dataUrl: string) => invoke<string | null>("save_screenshot", { dataUrl }),

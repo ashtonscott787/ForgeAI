@@ -166,16 +166,46 @@ const BRIDGE = `(() => {
     memory_list: () => [],
     connectors_list: () => [],
     skills_list: () => [],
-    get_settings: () => ({ theme: "dark", selected_model: cfg.selected || null, context_size: 4096, gpu_layers: 0 }),
+    get_settings: () => {
+      if (!state.settings) state.settings = { theme: "dark", selected_model: cfg.selected || null, context_size: 4096, gpu_layers: 0, search_provider: cfg.searchProvider || "wikipedia", searxng_instance: "" };
+      return state.settings;
+    },
+    // Settings persist here as they do in the app, so a control that reads back
+    // what it wrote behaves the same way in a test as it does for a person.
+    set_settings: (a) => { state.settings = Object.assign({}, state.settings, a && a.settings ? a.settings : a); return state.settings; },
     memory_for_prompt: () => [],
     skills_for_prompt: () => [],
     engine_status: () => ({ running: false, port: 0, model_file: null, base_url: "" }),
     read_files: () => [],
     // Keyless search is tested in the main process (tests/open-web.test.cjs). The stand-in returns a
     // fixed answer shaped like the real one, so the view can be exercised here.
-    web_search: ({ query }) => ({ provider: "wikipedia", query, fetched_at: 0, answer: "", sources: [
-      { title: "Forge AI", url: "https://en.wikipedia.org/wiki/Forge_AI", snippet: "A desktop app." },
-    ] }),
+    web_search: ({ query }) => {
+      // cfg.searchFails lets a scenario exercise the failure path, which must
+      // never look like an empty success.
+      if (cfg.searchFails) return { ok: false, provider: "brave", query, results: [], found: 0, error: "Brave refused the key. Check it in Settings.", kind: "auth" };
+      if (cfg.searchEmpty) return { ok: true, provider: "brave", label: "Brave Search", query, results: [], found: 0, note: "Brave Search returned no results for that search.", context: "", fetched_at: 0 };
+      return {
+        ok: true, provider: "brave", label: "Brave Search", query, fetched_at: 0, found: 2,
+        results: [
+          { title: "Forge AI", url: "https://en.wikipedia.org/wiki/Forge_AI", snippet: "A desktop app.", source: "en.wikipedia.org", provider: "brave" },
+          { title: "Steel prices", url: "https://example.com/steel", snippet: "Prices rose.", source: "example.com", provider: "brave" },
+        ],
+        context: "Brave Search results",
+      };
+    },
+    search_providers: () => ({
+      providers: [
+        { id: "wikipedia", label: "Wikipedia", keyless: true, needs: null, ready: true },
+        { id: "searxng", label: "SearXNG", keyless: true, needs: "instance", ready: false },
+        { id: "brave", label: "Brave Search", keyless: false, needs: "key", ready: Boolean(cfg.braveKey) },
+        { id: "tavily", label: "Tavily", keyless: false, needs: "key", ready: false },
+      ],
+      chosen: (state.settings && state.settings.search_provider) || cfg.searchProvider || "wikipedia",
+      instance: (state.settings && state.settings.searxng_instance) || "",
+    }),
+    search_key_save: ({ key }) => (String(key).length > 8
+      ? { ok: true, detail: "Working: the test search returned 2 result(s)." }
+      : { ok: false, error: "Brave refused the key. Check it in Settings." }),
     save_screenshot: ({ dataUrl }) => (dataUrl.startsWith("data:image/png;base64,") ? "/tmp/forge-shot.png" : null),
     // Stand-in for the forge-preview scheme, which only Electron serves.
     // The page cannot call Node modules, so registration goes to the harness server, which stores

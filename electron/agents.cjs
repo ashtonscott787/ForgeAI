@@ -211,8 +211,11 @@ function paramsOf(fileName) {
  * failure that makes a small model useless: a 2B model asked for a fact it does
  * not have will invent one fluently.
  */
-function forgeAssistant(modelFile) {
-  const params = paramsOf(modelFile);
+function forgeAssistant(modelFile, verifiedLabel = "") {
+  // A label read from the model's own header is the truth. The file name is a
+  // fallback, and an uploader can write anything there, so a verified figure
+  // always wins and neither is invented.
+  const params = String(verifiedLabel || "").trim() || paramsOf(modelFile);
   return validateAgent({
     name: `Forge AI${params ? ` ${params}` : ""}`,
     role: "general assistant on this computer",

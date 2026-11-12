@@ -138,6 +138,7 @@ export function Browser({
       const r = await api.webSearch(text);
       setResults(r);
       setQuery(text);
+      if (!r.ok) setNotice(r.error ?? "That search did not run.");
       note({ kind: "searched", label: "Searched", detail: text });
     } catch (e) {
       setNotice(e instanceof Error ? e.message : String(e));
@@ -207,13 +208,16 @@ export function Browser({
 
   const resultList = results && (
     <ol className="browser-results">
-      {results.sources.map((s) => (
+      {results.results.map((s) => (
         <li key={s.url}>
           <button className="linkbtn" onClick={() => openNew(s.url)}>{s.title}</button>
+          <span className="searchcard-host num">{s.source}</span>
           <div className="hint">{s.snippet}</div>
         </li>
       ))}
-      {results.sources.length === 0 && <li className="hint">No articles matched.</li>}
+      {results.results.length === 0 && (
+        <li className="hint">{results.ok ? results.note || "Nothing matched." : results.error}</li>
+      )}
     </ol>
   );
 
@@ -257,7 +261,7 @@ export function Browser({
       {active.url && results && (
         <div className="browser-results-pane" role="region" aria-label="Search results">
           <div className="browser-results-head">
-            <span>Open-source results for “{query}”</span>
+            <span>{results.label ?? "Search"} results for “{query}”</span>
             <button type="button" aria-label="Close results" onClick={() => setResults(null)}>×</button>
           </div>
           {resultList}

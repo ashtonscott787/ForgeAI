@@ -2,6 +2,7 @@ import { CloudPanel } from "../components/CloudPanel";
 import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
 import { SharePanel } from "../components/SharePanel";
 import { KnowledgePanel } from "../components/KnowledgePanel";
+import { SearchSettings } from "../components/SearchSettings";
 import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
@@ -80,6 +81,10 @@ export function SettingsView({
 
           <Group title="AI models" note="Where models come from, and which ones you can use.">
             <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
+          </Group>
+
+          <Group title="Internet and search" note="Where Forge AI looks things up, and what it needs to do so.">
+            <SearchSettings settings={settings} onChange={onChange} />
           </Group>
 
           <Group title="Files and documents" note="Your own documents and notes, which Forge AI can answer from. They stay on this computer.">

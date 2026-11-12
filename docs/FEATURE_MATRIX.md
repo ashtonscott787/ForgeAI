@@ -206,3 +206,24 @@ line, so ```` ```html about.html ```` — which is how a model names a file — 
 not recognised as a code block at all and fell through to prose. Multipage
 output could never have worked before this was fixed, and single-page replies
 that happened to carry an info string were being rendered as raw text.
+
+## Internet search, model metadata and PDF
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Real internet search | **Working (unit + UI)** | Four engines behind one interface: Wikipedia and SearXNG keyless, Brave and Tavily with the person's own key. 15 unit tests, 7 UI scenarios. No key is compiled in; keys go to the OS key store. |
+| Clickable citations | **Working (UI)** | Every result is numbered, shows its host, and opens outside the app. Tested by asserting the opened URL. |
+| A failed search is never an empty one | **Working (unit + UI)** | Refused keys, rate limits, non-JSON responses and a SearXNG instance with JSON disabled are each reported as themselves. The model is told the search failed and not to answer as though it ran. |
+| Search settings | **Working (UI)** | Each engine states what it needs, and one that cannot run is marked "not set up". A key is only kept after a real test search accepts it. |
+| Exact parameter count | **Working (unit + live)** | Read from the model's own GGUF header by summing tensor shapes. Verified against the published Gemma 2 2B: 2,614,341,888 parameters, counted exactly, fetched with a range request rather than a full download. |
+| Model metadata | **Working (unit + live)** | Architecture, name, context length and block count read from the file. Cached against size and mtime. Nothing is inferred from the file name, and a file that cannot be read says nothing rather than guessing. |
+| PDF generation | **Implemented; verification pending on a Mac** | `scripts/verify-pdf.cjs` renders, writes, reopens with pdf.js and checks four passages come back. This environment has no Electron, so it has not been run. The checking half IS proved here: 4 tests build a PDF by hand, read it back, and confirm the check fails on a non-PDF and on missing text. |
+
+### How to verify PDF on the target machine
+
+```
+npx electron scripts/verify-pdf.cjs
+```
+
+Exits 0 and prints the file, byte count, page count and Electron version on
+success; non-zero with the reason otherwise.
