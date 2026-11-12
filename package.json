@@ -19,7 +19,8 @@
     "test:ui:agents": "node tests/ui/agents-ui.cjs",
     "test:ui:documents": "node tests/ui/documents-ui.cjs",
     "test:ui:search": "node tests/ui/search-ui.cjs",
-    "test:ui:responsive": "node tests/ui/responsive-ui.cjs"
+    "test:ui:responsive": "node tests/ui/responsive-ui.cjs",
+    "test:ui:mail": "node tests/ui/mail-ui.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",

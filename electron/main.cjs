@@ -121,6 +121,13 @@ const DEFAULTS = {
   show_thinking: false,
   /** Ids of the knowledge packs whose material may be used in answers. */
   knowledge_active: [],
+  // The person's own outgoing mail account. The password lives in the key
+  // store, never here.
+  mail_host: "",
+  mail_port: 587,
+  mail_secure: false,
+  mail_user: "",
+  mail_from: "",
   /** Which search engine answers a lookup, and the SearXNG address when that is chosen. */
   search_provider: "wikipedia",
   searxng_instance: "",
@@ -225,6 +232,7 @@ const agents = require("./agents.cjs");
 const documents = require("./documents.cjs");
 const gguf = require("./gguf.cjs");
 const search = require("./search.cjs");
+const mail = require("./mail.cjs");
 const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
@@ -903,6 +911,79 @@ function register(win) {
     })(),
     total_memory_bytes: os.totalmem(),
   }));
+  // ── email ────────────────────────────────────────────────
+  h("mail_status", () => ({
+    configured: Boolean(settings.mail_host && settings.mail_from),
+    host: settings.mail_host || "",
+    port: Number(settings.mail_port) || 587,
+    secure: Boolean(settings.mail_secure),
+    user: settings.mail_user || "",
+    from: settings.mail_from || "",
+    has_password: Boolean(secrets.get("mail")),
+  }));
+
+  h("mail_save", (a) => {
+    settings = {
+      ...settings,
+      mail_host: String(a?.host || "").trim(),
+      mail_port: Number(a?.port) > 0 ? Number(a.port) : 587,
+      mail_secure: Boolean(a?.secure),
+      mail_user: String(a?.user || "").trim(),
+      mail_from: String(a?.from || "").trim(),
+    };
+    saveSettings(settings);
+    if (typeof a?.password === "string" && a.password) secrets.set("mail", a.password);
+    return { ok: true };
+  });
+
+  /** Builds the message and says what would be sent. Nothing leaves here. */
+  h("mail_preview", (a) => {
+    try {
+      const m = mail.buildMessage({
+        from: settings.mail_from,
+        to: a?.to,
+        cc: a?.cc,
+        subject: a?.subject,
+        text: a?.text,
+      });
+      return { ok: true, envelope: m.envelope, headers: m.data.split("\r\n\r\n")[0] };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  /**
+   * Sends one message. `approved` must be true, and it can only be true
+   * because a person pressed the button: the model cannot set it, since it
+   * never reaches this handler. A failure is never reported as a send.
+   */
+  h("mail_send", async (a) => {
+    if (a?.approved !== true) return { ok: false, error: "A message is only sent when you approve it." };
+    if (!settings.mail_host || !settings.mail_from) {
+      return { ok: false, error: "No outgoing mail account is set up. Add one in Settings, under Email." };
+    }
+    try {
+      const message = mail.buildMessage({
+        from: settings.mail_from,
+        to: a?.to,
+        cc: a?.cc,
+        subject: a?.subject,
+        text: a?.text,
+      });
+      const r = await mail.sendMail({
+        host: settings.mail_host,
+        port: Number(settings.mail_port) || 587,
+        secure: Boolean(settings.mail_secure),
+        user: settings.mail_user || "",
+        pass: secrets.get("mail") || "",
+        message,
+      });
+      return { ok: true, recipients: r.recipients, response: r.response };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e), stage: e?.stage || "send" };
+    }
+  });
+
   // ── documents and websites ───────────────────────────────
   /**
    * Writes a real file of the kind asked for. The person always chooses where
@@ -1059,7 +1140,10 @@ function register(win) {
         return { ok: true, result: r.text || "That page had no readable text." };
       }
       if (tool === "knowledge") {
-        const active = settings.knowledge_active || [];
+        // An agent reads the packs it was given. With none chosen it falls back
+        // to whatever is switched on globally, so an agent set up before packs
+        // existed still works.
+        const active = (Array.isArray(agent.packs) && agent.packs.length) ? agent.packs : (settings.knowledge_active || []);
         const parts = [];
         for (const id of active) {
           try { const t = knowledge.contextFor(readPack(id), input, 4); if (t) parts.push(t); } catch { /* skip an unreadable pack */ }
@@ -1071,6 +1155,37 @@ function register(win) {
         if (!when?.at) return { ok: false, error: "I could not work out a time from that." };
         const r = reminders.create({ text: input, at: when.at, repeat: when.repeat || null });
         return { ok: true, result: `Reminder set: ${r.text} at ${new Date(r.at).toLocaleString()}` };
+      }
+      if (tool === "draft_email") {
+        // Drafting changes nothing, so it runs freely; the draft comes back for
+        // a person to read, and sending is a separate permission.
+        return { ok: true, result: `Draft ready. It has not been sent.\n\n${input}` };
+      }
+      if (tool === "send_email") {
+        if (!settings.mail_host || !settings.mail_from) {
+          return { ok: false, error: "No outgoing mail account is set up, so nothing can be sent. Add one in Settings, under Email." };
+        }
+        // The lines are the draft: To, Subject, blank, body.
+        const lines = String(input).split(/\r?\n/);
+        const to = (lines.find((l) => /^to:/i.test(l)) || "").replace(/^to:/i, "").trim();
+        const subject = (lines.find((l) => /^subject:/i.test(l)) || "").replace(/^subject:/i, "").trim();
+        const at = lines.findIndex((l) => l.trim() === "");
+        const body = at >= 0 ? lines.slice(at + 1).join("\n") : "";
+        if (!to || !body.trim()) return { ok: false, error: "That draft has no recipient or no message, so nothing was sent." };
+        try {
+          const message = mail.buildMessage({ from: settings.mail_from, to, subject, text: body });
+          const r = await mail.sendMail({
+            host: settings.mail_host,
+            port: Number(settings.mail_port) || 587,
+            secure: Boolean(settings.mail_secure),
+            user: settings.mail_user || "",
+            pass: secrets.get("mail") || "",
+            message,
+          });
+          return { ok: true, result: `Sent to ${r.recipients} recipient(s). Server said: ${r.response}` };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : String(e) };
+        }
       }
       if (tool === "write_memory") {
         const m = memory.add({ text: input, scope: "personal" });

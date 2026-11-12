@@ -160,12 +160,19 @@ test("the assistant is named after the model it actually runs on", () => {
   assert.equal(A.forgeAssistant("mystery.gguf").name, "Forge AI", "no size is better than a wrong one");
 });
 
-test("the assistant gets every tool, and none of them pre-approved", () => {
+test("the assistant gets every tool except sending email, and none pre-approved", () => {
   const f = A.forgeAssistant("gemma-2-2b-it-Q4_K_M.gguf");
-  assert.deepEqual([...f.tools].sort(), [...A.TOOL_IDS].sort(), "it can do everything the app can");
-  assert.deepEqual(f.preapproved, [], "but nothing happens without a yes the first time");
+  const withheld = A.TOOL_IDS.filter((t) => !f.tools.includes(t));
+  // Sending mail is withheld on purpose: a general assistant set up by one
+  // button should not arrive able to send mail as the person. Drafting is free.
+  assert.deepEqual(withheld, ["send_email"], "only sending email is withheld");
+  assert.ok(f.tools.includes("draft_email"), "it can still write one");
+  assert.equal(A.decide(f, "send_email").allow, false, "and it cannot send it");
+  assert.deepEqual(f.preapproved, [], "nothing happens without a yes the first time");
   assert.equal(f.model, "gemma-2-2b-it-Q4_K_M.gguf");
-  for (const t of A.TOOLS.filter((x) => x.changes)) {
+  // Only the ones it actually has can "wait"; one it does not have is refused
+  // outright, which is the stronger outcome and is asserted above.
+  for (const t of A.TOOLS.filter((x) => x.changes && f.tools.includes(x.id))) {
     assert.equal(A.decide(f, t.id).approval, true, `${t.id} still waits for a person`);
   }
 });

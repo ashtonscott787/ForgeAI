@@ -136,6 +136,11 @@ const BRIDGE = `(() => {
       { id: "write_file", label: "Write or change a file", changes: true },
     ]),
     agent_list: () => (state.agents || (state.agents = [])),
+    mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady) }),
+    mail_save: () => ({ ok: true }),
+    mail_send: (a) => (a && a.approved === true
+      ? { ok: true, recipients: 1, response: "250 OK queued" }
+      : { ok: false, error: "A message is only sent when you approve it." }),
     agent_icons: () => ["\u{1F916}", "\u{1F4E7}", "\u{1F50D}", "\u{1F4C1}"],
     agent_duplicate: ({ id }) => {
       state.agents = state.agents || [];

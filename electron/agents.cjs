@@ -39,6 +39,8 @@ const TOOLS = [
   { id: "write_file", label: "Write or change a file", changes: true },
   { id: "create_reminder", label: "Create a reminder", changes: true },
   { id: "write_memory", label: "Save something to memory", changes: true },
+  { id: "draft_email", label: "Draft an email", changes: false, note: "Writes it. Sending is separate." },
+  { id: "send_email", label: "Send an email", changes: true, note: "Needs an outgoing account in Settings." },
 ];
 const TOOL_IDS = TOOLS.map((t) => t.id);
 const byId = (id) => TOOLS.find((t) => t.id === id) || null;
@@ -68,6 +70,7 @@ function emptyAgent(name = "New agent") {
     model: null,
     tools: [],
     preapproved: [],
+    packs: [],
     created: Date.now(),
     updated: Date.now(),
   };
@@ -86,6 +89,13 @@ function validateAgent(raw) {
   // Pre-approval is meaningless for a tool the agent does not have, and
   // dangerous to keep around in case the tool is granted later.
   const preapproved = [...new Set(list(raw.preapproved))].filter((t) => tools.includes(t));
+  // Which knowledge packs this agent may read. Ids only, checked against what
+  // is on this computer when the agent runs — an imported agent cannot name a
+  // pack into existence, and naming one it has no permission to use does
+  // nothing, because the knowledge tool still has to be ticked.
+  const packs = Array.isArray(raw.packs)
+    ? [...new Set(raw.packs.filter((x) => typeof x === "string" && /^[a-f0-9]{8,32}$/i.test(x)))].slice(0, 50)
+    : [];
   return {
     format: FORMAT,
     version: VERSION,
@@ -99,6 +109,7 @@ function validateAgent(raw) {
     model: typeof raw.model === "string" && raw.model.trim() ? raw.model.trim().slice(0, 200) : null,
     tools,
     preapproved,
+    packs,
     created: Number(raw.created) || Date.now(),
     updated: Date.now(),
   };
@@ -234,7 +245,7 @@ function forgeAssistant(modelFile, verifiedLabel = "") {
     role: "general assistant on this computer",
     description: "Searches, reads pages and files, and writes documents. Says when it does not know.",
     model: modelFile || null,
-    tools: ["web_search", "read_page", "read_files", "knowledge", "write_file", "create_reminder", "write_memory"],
+    tools: ["web_search", "read_page", "read_files", "knowledge", "write_file", "create_reminder", "write_memory", "draft_email"],
     preapproved: [],
     instructions: [
       "You are a general assistant running on this person's own computer. Nothing they say leaves the machine unless a tool you call sends it.",

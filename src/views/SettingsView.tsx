@@ -3,6 +3,7 @@ import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
 import { SharePanel } from "../components/SharePanel";
 import { KnowledgePanel } from "../components/KnowledgePanel";
 import { SearchSettings } from "../components/SearchSettings";
+import { MailPanel } from "../components/MailPanel";
 import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
@@ -85,6 +86,10 @@ export function SettingsView({
 
           <Group title="Internet and search" note="Where Forge AI looks things up, and what it needs to do so.">
             <SearchSettings settings={settings} onChange={onChange} />
+          </Group>
+
+          <Group title="Email" note="Your own outgoing account. Forge AI drafts; you send.">
+            <MailPanel />
           </Group>
 
           <Group title="Files and documents" note="Your own documents and notes, which Forge AI can answer from. They stay on this computer.">

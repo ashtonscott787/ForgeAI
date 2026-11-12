@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type Agent, type AgentTool, type MachineCapability } from "../lib/ipc";
+import { api, type Agent, type AgentTool, type KnowledgePack, type MachineCapability } from "../lib/ipc";
 import { streamChat, type ChatMessage } from "../lib/chat";
 
 /**
@@ -38,6 +38,7 @@ export function Agents({
   const [list, setList] = useState<Agent[]>([]);
   const [tools, setTools] = useState<AgentTool[]>([]);
   const [icons, setIcons] = useState<string[]>([]);
+  const [packs, setPacks] = useState<KnowledgePack[]>([]);
   const [editing, setEditing] = useState<Agent | null>(null);
   const [running, setRunning] = useState<Agent | null>(null);
   const [goal, setGoal] = useState("");
@@ -52,6 +53,7 @@ export function Agents({
     load();
     void api.agentTools().then(setTools).catch(() => undefined);
     void api.agentIcons().then(setIcons).catch(() => undefined);
+    void api.knowledgeList().then(setPacks).catch(() => undefined);
   }, []);
   useEffect(() => {
     if (self) void api.agentAdvice({ usable_bytes: self.usable_model_bytes }).then(setAdvice).catch(() => undefined);
@@ -146,7 +148,7 @@ export function Agents({
           {advice?.warn && <div className="banner" role="status">{advice.text}</div>}
 
           <div className="sharerow">
-            <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", icon: icons[0] ?? "", description: "", role: "", instructions: "", model: null, tools: [], preapproved: [], updated: 0 } as Agent)}>New agent</button>
+            <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", icon: icons[0] ?? "", description: "", role: "", instructions: "", model: null, tools: [], preapproved: [], packs: [], updated: 0 } as Agent)}>New agent</button>
             <button className="ghostbtn" onClick={() => void api.agentImport().then(load)}>Import</button>
             {!list.some((x) => x.name.startsWith("Forge AI")) && installed.length > 0 && (
               <button
@@ -194,6 +196,7 @@ export function Agents({
               agent={editing}
               tools={tools}
               icons={icons}
+              packs={packs}
               models={installed}
               onCancel={() => setEditing(null)}
               onSave={save}
@@ -276,9 +279,10 @@ function parseActs(text: string) {
 }
 
 function AgentEditor({
-  agent, tools, models, icons, onSave, onCancel,
+  agent, tools, models, icons, packs, onSave, onCancel,
 }: {
   icons: string[];
+  packs: KnowledgePack[];
   agent: Agent;
   tools: AgentTool[];
   models: { file_name: string; label: string }[];
@@ -362,6 +366,41 @@ function AgentEditor({
           );
         })}
       </ul>
+
+      {a.tools.includes("knowledge") && (
+        <>
+          <h4 className="perm-head">What it may read</h4>
+          {packs.length === 0 ? (
+            <p className="hint">No knowledge packs yet. Make one under Settings, in “Files and documents”.</p>
+          ) : (
+            <>
+              <p className="hint">
+                Choose the packs this agent may read. With none chosen it uses whichever
+                packs are switched on in Settings.
+              </p>
+              <ul className="permlist">
+                {packs.map((p) => (
+                  <li key={p.id} className={`permrow${a.packs.includes(p.id) ? " on" : ""}`}>
+                    <label className="perm-main">
+                      <input
+                        type="checkbox"
+                        checked={a.packs.includes(p.id)}
+                        onChange={() => setA((prev) => ({
+                          ...prev,
+                          packs: prev.packs.includes(p.id) ? prev.packs.filter((x) => x !== p.id) : [...prev.packs, p.id],
+                        }))}
+                        aria-label={`Let it read ${p.name}`}
+                      />
+                      <span className="perm-label">{p.name}</span>
+                      <span className="perm-tag">{p.documents.length} document{p.documents.length === 1 ? "" : "s"}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
 
       <div className="sharerow">
         <button className="ghostbtn" disabled={!a.name.trim()} onClick={() => onSave(a)}>Save</button>

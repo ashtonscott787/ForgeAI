@@ -138,6 +138,11 @@ export interface Settings {
   knowledge_active?: string[];
   search_provider?: string;
   searxng_instance?: string;
+  mail_host?: string;
+  mail_port?: number;
+  mail_secure?: boolean;
+  mail_user?: string;
+  mail_from?: string;
 }
 
 export interface EngineStatus {
@@ -363,6 +368,8 @@ export interface Agent {
   model: string | null;
   tools: string[];
   preapproved: string[];
+  /** Knowledge packs this agent may read. Empty means the globally active ones. */
+  packs: string[];
   updated: number;
 }
 export interface AgentActResult {
@@ -425,6 +432,11 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  mailStatus: () => invoke<{ configured: boolean; host: string; port: number; secure: boolean; user: string; from: string; has_password: boolean }>("mail_status"),
+  mailSave: (a: { host: string; port: number; secure: boolean; user: string; from: string; password?: string }) =>
+    invoke<{ ok: boolean }>("mail_save", a),
+  mailSend: (a: { to: string; cc?: string; subject: string; text: string; approved: true }) =>
+    invoke<{ ok: boolean; recipients?: number; error?: string; stage?: string }>("mail_send", a),
   saveDocument: (a: { kind: "pdf" | "docx" | "md" | "txt" | "csv" | "html"; title: string; text: string }) =>
     invoke<{ ok: boolean; path?: string; bytes?: number; error?: string; cancelled?: boolean }>("save_document", a),
   siteParse: (text: string) =>

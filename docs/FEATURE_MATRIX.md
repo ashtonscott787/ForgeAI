@@ -252,3 +252,16 @@ fit, since the same information is on the row it describes.
 so the rule meant to hide the conversation on a narrow window also hid the
 browser pane's own `<aside>` — opening the browser below 900px showed nothing
 at all. Both selectors now name the element.
+
+## Email and per-agent knowledge
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Compose a real email | **Working (unit)** | RFC 5322 with proper headers, RFC 2047 for non-ASCII subjects, quoted-printable bodies wrapped under the line limit. A line break in any header is refused, not stripped, because that is how extra recipients get added to someone else's message. |
+| Send over SMTP | **Working (unit)** | STARTTLS and implicit TLS, AUTH PLAIN and LOGIN, dot-stuffing so a line that is only a full stop cannot end the message early. Run against a server that records the whole dialogue: 16 tests, including refused credentials, a rejected recipient and a message refused at the end — none of which is ever reported as sent. |
+| Never sends unencrypted credentials | **Working (unit)** | A password crosses the network only over TLS, STARTTLS, or to this machine. The rule is a separate function so it is checked directly rather than inferred from a socket. |
+| Nothing is sent without approval | **Working (unit + UI)** | The send handler refuses unless `approved` is true, and that flag can only come from a person pressing the button — it never reaches the model. The card names the recipient before it goes, and cannot send twice. |
+| Email settings | **Working (UI)** | Account in settings, password in the OS key store. |
+| Agent email tools | **Working (unit)** | Drafting changes nothing and runs freely; sending is a separate permission that stops for a person. The built-in assistant gets drafting but **not** sending, so one button never produces something that can send mail as you. |
+| Reading an inbox (IMAP) | **Not built** | Stated plainly in the panel rather than implied. Forge AI can write and send, not receive. |
+| Per-agent knowledge packs | **Working (unit + UI)** | An agent reads the packs chosen for it; with none chosen it falls back to the globally active ones, so agents made before packs existed still work. Imported agents cannot name a pack into existence. |
