@@ -101,7 +101,11 @@ test("CI does not also pin a pnpm version, which would conflict with packageMana
   // pnpm/action-setup refuses to run when it is given a version AND
   // package.json declares packageManager. Adding the pin broke both CI jobs.
   const wf = fs.readFileSync(path.join(root, ".github/workflows/desktop.yml"), "utf8");
-  const setup = wf.slice(wf.indexOf("pnpm/action-setup"), wf.indexOf("pnpm/action-setup") + 220);
-  assert.ok(!/version:\s*\d/.test(setup), "the workflow lets packageManager decide the pnpm version");
+  // Only this step: a fixed-size window caught "node-version: 22" from the
+  // next one and failed for the wrong reason.
+  const from = wf.indexOf("pnpm/action-setup");
+  const next = wf.indexOf("\n      - ", from);
+  const setup = wf.slice(from, next === -1 ? wf.length : next);
+  assert.ok(!/\bversion:\s*\d/.test(setup), `the workflow still pins a pnpm version: ${setup}`);
   assert.match(require(path.join(root, "package.json")).packageManager, /^pnpm@/, "and package.json declares one");
 });
