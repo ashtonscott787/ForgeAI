@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "electron:dev": "electron .",
-    "dist": "electron-builder",
+    "dist": "node scripts/check-engine.cjs && electron-builder",
     "test": "node --test tests/*.test.cjs",
     "test:ui": "node tests/ui/cloud-ui.cjs",
     "test:e2e": "node tests/e2e/electron.e2e.cjs",
@@ -22,7 +22,9 @@
     "test:ui:search": "node tests/ui/search-ui.cjs",
     "test:ui:responsive": "node tests/ui/responsive-ui.cjs",
     "test:ui:mail": "node tests/ui/mail-ui.cjs",
-    "test:all": "bash scripts/test-all.sh"
+    "test:all": "bash scripts/test-all.sh",
+    "engine:get": "node scripts/get-engine.cjs",
+    "engine:check": "node scripts/check-engine.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",

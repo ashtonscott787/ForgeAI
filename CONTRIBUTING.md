@@ -93,6 +93,22 @@ Run Electron through pnpm, never through `npx electron`: npx will download a
 different Electron (it has no idea this project pins 38) and you would be
 testing a runtime the app never ships with.
 
+The packaged app ships the inference engine from `engine/`, which is not in the
+repository. Fetch it before packaging:
+
+```bash
+pnpm engine:get
+```
+
+`pnpm dist` refuses to package without it. electron-builder only *warns* when
+an `extraResources` path is missing, so a build with no engine succeeds and
+produces an installer that cannot run a model — which nothing announces until
+someone downloads it and tries.
+
+llama.cpp publishes macOS (arm64, x64) and Windows x64 builds for the pinned
+tag. There is no Linux build: build it from source and put `llama-server` and
+its libraries in `engine/`.
+
 ```bash
 pnpm exec electron scripts/verify-pdf.cjs   # proves PDF generation end to end
 pnpm test                                    # unit tests
