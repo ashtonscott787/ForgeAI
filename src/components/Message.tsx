@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { parseSegments } from "../lib/blocks";
 import { MemoryAskCard } from "./MemoryAskCard";
 import { ReminderAskCard } from "./ReminderAskCard";
@@ -9,18 +10,40 @@ import { GenUI } from "./GenUI";
 import { HtmlPreview } from "./HtmlPreview";
 import { Markdown } from "./Markdown";
 
+/**
+ * The model's own working. Collapsed once it is finished, and shown open while
+ * it is still being written, because that is the only time it is worth watching.
+ */
+function Thinking({ text, open }: { text: string; open: boolean }) {
+  const [show, setShow] = useState(open);
+  useEffect(() => { if (open) setShow(true); }, [open]);
+  return (
+    <div className="thinking">
+      <button type="button" className="thinking-h" aria-expanded={show} onClick={() => setShow((v) => !v)}>
+        <span className="thinking-dot" aria-hidden="true" />
+        <span>{open ? "Thinking…" : "Thought about this"}</span>
+        <span className={`bact-chev${show ? " on" : ""}`} aria-hidden="true">›</span>
+      </button>
+      {show && <pre className="thinking-b">{text}</pre>}
+    </div>
+  );
+}
+
 /** One assistant turn, rendered as the pieces it actually contains. */
 export function AssistantMessage({
   content,
   streaming,
   onSend,
   onResearch,
+  showThinking = false,
 }: {
   content: string;
   streaming: boolean;
   onSend: (text: string) => void;
   /** Research runs itself and feeds the findings straight back to the model. */
   onResearch?: (text: string) => void;
+  /** Off by default: most people want the answer, not the working. */
+  showThinking?: boolean;
 }) {
   const segments = parseSegments(content);
   const openLink = (url: string) => void api.openExternal(url).catch(() => undefined);
@@ -34,6 +57,7 @@ export function AssistantMessage({
         if (s.kind === "email") return <EmailCard key={i} email={s.email} />;
         if (s.kind === "memory") return <MemoryAskCard key={i} ask={s.ask} />;
         if (s.kind === "reminder") return <ReminderAskCard key={i} ask={s.ask} />;
+        if (s.kind === "thinking") return showThinking ? <Thinking key={i} text={s.text} open={s.open} /> : null;
         if (s.kind === "search")
           return (
             <ResearchCard

@@ -31,6 +31,8 @@ interface Props {
   conversationId: string;
   /** Text and images from another view (the browser). Placed in the composer; never sent automatically. */
   handoff?: { text: string; images: string[]; browser?: BrowserActivity } | null;
+  /** Show the model's working, and the finish time, under each answer. */
+  showThinking?: boolean;
   onHandoffUsed?: () => void;
   messages: ChatMessage[];
   onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
@@ -388,6 +390,7 @@ export function Chat(props: Props) {
               usage: res.usage,
               perf: {
                 total_ms: ended - started,
+                finished_at: Date.now(),
                 load_ms: 0,
                 first_token_ms: first - started,
                 generate_ms: ended - first,
@@ -463,6 +466,7 @@ export function Chat(props: Props) {
           if (last && last.role === "assistant") {
             const perf: Perf = {
               total_ms: ended - started,
+              finished_at: Date.now(),
               load_ms: loadMs,
               first_token_ms: first - started,
               generate_ms: generateMs,
@@ -520,6 +524,7 @@ export function Chat(props: Props) {
                   m.content ? (
                     <AssistantMessage
                       content={m.content}
+                      showThinking={props.showThinking === true}
                       streaming={streaming && i === messages.length - 1}
                       onSend={(t) => void send(t)}
                       // Only the newest turn may run a search, and only once:

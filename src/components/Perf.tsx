@@ -30,6 +30,9 @@ export function PerfLine({ perf }: { perf: Perf }) {
             <div><dt>Document context</dt><dd>{perf.context_chars.toLocaleString()} characters</dd></div>
           ) : null}
           <div><dt>Ran on</dt><dd>{perf.where === "local" ? "this computer" : perf.where === "cloud" ? "provider cloud" : "cluster"}</dd></div>
+          {perf.finished_at ? (
+            <div><dt>Finished at</dt><dd>{new Date(perf.finished_at).toLocaleTimeString()}</dd></div>
+          ) : null}
         </dl>
       )}
     </div>

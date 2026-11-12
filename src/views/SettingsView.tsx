@@ -1,5 +1,6 @@
 import { CloudPanel } from "../components/CloudPanel";
 import { SkillsPanel, ConnectorsPanel, DefaultBrowserPanel } from "../components/Extensions";
+import { SharePanel } from "../components/SharePanel";
 import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
@@ -51,6 +52,18 @@ export function SettingsView({
         <div className="pbody">
           <DefaultBrowserPanel />
           <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
+          <SharePanel />
+          <div className="panel">
+            <div className="panel-h"><span className="t">While it answers</span></div>
+            <div className="panel-b">
+              <Field
+                label="Show its thinking and how long it took"
+                hint="Models that reason out loud put that working in the reply. Shown as a separate, collapsed section, with the time the answer finished and how long it took."
+              >
+                <Toggle on={settings.show_thinking === true} onChange={(v) => save({ show_thinking: v })} />
+              </Field>
+            </div>
+          </div>
           <SkillsPanel />
           <ConnectorsPanel />
           <div className="panel">

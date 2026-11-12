@@ -52,6 +52,8 @@ export interface Perf {
   machine: string;
   where: "local" | "cluster" | "cloud";
   context_chars?: number;
+  /** Wall-clock time the answer finished, so a transcript read later still says when. */
+  finished_at?: number;
 }
 
 export interface StreamHandle {

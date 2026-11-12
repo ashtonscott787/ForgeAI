@@ -40,11 +40,40 @@ export type Segment =
   | { kind: "email"; email: EmailParts }
   | { kind: "search"; ask: SearchAsk }
   | { kind: "memory"; ask: MemoryAsk }
-  | { kind: "reminder"; ask: ReminderAsk };
+  | { kind: "reminder"; ask: ReminderAsk }
+  /** The model's own working, which some models emit in <think> tags. */
+  | { kind: "thinking"; text: string; open: boolean };
 
 const FENCE = /```([A-Za-z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g;
 
+/**
+ * Reasoning models wrap their working in <think> tags. It is pulled out before
+ * anything else, so it never reaches the markdown renderer and never gets
+ * mistaken for the answer. A tag still open is kept as unfinished working,
+ * which is what it is while the reply is streaming.
+ */
+const THINK = /<(think|thinking|reasoning)>([\s\S]*?)(?:<\/\1>|$)/gi;
+
 export function parseSegments(content: string): Segment[] {
+  if (THINK.test(content)) {
+    THINK.lastIndex = 0;
+    const out: Segment[] = [];
+    let at = 0;
+    for (const m of content.matchAll(THINK)) {
+      const start = m.index ?? 0;
+      if (start > at) out.push(...parseBody(content.slice(at, start)));
+      const text = (m[2] ?? "").trim();
+      // An open tag means the model is still working; a closed one is finished.
+      if (text) out.push({ kind: "thinking", text, open: !m[0].match(/<\/(think|thinking|reasoning)>$/i) });
+      at = start + m[0].length;
+    }
+    if (at < content.length) out.push(...parseBody(content.slice(at)));
+    return out;
+  }
+  return parseBody(content);
+}
+
+function parseBody(content: string): Segment[] {
   const out: Segment[] = [];
   let last = 0;
   for (const m of content.matchAll(FENCE)) {

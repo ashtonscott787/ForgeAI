@@ -129,6 +129,12 @@ export interface Settings {
   update_channel?: "stable" | "beta";
   last_update_check?: number;
   skipped_version?: string | null;
+  share_enabled?: boolean;
+  share_port?: number;
+  share_mesh?: boolean;
+  share_token?: string | null;
+  /** Show the model's own reasoning, and how long the answer took. */
+  show_thinking?: boolean;
 }
 
 export interface EngineStatus {
@@ -297,6 +303,18 @@ export interface ProviderStreamResult {
   cancelled: boolean;
 }
 
+/** The endpoint other applications and computers use to reach this machine's models. */
+export interface ShareStatus {
+  enabled: boolean;
+  running: boolean;
+  urls: string[];
+  port: number;
+  token: string | null;
+  mesh_enabled: boolean;
+  mesh_address: string | null;
+  error: string | null;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -339,6 +357,9 @@ export const api = {
     listen<{ seconds: number; tail: string }>("engine://loading", (e) => cb(e.payload)),
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
+  shareStatus: () => invoke<ShareStatus>("share_status"),
+  shareSet: (a: { enabled: boolean; port?: number; mesh?: boolean }) => invoke<ShareStatus>("share_set", a),
+  shareNewToken: () => invoke<ShareStatus>("share_new_token"),
   parseWhen: (text: string) =>
     invoke<{ at: number; repeat: Reminder["repeat"]; text: string } | { error: string }>("parse_when", { text }),
   remindersList: () => invoke<Reminder[]>("reminders_list"),

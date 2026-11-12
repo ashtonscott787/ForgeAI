@@ -87,6 +87,14 @@ const DEFAULTS = {
   load_into_memory: false,
   /** Ceiling on how much of this machine's memory models may use, in bytes. */
   memory_budget_bytes: null,
+  // Letting other applications, and other computers on a private mesh, use the
+  // models on this machine. Off until it is switched on, and never without a token.
+  share_enabled: false,
+  share_port: 11435,
+  share_mesh: false,
+  share_token: null,
+  /** Show the model's own reasoning, and how long the answer took. */
+  show_thinking: false,
 };
 function loadSettings() { try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) }; } catch { return { ...DEFAULTS }; } }
 function saveSettings(s) { const t = settingsFile() + ".tmp"; fs.writeFileSync(t, JSON.stringify(s, null, 2)); fs.renameSync(t, settingsFile()); }
@@ -149,6 +157,7 @@ function get(url, headers, redirects = 0) {
 // into a dead link inside the app.
 const { resolveArtifact, resolveProjector } = require("./hf.cjs");
 const { missingEngineLibraries } = require("./engine-check.cjs");
+const share = require("./share-server.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
   const q = String(query || "").trim();
@@ -209,6 +218,53 @@ const logTail = (lines = 12) => {
     return "(the engine wrote nothing to its log)";
   }
 };
+// ── the shared endpoint ──────────────────────────────────────
+let shared = null;
+let shareError = null;
+
+const meshAddress = () => {
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const i of list || []) {
+      if (i.family === "IPv4" && share.isMeshAddress(i.address)) return i.address;
+    }
+  }
+  return null;
+};
+
+function shareStatus() {
+  return {
+    enabled: Boolean(settings.share_enabled),
+    running: Boolean(shared),
+    urls: shared ? shared.urls : [],
+    port: settings.share_port,
+    token: settings.share_token || null,
+    mesh_enabled: Boolean(settings.share_mesh),
+    mesh_address: meshAddress(),
+    error: shareError,
+  };
+}
+
+async function restartShare() {
+  if (shared) { try { shared.close(); } catch {} shared = null; }
+  shareError = null;
+  if (!settings.share_enabled) return;
+  try {
+    const srv = share.createServer({
+      listModels: () => installed(),
+      ensureEngine: async (fileName) => ensureEngine({ modelFile: fileName }),
+      getToken: () => settings.share_token,
+      machineName: () => os.hostname(),
+    });
+    const mesh = settings.share_mesh ? meshAddress() : null;
+    if (settings.share_mesh && !mesh) {
+      shareError = "No private mesh address was found on this machine, so only this computer can reach it. Start Tailscale (or your mesh) and switch it on again.";
+    }
+    shared = await share.listen(srv, { port: Number(settings.share_port) || 11435, meshAddress: mesh });
+  } catch (e) {
+    shareError = e instanceof Error ? e.message : String(e);
+  }
+}
+
 let idleTimer = null;
 function touchEngine() {
   if (idleTimer) clearTimeout(idleTimer);
@@ -636,6 +692,29 @@ function register(win) {
     })(),
     total_memory_bytes: os.totalmem(),
   }));
+  // ── sharing this machine's models ────────────────────────
+  h("share_status", () => shareStatus());
+  h("share_set", async (a) => {
+    const next = {
+      ...settings,
+      share_enabled: Boolean(a?.enabled),
+      share_port: Number(a?.port) > 0 ? Number(a.port) : settings.share_port,
+      share_mesh: Boolean(a?.mesh),
+    };
+    // A token is made the first time sharing is switched on, never before.
+    if (next.share_enabled && !next.share_token) next.share_token = share.newToken();
+    settings = next;
+    saveSettings(settings);
+    await restartShare();
+    return shareStatus();
+  });
+  h("share_new_token", async () => {
+    settings = { ...settings, share_token: share.newToken() };
+    saveSettings(settings);
+    await restartShare();
+    return shareStatus();
+  });
+
   h("link_readiness", () => {
     let addr = null;
     for (const list of Object.values(os.networkInterfaces())) for (const i of list || []) {
@@ -738,6 +817,9 @@ app.whenReady().then(() => {
     return new Response(r.body, { status: r.status, headers: r.headers });
   });
   settings = loadSettings();
+  // Sharing survives a restart when it was left on, so another machine or app
+  // does not silently lose its endpoint.
+  void restartShare();
   updater.cleanupOldBundles();
   secrets.load(root());
   memory.load(root());

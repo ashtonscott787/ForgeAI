@@ -1,8 +1,9 @@
 import { Browser } from "./views/Browser";
+import { GhostMark } from "./components/GhostMark";
 import type { BrowserActivity } from "./lib/chat";
 import { cloudRows } from "./lib/cloud";
 import { publisherFor } from "./lib/publisher";
-import { loadConversations, newConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
+import { loadConversations, newConversation, newTempConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
 import type { ChatMessage } from "./lib/chat";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chat } from "./views/Chat";
@@ -148,6 +149,20 @@ export default function App() {
       ),
     [activeId],
   );
+  /** A chat that leaves nothing behind: not stored, and gone once it is left. */
+  const startTempChat = () => {
+    setView("chat");
+    if (active.temporary) return;
+    const c = newTempConversation();
+    setConvos((l) => [c, ...l]);
+    setActiveId(c.id);
+  };
+  // Leaving a temporary chat ends it. Nothing was ever written to storage, so
+  // closing the app ends it too, without any clean-up to run.
+  useEffect(() => {
+    setConvos((l) => (l.some((c) => c.temporary && c.id !== activeId) ? l.filter((c) => !c.temporary || c.id === activeId) : l));
+  }, [activeId]);
+
   const startNewChat = () => {
     setView("chat");
     if (active.messages.length === 0) return;
@@ -317,7 +332,7 @@ export default function App() {
           )}
           <div className="convlist">
             {convos
-              .filter((c) => c.messages.length > 0)
+              .filter((c) => c.messages.length > 0 && !c.temporary)
               .filter((c) => {
                 // Titles alone miss the chat you remember by something said in it.
                 const q = convQuery.trim().toLowerCase();
@@ -413,7 +428,22 @@ export default function App() {
 
           <div className="views">
           <section className={`view${view === "chat" ? " active" : ""}`}>
+            {active.temporary && (
+              <div className="tempnote" role="status">
+                <GhostMark /> Temporary chat — not saved, and it ends when you leave it or close Forge AI.
+              </div>
+            )}
             <div className={`chat-split${panes[activeId] ? " withpane" : ""}`}>
+            <button
+              type="button"
+              className={`ghost-toggle${active.temporary ? " on" : ""}`}
+              aria-pressed={Boolean(active.temporary)}
+              title={active.temporary ? "This chat is temporary" : "Start a temporary chat"}
+              aria-label={active.temporary ? "This chat is temporary" : "Start a temporary chat"}
+              onClick={startTempChat}
+            >
+              <GhostMark />
+            </button>
             <button
               type="button"
               className={`browser-toggle${panes[activeId] ? " on" : ""}`}
@@ -437,6 +467,7 @@ export default function App() {
               onConfigurationChange={(v, c) => setConfigurations((p) => ({ ...p, [v]: c }))}
               onGoto={setView}
               contextSize={settings.context_size}
+              showThinking={settings.show_thinking === true}
               messages={active.messages}
               conversationId={activeId}
               handoff={handoff}

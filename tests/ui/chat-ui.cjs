@@ -87,6 +87,32 @@ async function scenario(name, server, fn) {
     assert.equal(users, 1, "the question still appears exactly once");
   });
 
+  await scenario("A temporary chat is marked, hidden from the list, and never stored", server, async (page) => {
+    const before = await page.locator(".conv").count();
+    await page.getByRole("button", { name: "Start a temporary chat" }).click();
+    await page.waitForSelector(".tempnote", { timeout: 4000 });
+    assert.match(await page.locator(".tempnote").innerText(), /not saved/i, "it says plainly that it is not saved");
+    assert.equal(await page.locator(".conv").count(), before, "it is not added to the chat list");
+    // Type something, so there is content that could be stored, then check it is not.
+    const box = page.locator('textarea[placeholder^="Ask anything"]');
+    await box.fill("something private");
+    const stored = await page.evaluate(() => localStorage.getItem("forge.conversations.v1") || "");
+    assert.ok(!stored.includes("Temporary chat"), "no temporary chat reaches storage");
+    assert.ok(!stored.includes("something private"), "nothing typed in it reaches storage");
+  });
+
+  await scenario("Leaving a temporary chat ends it", server, async (page) => {
+    await page.getByRole("button", { name: "Start a temporary chat" }).click();
+    await page.waitForSelector(".tempnote");
+    await page.locator(".conv", { hasText: "Bike repair" }).first().click();
+    await page.waitForSelector(".tempnote", { state: "detached", timeout: 4000 });
+    // Going back to the ghost gives a fresh one, not the old one.
+    await page.getByRole("button", { name: "Start a temporary chat" }).click();
+    await page.waitForSelector(".tempnote");
+    const text = await page.locator('textarea[placeholder^="Ask anything"]').inputValue();
+    assert.equal(text, "", "the previous temporary chat is gone, not restored");
+  });
+
   server.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
