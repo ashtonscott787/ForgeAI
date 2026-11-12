@@ -18,6 +18,8 @@ export const SYSTEM_PROMPT = [
   "",
   '6. Reminders: when the person asks to be reminded of something, emit a ```forge-reminder block containing {"text": "what to say", "when": "at 7pm"}. Keep "when" in their own words — Forge AI works out the time and asks them to confirm.',
   "",
+  '7. A specific page: when you know the exact page that answers the question, emit a ```forge-browse block containing {"url": "https://..."}. Forge AI shows the person the address, and only reads it if they press the button; its text then comes back to you. Use this for a known page, and forge-search when you need to find one. Never invent an address.',
+  "",
   "Otherwise answer normally in Markdown. Be concise and concrete.",
 ].join("\n");
 

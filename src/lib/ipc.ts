@@ -388,6 +388,7 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  readUrl: (url: string) => invoke<{ ok: boolean; url?: string; text?: string; error?: string }>("read_url", { url }),
   agentTools: () => invoke<AgentTool[]>("agent_tools"),
   agentList: () => invoke<Agent[]>("agent_list"),
   agentSave: (agent: Agent) => invoke<Agent>("agent_save", { agent }),

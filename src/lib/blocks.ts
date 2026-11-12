@@ -42,7 +42,9 @@ export type Segment =
   | { kind: "memory"; ask: MemoryAsk }
   | { kind: "reminder"; ask: ReminderAsk }
   /** The model's own working, which some models emit in <think> tags. */
-  | { kind: "thinking"; text: string; open: boolean };
+  | { kind: "thinking"; text: string; open: boolean }
+  /** The model asking to look at a page in the built-in browser. */
+  | { kind: "browse"; url: string };
 
 const FENCE = /```([A-Za-z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g;
 
@@ -91,6 +93,9 @@ function parseBody(content: string): Segment[] {
     } else if (lang === "forge-reminder") {
       const ask = parseReminder(code);
       out.push(ask ? { kind: "reminder", ask } : { kind: "code", lang: "json", code: code.trimEnd() });
+    } else if (lang === "forge-browse") {
+      const url = parseBrowse(code);
+      out.push(url ? { kind: "browse", url } : { kind: "code", lang: "json", code: code.trimEnd() });
     } else if (lang === "forge-ui") {
       const spec = parseUi(code);
       out.push(spec ? { kind: "ui", spec } : { kind: "code", lang: "json", code: code.trimEnd() });
@@ -105,6 +110,42 @@ function parseBody(content: string): Segment[] {
 }
 
 /** Unterminated fences stream in token by token; show them as code as they grow. */
+/**
+ * A browse block names one page. It is accepted as bare text or as JSON with a
+ * url field, because models write both. Only https survives: an http address is
+ * upgraded, and anything that is not an address at all is refused rather than
+ * guessed at, so a model cannot steer the app at a file or a local service.
+ */
+export function parseBrowse(code: string): string | null {
+  let raw = String(code ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("{")) {
+    try {
+      const d = JSON.parse(raw) as { url?: unknown };
+      raw = typeof d.url === "string" ? d.url.trim() : "";
+    } catch {
+      return null;
+    }
+  }
+  raw = raw.replace(/^<|>$/g, "").trim();
+  if (!raw) return null;
+  if (/^http:\/\//i.test(raw)) raw = raw.replace(/^http:\/\//i, "https://");
+  if (!/^https:\/\//i.test(raw)) {
+    // A bare host is fine; a sentence is not.
+    if (/\s/.test(raw) || !/^[\w.-]+\.[a-z]{2,}([/?#].*)?$/i.test(raw)) return null;
+    raw = `https://${raw}`;
+  }
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return null;
+    const host = u.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 function pushText(out: Segment[], text: string) {
   const open = text.match(/```([A-Za-z0-9_-]*)[ \t]*\r?\n([\s\S]*)$/);
   if (open) {

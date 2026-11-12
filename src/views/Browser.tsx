@@ -29,11 +29,14 @@ export function Browser({
   onSendToChat,
   compact = false,
   onClose,
+  openUrl,
 }: {
   onSendToChat: (text: string, images?: string[], activity?: BrowserActivity) => void;
   /** Pane mode: narrower controls, no full-width start screen. */
   compact?: boolean;
   onClose?: () => void;
+  /** A page the rest of the app wants shown. Each new value opens a tab. */
+  openUrl?: { url: string; at: number } | null;
 }) {
   const [tabs, setTabs] = useState<Tab[]>([{ id: newId(), url: HOME, title: "New tab" }]);
   const [activeId, setActiveId] = useState<string>(tabs[0]!.id);
@@ -70,6 +73,13 @@ export function Browser({
   useEffect(() => {
     setAddress(active.url);
   }, [active.id, active.url]);
+
+  // Keyed on `at` rather than the address, so asking for the same page twice
+  // still opens it the second time.
+  useEffect(() => {
+    if (openUrl?.url) openNew(openUrl.url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openUrl?.at]);
 
   /** A guest that cannot report its title still sends its text; the host name does instead. */
   const titleOf = (view: { getTitle?: () => string }, url: string) => {

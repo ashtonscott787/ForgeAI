@@ -95,6 +95,7 @@ export default function App() {
   // The browser pane belongs to a conversation, so switching chats keeps each one's pane as it was.
   const [panes, setPanes] = useState<Record<string, boolean>>({});
   const [convQuery, setConvQuery] = useState("");
+  const [paneUrl, setPaneUrl] = useState<{ url: string; at: number } | null>(null);
   useEffect(() => {
     if (!inTauri) return;
     void api.providerStatus().then(setProviders).catch(() => undefined);
@@ -470,6 +471,10 @@ export default function App() {
               onGoto={setView}
               contextSize={settings.context_size}
               showThinking={settings.show_thinking === true}
+              onOpenPane={(url) => {
+                setPanes((p) => ({ ...p, [activeId]: true }));
+                setPaneUrl({ url, at: Date.now() });
+              }}
               messages={active.messages}
               conversationId={activeId}
               handoff={handoff}
@@ -481,6 +486,7 @@ export default function App() {
               <aside className="chat-pane" aria-label="Browser">
                 <Browser
                   compact
+                  openUrl={paneUrl}
                   onClose={() => setPanes((p) => ({ ...p, [activeId]: false }))}
                   onSendToChat={(text, images = [], browser) => setHandoff({ text, images, browser })}
                 />

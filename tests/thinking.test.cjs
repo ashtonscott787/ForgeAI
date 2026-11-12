@@ -62,6 +62,50 @@ test("code blocks around the working still parse", () => {
   assert.match(code.code, /print\(1\)/);
 });
 
+test("a browse block names one https page", () => {
+  const { parseSegments, parseBrowse } = load();
+  const segs = parseSegments('Let me check.\n\n```forge-browse\n{"url":"https://example.com/policy"}\n```\n');
+  const b = segs.find((s) => s.kind === "browse");
+  assert.ok(b, "the block becomes a browse segment");
+  assert.equal(b.url, "https://example.com/policy");
+  // Bare text and a bare host are both accepted, because models write both.
+  assert.equal(parseBrowse("https://example.com/x"), "https://example.com/x");
+  assert.equal(parseBrowse("example.com"), "https://example.com/");
+  assert.equal(parseBrowse("<https://example.com/>"), "https://example.com/");
+});
+
+test("http is upgraded to https, and anything else is refused", () => {
+  const { parseBrowse } = load();
+  assert.equal(parseBrowse("http://example.com/a"), "https://example.com/a");
+  for (const bad of [
+    "file:///etc/passwd",
+    "ftp://example.com",
+    "javascript:alert(1)",
+    "data:text/html,<script>",
+    "please look up the weather",
+    "",
+    "   ",
+    "not a url",
+  ]) {
+    assert.equal(parseBrowse(bad), null, `${bad} is refused`);
+  }
+});
+
+test("the model cannot steer the app at this machine", () => {
+  const { parseBrowse } = load();
+  assert.equal(parseBrowse("https://localhost/admin"), null);
+  assert.equal(parseBrowse("https://127.0.0.1:11435/v1/models"), null, "not even the share endpoint");
+  assert.equal(parseBrowse("https://printer.local/"), null);
+  assert.equal(parseBrowse("localhost"), null);
+});
+
+test("a malformed browse block falls back to code, not a guessed address", () => {
+  const { parseSegments } = load();
+  const segs = parseSegments("```forge-browse\n{\"url\": 42}\n```");
+  assert.equal(segs[0].kind, "code", "it is shown as what it is, not acted on");
+  assert.ok(!segs.some((s) => s.kind === "browse"));
+});
+
 test("several think blocks in one reply are all separated", () => {
   const { parseSegments } = load();
   const segs = parseSegments("<think>one</think>first<think>two</think>second");

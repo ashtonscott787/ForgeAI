@@ -33,6 +33,8 @@ interface Props {
   handoff?: { text: string; images: string[]; browser?: BrowserActivity } | null;
   /** Show the model's working, and the finish time, under each answer. */
   showThinking?: boolean;
+  /** Opens a page in the browser pane beside this conversation. */
+  onOpenPane?: (url: string) => void;
   onHandoffUsed?: () => void;
   messages: ChatMessage[];
   onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
@@ -539,6 +541,7 @@ export function Chat(props: Props) {
                     <AssistantMessage
                       content={m.content}
                       showThinking={props.showThinking === true}
+                      onOpenPane={props.onOpenPane}
                       streaming={streaming && i === messages.length - 1}
                       onSend={(t) => void send(t)}
                       // Only the newest turn may run a search, and only once:

@@ -312,6 +312,26 @@ function listAgents() {
   } catch { return []; }
 }
 
+/**
+ * Fetches a page and returns its readable text. Shared by the agent's read_page
+ * tool and by the chat's browse block, so there is one place where the refusal
+ * of local addresses and the size cap live.
+ */
+async function fetchReadable(rawUrl) {
+  const url = openWeb.checkPageUrl(rawUrl);
+  const res = await get(url, { Accept: "text/html,*/*" });
+  if (res.statusCode !== 200) { res.resume(); throw new Error(`That page answered HTTP ${res.statusCode}.`); }
+  let html = "";
+  let size = 0;
+  res.setEncoding("utf8");
+  await new Promise((resolve, reject) => {
+    res.on("data", (c) => { size += c.length; if (size > 3_000_000) { res.destroy(); resolve(); return; } html += c; });
+    res.on("end", resolve);
+    res.on("error", reject);
+  });
+  return { url, text: String(openWeb.readablePageText(html) || "").slice(0, 12000) };
+}
+
 let idleTimer = null;
 function touchEngine() {
   if (idleTimer) clearTimeout(idleTimer);
@@ -739,6 +759,16 @@ function register(win) {
     })(),
     total_memory_bytes: os.totalmem(),
   }));
+  /** Reads a page for the chat, when the model asks to look one up. */
+  h("read_url", async (a) => {
+    try {
+      const r = await fetchReadable(String(a?.url || ""));
+      return { ok: true, url: r.url, text: r.text };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // ── agents ───────────────────────────────────────────────
   h("agent_tools", () => agents.TOOLS);
   h("agent_list", () => listAgents());
@@ -785,21 +815,10 @@ function register(win) {
         return { ok: true, result: (r.sources || []).map((x) => `${x.title}: ${x.snippet} (${x.url})`).join("\n") || "Nothing matched." };
       }
       if (tool === "read_page") {
-        // checkPageUrl refuses local addresses, so an agent cannot be steered
+        // fetchReadable refuses local addresses, so an agent cannot be steered
         // into reading something on this machine's own network.
-        const url = openWeb.checkPageUrl(input);
-        const res = await get(url, { Accept: "text/html,*/*" });
-        if (res.statusCode !== 200) { res.resume(); return { ok: false, error: `That page answered HTTP ${res.statusCode}.` }; }
-        let html = "";
-        let size = 0;
-        res.setEncoding("utf8");
-        await new Promise((resolve, reject) => {
-          res.on("data", (c) => { size += c.length; if (size > 3_000_000) { res.destroy(); resolve(); return; } html += c; });
-          res.on("end", resolve);
-          res.on("error", reject);
-        });
-        const text = openWeb.readablePageText(html);
-        return { ok: true, result: String(text || "").slice(0, 12000) || "That page had no readable text." };
+        const r = await fetchReadable(input);
+        return { ok: true, result: r.text || "That page had no readable text." };
       }
       if (tool === "knowledge") {
         const active = settings.knowledge_active || [];

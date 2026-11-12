@@ -156,5 +156,6 @@ tag's source). Not run on macOS or Windows.
 | Find an old chat | **Working (UI)** | Searches titles and message bodies. |
 | Agents | **Working (unit + UI), untested on a real loop** | Saved workers with a name, role, standing instructions, model and an explicit permission list. 22 unit tests on the permission checks and 6 UI scenarios on the configuration. The loop itself has not been run against a real model here. |
 | Agent permissions enforced in the main process | **Working (unit)** | `agent_act` re-checks every call against what the agent was granted. The renderer's claim and the model's request are both ignored. |
-| The model operating the browser itself | **Partly** | An agent can search the web and read a page through its own tools. The browser *pane* is still driven by the person. |
+| The model operating the browser | **Working (unit)** | In chat the model emits a `forge-browse` block naming a page; the address is shown and a person presses the button, then the pane opens there and the page's text goes back to the model. Agents do the same through their own tools. The model never fetches on its own. |
+| A model cannot steer the app at this machine | **Working (unit)** | `parseBrowse` refuses file:, ftp:, javascript:, data:, localhost, 127.0.0.1 and .local, and upgrades http to https. Tested against each. |
 | Fine-tuning model weights | **Not planned for laptops** | Needs a training stack and far more memory than the target machines have. Knowledge packs are the supported route. |

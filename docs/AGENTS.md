@@ -70,3 +70,19 @@ Export writes one JSON file; import validates every field, drops anything
 unrecognised and assigns a new id, so importing the same agent twice does not
 overwrite the first. An imported file cannot smuggle in a permission that does
 not exist: unknown tool names are stripped.
+
+## The model looking at a page, in ordinary chat
+
+Outside agents, a model can ask to read one page by emitting a `forge-browse`
+block naming it. Two rules make that safe enough to ship:
+
+- **It never fetches on its own.** The address is shown and a person presses the
+  button. A reply is text, and text should not be able to make the app reach an
+  address nobody saw.
+- **The address is parsed, not trusted.** Only `https` survives; `http` is
+  upgraded; `file:`, `ftp:`, `javascript:` and `data:` are refused, as are
+  `localhost`, `127.0.0.1` and `.local` names — so a model cannot point the app
+  at this machine, including Forge AI's own shared endpoint.
+
+Once read, the pane opens on the same page, so what the model is working from is
+visible rather than taken on trust.

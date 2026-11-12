@@ -9,6 +9,7 @@ import { EmailCard } from "./EmailCard";
 import { GenUI } from "./GenUI";
 import { HtmlPreview } from "./HtmlPreview";
 import { Markdown } from "./Markdown";
+import { BrowseCard } from "./BrowseCard";
 
 /**
  * The model's own working. Collapsed once it is finished, and shown open while
@@ -35,6 +36,7 @@ export function AssistantMessage({
   streaming,
   onSend,
   onResearch,
+  onOpenPane,
   showThinking = false,
 }: {
   content: string;
@@ -42,6 +44,8 @@ export function AssistantMessage({
   onSend: (text: string) => void;
   /** Research runs itself and feeds the findings straight back to the model. */
   onResearch?: (text: string) => void;
+  /** Shows the page in the browser pane beside the conversation. */
+  onOpenPane?: (url: string) => void;
   /** Off by default: most people want the answer, not the working. */
   showThinking?: boolean;
 }) {
@@ -58,6 +62,16 @@ export function AssistantMessage({
         if (s.kind === "memory") return <MemoryAskCard key={i} ask={s.ask} />;
         if (s.kind === "reminder") return <ReminderAskCard key={i} ask={s.ask} />;
         if (s.kind === "thinking") return showThinking ? <Thinking key={i} text={s.text} open={s.open} /> : null;
+        if (s.kind === "browse")
+          return (
+            <BrowseCard
+              key={i}
+              url={s.url}
+              disabled={streaming}
+              onRead={onResearch}
+              onOpenPane={onOpenPane}
+            />
+          );
         if (s.kind === "search")
           return (
             <ResearchCard
