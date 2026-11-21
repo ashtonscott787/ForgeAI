@@ -986,3 +986,50 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 .provopt { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
 .provopt.on { border-color: var(--accent, #d9743f); color: var(--fg); }
 .provopt.warn { opacity: .7; }
+
+/* ── Systems: what is connected, drawn ───────────────────────
+   Four states, because "not switched on" and "broken" are different. */
+.sysbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.sysacts { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.livetoggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.livetoggle input { width: auto; margin: 0; }
+.sysdot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--line-strong); }
+.sysdot.connected { background: var(--ok, #35b36b); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok, #35b36b) 22%, transparent); }
+.sysdot.failed, .sysdot.high { background: var(--bad, #d9534f); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad, #d9534f) 22%, transparent); }
+.sysdot.medium { background: var(--warn, #e0a24b); }
+.sysdot.low, .sysdot.not_set_up { background: var(--fg-3); }
+
+.sysmap { display: flex; gap: 22px; align-items: flex-start; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.sysroot { display: flex; flex-direction: column; align-items: center; gap: 7px; padding-top: 26px; flex: none; }
+.sysroot-dot { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent, #d9743f), var(--accent-2, #6aa3ff)); }
+.sysroot-label { font-size: 11.5px; color: var(--fg-3); }
+.sysbranches { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.sysgroup-name { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 4px; }
+.sysrow { display: grid; grid-template-columns: 26px minmax(110px, auto) 1fr auto; gap: 10px; align-items: baseline; padding: 4px 0; font-size: 13px; }
+.syswire { position: relative; height: 1px; background: var(--line-strong); align-self: center; }
+.syswire i { position: absolute; right: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; }
+.sysrow.failed .syswire { background: color-mix(in srgb, var(--bad, #d9534f) 55%, transparent); }
+.sysrow.connected .syswire { background: color-mix(in srgb, var(--ok, #35b36b) 45%, transparent); }
+.sysname { font-weight: 600; }
+.sysdetail { color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sysms { font-size: 11.5px; color: var(--fg-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sysms.failed { color: var(--bad, #d9534f); }
+.sysms.connected { color: var(--fg-2); }
+.sysnotes { list-style: none; margin: 12px 0 0; padding: 0; font-size: 12.5px; color: var(--fg-3); display: flex; flex-direction: column; gap: 4px; }
+
+.syssec { margin-top: 20px; }
+.findlist { list-style: none; margin: 8px 0 0; padding: 0; }
+.findrow { padding: 11px 0; border-top: 1px solid var(--line); }
+.findhead { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.findhead .ghostbtn { margin-left: auto; }
+.findsev { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.findsev.high { color: var(--bad, #d9534f); }
+.findsev.medium { color: var(--warn, #e0a24b); }
+.findsev.low { color: var(--fg-3); }
+.findfix { margin-top: 4px; font-size: 12.5px; }
+@media (max-width: 760px) {
+  .sysmap { flex-direction: column; }
+  .sysroot { flex-direction: row; padding-top: 0; }
+  .sysrow { grid-template-columns: 1fr auto; }
+  .syswire, .sysdetail { display: none; }
+}

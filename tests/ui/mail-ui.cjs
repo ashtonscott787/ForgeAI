@@ -80,7 +80,7 @@ async function scenario(name, server, cfg, fn) {
     assert.equal(await page.getByRole("button", { name: "Send this" }).count(), 0, "it cannot be sent twice by accident");
   });
 
-  await scenario("An account can be set up in Settings, and says reading is not built", server, {}, async (page) => {
+  await scenario("An account can be set up in Settings, and reading is described honestly", server, {}, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     const panel = page.getByLabel("Outgoing email account");
     await panel.waitFor({ timeout: 5000 });
@@ -88,7 +88,11 @@ async function scenario(name, server, cfg, fn) {
     await panel.getByLabel("Outgoing server (SMTP)").fill("smtp.example.com");
     await panel.getByRole("button", { name: /Save account|Saving/ }).click();
     await page.waitForFunction(() => document.body.innerText.includes("Saved."), null, { timeout: 5000 });
-    assert.match(await panel.innerText(), /Reading your inbox is not built/, "the gap is stated rather than implied");
+    // Reading used to be absent and the panel said so. It exists now, so the
+    // claim worth checking is what it does and does not do.
+    assert.match(await panel.innerText(), /read-only/i, "it says reading changes nothing");
+    assert.match(await panel.innerText(), /never deletes, moves or marks anything/i);
+    assert.match(await panel.innerText(), /sent only when you press the button/i, "and that sending still needs a person");
   });
 
   server.close();

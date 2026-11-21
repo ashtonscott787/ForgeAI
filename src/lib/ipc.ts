@@ -409,6 +409,38 @@ export interface MailHeader {
   date: string;
 }
 
+export interface StatusRow {
+  group: string;
+  name: string;
+  detail: string;
+  state: "connected" | "off" | "failed" | "not_set_up";
+  ms: number | null;
+  note: string;
+}
+export interface SystemStatus {
+  at: number;
+  rows: StatusRow[];
+  counts: Record<string, number>;
+  headline: string;
+  worst: string;
+}
+export interface Finding {
+  id: string;
+  severity: "high" | "medium" | "low";
+  area: string;
+  title: string;
+  found: string;
+  fix: string;
+}
+export interface SecurityReport {
+  at: number;
+  findings: Finding[];
+  counts: Record<string, number>;
+  worst: string;
+  headline: string;
+  scope: string;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -452,6 +484,8 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  systemStatus: () => invoke<SystemStatus>("system_status"),
+  securityAudit: () => invoke<SecurityReport>("security_audit"),
   mailProviders: () => invoke<Record<string, MailProvider>>("mail_providers"),
   mailCheck: () => invoke<{ ok: boolean; mailboxes?: string[]; error?: string }>("mail_check"),
   mailInbox: (a?: { mailbox?: string; count?: number }) =>

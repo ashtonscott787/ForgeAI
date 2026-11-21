@@ -240,6 +240,9 @@ const documents = require("./documents.cjs");
 const gguf = require("./gguf.cjs");
 const mail = require("./mail.cjs");
 const imap = require("./imap.cjs");
+// `status` is already the engine's own status function in this file.
+const sysStatus = require("./status.cjs");
+const security = require("./security.cjs");
 const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
@@ -917,6 +920,29 @@ function register(win) {
   }));
   // ── email ────────────────────────────────────────────────
   h("mail_providers", () => mail.PROVIDERS);
+
+  /** What is actually connected, measured each time it is asked. */
+  h("system_status", () => sysStatus.snapshot({
+    engine,
+    shared: { ...shareStatus(), mesh_enabled: Boolean(settings.share_mesh) },
+    settings,
+    secrets,
+    models: installed(),
+    packs: listPacks().length,
+    agents: listAgents().length,
+    meshAddress,
+  }));
+
+  /** Weak points in how Forge AI is set up here. It never changes anything. */
+  h("security_audit", () => security.audit({
+    settings,
+    secrets,
+    shared: { ...shareStatus(), mesh_enabled: Boolean(settings.share_mesh) },
+    meshAddress,
+    engineMissing: () => { try { return missingEngineLibraries(engineDir()); } catch { return []; } },
+    version: app.getVersion(),
+    latest: settings.last_seen_version || null,
+  }));
 
   /** Opens the mailbox, does one thing, and always closes. */
   async function withMailbox(fn) {

@@ -138,6 +138,31 @@ const BRIDGE = `(() => {
     agent_list: () => (state.agents || (state.agents = [])),
     mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady), provider: "other", imap_host: cfg.mailReady ? "imap.example.com" : "", imap_port: 993, can_read: Boolean(cfg.mailReady) }),
     mail_save: () => ({ ok: true }),
+    system_status: () => ({
+      at: Date.now(), worst: "failed", headline: "1 not working",
+      counts: { connected: 4, failed: 1, off: 2, not_set_up: 2 },
+      rows: [
+        { group: "This computer", name: "Inference engine", detail: "gemma-2-2b-it-Q4_K_M.gguf", state: "connected", ms: 2, note: "" },
+        { group: "This computer", name: "Models", detail: "3 installed", state: "connected", ms: null, note: "" },
+        { group: "This computer", name: "Knowledge", detail: "2 packs", state: "connected", ms: null, note: "" },
+        { group: "This computer", name: "Agents", detail: "1 saved", state: "connected", ms: null, note: "" },
+        { group: "Private mesh", name: "Tailscale", detail: "100.88.1.4", state: "connected", ms: null, note: "This machine has a mesh address." },
+        { group: "Private mesh", name: "Shared to the mesh", detail: "off", state: "off", ms: null, note: "" },
+        { group: "Sharing", name: "Local endpoint", detail: "off", state: "off", ms: null, note: "" },
+        { group: "Email", name: "Incoming (IMAP)", detail: "imap.example.com", state: "failed", ms: 2585, note: "ECONNREFUSED" },
+        { group: "Email", name: "Outgoing (SMTP)", detail: "not set up", state: "not_set_up", ms: null, note: "Settings, Email." },
+        { group: "Search", name: "wikipedia", detail: "ready", state: "connected", ms: null, note: "" },
+      ],
+    }),
+    security_audit: () => ({
+      at: Date.now(), worst: "high", headline: "2 things worth looking at",
+      counts: { high: 1, low: 1 },
+      scope: "This looks at how Forge AI is set up and what it exposes. It is not an antivirus, and it does not scan your operating system or your network.",
+      findings: [
+        { id: "share-no-token", severity: "high", area: "Sharing", title: "The shared endpoint has no access token", found: "Sharing is on and no token is set.", fix: "Open Settings, Sharing, and press New token." },
+        { id: "share-mesh", severity: "low", area: "Sharing", title: "Your models are reachable from your private mesh", found: "Bound to 100.88.1.4.", fix: "This is what the setting is for." },
+      ],
+    }),
     mail_providers: () => ({
       gmail: { label: "Gmail", imap: { host: "imap.gmail.com", port: 993 }, smtp: { host: "smtp.gmail.com", port: 587, secure: false }, note: "Needs an app password.", works: true },
       microsoft: { label: "Outlook / Microsoft 365", imap: { host: "outlook.office365.com", port: 993 }, smtp: { host: "smtp-mail.outlook.com", port: 587, secure: false }, note: "Microsoft has switched off password sign-in for mail apps.", works: false },

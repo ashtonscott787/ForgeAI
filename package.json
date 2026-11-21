@@ -26,7 +26,8 @@
     "engine:get": "node scripts/get-engine.cjs",
     "engine:check": "node scripts/check-engine.cjs",
     "test:ui:boot": "node tests/ui/boot-ui.cjs",
-    "test:ui:mailbox": "node tests/ui/mailbox-ui.cjs"
+    "test:ui:mailbox": "node tests/ui/mailbox-ui.cjs",
+    "test:ui:systems": "node tests/ui/systems-ui.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
