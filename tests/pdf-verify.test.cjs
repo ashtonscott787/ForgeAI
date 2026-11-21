@@ -106,6 +106,6 @@ test("the verification script exists and is runnable with Electron", () => {
   assert.ok(fs.existsSync(p), "the script is in the repository");
   const src = fs.readFileSync(p, "utf8");
   assert.match(src, /printToPDF/, "it uses Electron's own print engine");
-  assert.match(src, /pdfjs-dist/, "and reads the result back rather than trusting it");
+  assert.match(src, /readAttachment/, "and reads the result back the way the app reads an attached PDF");
   assert.match(src, /npx electron scripts\/verify-pdf\.cjs/, "it documents how to run it");
 });

@@ -9,6 +9,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const zlib = require("node:zlib");
+const { spawn } = require("node:child_process");
+
+// A PDF that cannot be read in this long is not going to be.
+const PDF_TIMEOUT_MS = 60_000;
 
 const TEXT_EXT = new Set([
   ".txt", ".md", ".markdown", ".csv", ".tsv", ".json", ".jsonl", ".html", ".htm", ".css",
@@ -111,32 +115,41 @@ function fromXlsx(buf, maxRows = 400) {
 }
 
 async function fromPdf(filePath) {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await pdfjs.getDocument({
-    data: new Uint8Array(fs.readFileSync(filePath)),
-    useSystemFonts: true,
-    isEvalSupported: false,
-  }).promise;
-  const pages = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    // Keep line breaks: pdf.js marks the end of a visual line with hasEOL.
-    let line = "";
-    const lines = [];
-    for (const item of content.items) {
-      if (typeof item.str !== "string") continue;
-      line += item.str;
-      if (item.hasEOL) {
-        lines.push(line);
-        line = "";
+  // pdf.js is run in a separate process: inside Electron's main process it
+  // crashes the whole app with SIGSEGV on macOS, which no try/catch can save.
+  // See electron/pdf-text.cjs. process.execPath is Electron when the app is
+  // running and node when the tests are, and ELECTRON_RUN_AS_NODE makes the
+  // former behave as the latter, so one spawn covers both.
+  const reader = path.join(__dirname, "pdf-text.cjs");
+  const out = await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [reader, filePath], {
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("reading the PDF took too long"));
+    }, PDF_TIMEOUT_MS);
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+    child.on("error", (e) => { clearTimeout(timer); reject(e); });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (signal) {
+        reject(new Error(`the PDF reader was killed by ${signal}`));
+        return;
       }
-    }
-    if (line) lines.push(line);
-    pages.push({ page: i, text: lines.join("\n").replace(/[ \t]{2,}/g, " ").trim() });
-  }
-  await doc.destroy();
-  return pages;
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        reject(new Error(stderr.trim().split("\n").pop() || `the PDF reader exited with code ${code}`));
+      }
+    });
+  });
+  if (out.error) throw new Error(out.error);
+  return out.pages;
 }
 
 /**

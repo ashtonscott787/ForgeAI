@@ -19,6 +19,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const documents = require("../electron/documents.cjs");
+const { readAttachment } = require("../electron/extract.cjs");
 
 const MARKERS = [
   "Forge AI PDF verification",
@@ -50,17 +51,16 @@ async function render(html) {
   }
 }
 
-/** Reads the PDF back with pdf.js and returns its text. */
+/**
+ * Reads the PDF back the way the app reads one somebody attaches — which runs
+ * pdf.js in a process of its own, because in Electron's main process it takes
+ * the app down with SIGSEGV. Reading it here the app's way means this check
+ * cannot pass while attaching a PDF crashes Forge AI.
+ */
 async function textOf(file) {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(file)), useSystemFonts: true }).promise;
-  let out = "";
-  for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    const content = await page.getTextContent();
-    out += content.items.map((i) => i.str).join(" ") + "\n";
-  }
-  return { text: out, pages: doc.numPages };
+  const read = await readAttachment(file);
+  if (!read.readable) throw new Error(`the PDF could not be read back: ${read.note}`);
+  return { text: read.text, pages: read.pages };
 }
 
 const fail = (why) => { console.error(`FAIL: ${why}`); app.exit(1); };

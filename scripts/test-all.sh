@@ -10,6 +10,13 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 : "${FORGE_CHROMIUM:=}"
+# Some machines carry a Chromium that Playwright did not download itself, in
+# which case Playwright looks for one it does not have and every UI suite fails
+# for want of a browser rather than because anything is wrong. Use the one that
+# is here, unless a path was given.
+if [ -z "$FORGE_CHROMIUM" ] && [ -x /opt/pw-browsers/chromium ]; then
+  export FORGE_CHROMIUM=/opt/pw-browsers/chromium
+fi
 SUITES=(cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui boot-ui mailbox-ui systems-ui people-ui)
 FAILED=()
 
