@@ -263,6 +263,34 @@ jobs:
       # not have, so it has never been run there. The macOS runner does have
       # it: this renders a document, writes it, reopens it with pdf.js and
       # checks the passages come back, and fails the build if they do not.
+      # 0.5.5 shipped an app that could not open: a module was used at load time
+      # and declared later, so the main process threw before any window
+      # appeared. Every check here passed, because none of them had ever
+      # started the app. This one does.
+      - name: "Launch the installed app and check it stays up"
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -uo pipefail
+          BIN="/Applications/Forge AI.app/Contents/MacOS/Forge AI"
+          test -x "$BIN" || { echo "no executable in the installed app"; exit 1; }
+          "$BIN" > "$RUNNER_TEMP/launch.log" 2>&1 &
+          PID=$!
+          sleep 25
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "The app exited on its own. Its output:"
+            cat "$RUNNER_TEMP/launch.log"
+            exit 1
+          fi
+          kill "$PID" 2>/dev/null || true
+          if grep -qiE "Uncaught Exception|ReferenceError|TypeError: .* is not a function|Cannot access" "$RUNNER_TEMP/launch.log"; then
+            echo "The app started but reported a fatal error:"
+            cat "$RUNNER_TEMP/launch.log"
+            exit 1
+          fi
+          echo "The app launched and stayed up for 25 seconds."
+          cat "$RUNNER_TEMP/launch.log" || true
+
       - name: "Verify PDF generation really works"
         if: runner.os == 'macOS'
         # Reports but does not gate: the fix for the DisallowJavascriptExecution

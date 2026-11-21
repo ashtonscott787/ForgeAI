@@ -24,6 +24,10 @@ const { isTrustedSender } = require("./trust.cjs");
 const providers = require("./providers.cjs");
 const { openEngineLog } = require("./engine-log.cjs");
 const openWeb = require("./open-web.cjs");
+// Required here, with the other modules, because the transport below runs at
+// load time. Declared further down it is in the temporal dead zone, and the
+// app dies before it opens a window.
+const search = require("./search.cjs");
 // Keyless lookups leave through Electron's network stack, so they follow the system proxy.
 openWeb.useTransport((url, { timeoutMs, maxBytes, userAgent }) => new Promise((resolve, reject) => {
   const req = electronNet.request({ method: "GET", url, redirect: "error" });
@@ -231,7 +235,6 @@ const knowledge = require("./knowledge.cjs");
 const agents = require("./agents.cjs");
 const documents = require("./documents.cjs");
 const gguf = require("./gguf.cjs");
-const search = require("./search.cjs");
 const mail = require("./mail.cjs");
 const website = require("./website.cjs");
 
