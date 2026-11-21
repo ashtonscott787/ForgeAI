@@ -177,6 +177,27 @@ const BRIDGE = `(() => {
     mail_send: (a) => (a && a.approved === true
       ? { ok: true, recipients: 1, response: "250 OK queued" }
       : { ok: false, error: "A message is only sent when you approve it." }),
+    agent_activity: () => ({
+      events: cfg.agentEvents === 0 ? 0 : 7,
+      agents: cfg.agentEvents === 0 ? [] : [
+        { id: "a1", name: "Bea", icon: "\u{1F4E7}", tools: ["web_search", "read_email"], packs: ["p1"],
+          runs: 2, calls: 5, failures: 1, waiting: 1, last_at: Date.now(), last_kind: "failed", used: { web_search: 3, read_email: 2 } },
+        { id: "a2", name: "Finn", icon: "\u{1F4CA}", tools: ["web_search", "read_files"], packs: ["p1"],
+          runs: 1, calls: 2, failures: 0, waiting: 0, last_at: Date.now(), last_kind: "finished", used: { web_search: 2 } },
+        { id: "a3", name: "Solo", icon: "\u{1F916}", tools: ["create_reminder"], packs: [],
+          runs: 0, calls: 0, failures: 0, waiting: 0, last_at: null, last_kind: null, used: {} },
+      ],
+      links: cfg.agentEvents === 0 ? [] : [
+        { a: "a1", b: "a2", tools: ["web_search"], packs: ["p1"], why: "shared permissions" },
+      ],
+      recent: cfg.agentEvents === 0 ? [] : [
+        { at: Date.now() - 4000, agent_id: "a1", agent_name: "Bea", kind: "started", tool: null, input: "check the supplier", ok: null, detail: "" },
+        { at: Date.now() - 3000, agent_id: "a1", agent_name: "Bea", kind: "tool", tool: "web_search", input: "steel", ok: true, detail: "2 results" },
+        { at: Date.now() - 2000, agent_id: "a1", agent_name: "Bea", kind: "tool", tool: "read_email", input: "", ok: false, detail: "no account set up" },
+      ],
+    }),
+    agent_activity_clear: () => ({ cleared: true }),
+    agent_event: () => ({ ok: true }),
     agent_icons: () => ["\u{1F916}", "\u{1F4E7}", "\u{1F50D}", "\u{1F4C1}"],
     agent_duplicate: ({ id }) => {
       state.agents = state.agents || [];

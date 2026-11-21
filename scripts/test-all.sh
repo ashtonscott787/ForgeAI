@@ -14,9 +14,16 @@ SUITES=(cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-
 FAILED=()
 
 echo "== unit tests"
-if node --test tests/*.test.cjs 2>&1 | tail -20 | grep -E "^# (tests|pass|fail|skipped)"; then :; fi
-UNIT_FAIL=$(node --test tests/*.test.cjs 2>&1 | grep -E "^# fail" | awk '{print $3}')
-[ "${UNIT_FAIL:-0}" = "0" ] || FAILED+=("unit (${UNIT_FAIL} failing)")
+# Run once and keep the output: running twice doubled the time, and piping
+# through `tail -20` cut the summary lines it was meant to print, so the
+# header said "1" while the real counts scrolled past.
+UNIT_OUT=$(node --test tests/*.test.cjs 2>&1)
+echo "$UNIT_OUT" | grep -E "^# (tests|pass|fail|skipped)" || echo "(no summary line — see above)"
+UNIT_FAIL=$(echo "$UNIT_OUT" | grep -E "^# fail" | awk '{print $3}')
+if [ "${UNIT_FAIL:-1}" != "0" ]; then
+  echo "$UNIT_OUT" | grep -E "^not ok" | head -10
+  FAILED+=("unit (${UNIT_FAIL:-unknown} failing)")
+fi
 
 echo
 echo "== building"

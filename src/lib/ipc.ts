@@ -441,6 +441,25 @@ export interface SecurityReport {
   scope: string;
 }
 
+export interface AgentActivityRow {
+  id: string; name: string; icon: string;
+  tools: string[]; packs: string[];
+  runs: number; calls: number; failures: number; waiting: number;
+  last_at: number | null; last_kind: string | null;
+  used: Record<string, number>;
+}
+export interface AgentLink { a: string; b: string; tools: string[]; packs: string[]; why: string }
+export interface AgentEvent {
+  at: number; agent_id: string; agent_name: string; kind: string;
+  tool: string | null; input: string; ok: boolean | null; detail: string;
+}
+export interface AgentActivity {
+  agents: AgentActivityRow[];
+  links: AgentLink[];
+  events: number;
+  recent: AgentEvent[];
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -484,6 +503,9 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  agentActivity: () => invoke<AgentActivity>("agent_activity"),
+  agentActivityClear: () => invoke<{ cleared: boolean }>("agent_activity_clear"),
+  agentEvent: (a: { id: string; name: string; kind: string; detail?: string }) => invoke<unknown>("agent_event", a),
   systemStatus: () => invoke<SystemStatus>("system_status"),
   securityAudit: () => invoke<SecurityReport>("security_audit"),
   mailProviders: () => invoke<Record<string, MailProvider>>("mail_providers"),

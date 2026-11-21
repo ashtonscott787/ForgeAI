@@ -133,6 +133,44 @@ async function scenario(name, server, fn, cfg = { local: true }) {
     assert.match(await test.getAttribute("title"), /without doing anything to your computer/);
   });
 
+  await scenario("The map shows what each agent has done, and marks failures", server, async (page) => {
+    const map = page.locator(".view.active .amap");
+    await map.waitFor({ timeout: 5000 });
+    assert.equal(await map.locator(".anode").count(), 3, "every agent is drawn");
+    const bea = map.locator(".anode", { hasText: "Bea" });
+    assert.match(await bea.innerText(), /2 runs · 5 actions/);
+    assert.match(await bea.innerText(), /1 waited for you/, "waiting is its own number");
+    assert.match(await bea.innerText(), /1 failed/);
+    assert.equal(await map.locator(".anode.hasfail").count(), 1, "only the one with a failure is marked");
+    assert.match(await map.locator(".anode", { hasText: "Solo" }).innerText(), /Has not run yet/);
+  });
+
+  await scenario("Lines between agents are shared permissions, and say so", server, async (page) => {
+    const map = page.locator(".view.active .amap");
+    await map.waitFor({ timeout: 5000 });
+    const legend = await map.locator(".amap-legend").innerText();
+    // Agents never contact each other; the picture must not imply they do.
+    assert.match(legend, /do\s+not talk to each other/i);
+    assert.match(legend, /run one at a time/i);
+    assert.match(await map.locator(".amap-links li").first().innerText(), /shared permission/);
+  });
+
+  await scenario("The feed shows recent actions, newest first, with failures marked", server, async (page) => {
+    const feed = page.locator(".view.active .amap-feed");
+    await feed.waitFor({ timeout: 5000 });
+    const items = await feed.locator("li").allInnerTexts();
+    assert.match(items[0], /read email/, "newest first");
+    assert.equal(await feed.locator("li.bad").count(), 1, "the failed one is marked");
+    assert.match(items[0], /no account set up/, "and says why");
+  });
+
+  await scenario("With no agents, the map says so instead of drawing nothing", server, async (page) => {
+    const map = page.locator(".view.active .amap");
+    await map.waitFor({ timeout: 5000 });
+    assert.match(await map.innerText(), /No agents yet/);
+    assert.equal(await map.locator(".anode").count(), 0);
+  }, { local: true, agentEvents: 0 });
+
   server.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

@@ -243,6 +243,7 @@ const imap = require("./imap.cjs");
 // `status` is already the engine's own status function in this file.
 const sysStatus = require("./status.cjs");
 const security = require("./security.cjs");
+const agentLog = require("./agent-log.cjs");
 const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
@@ -1199,10 +1200,22 @@ function register(win) {
     const tool = String(a?.tool || "");
     const input = String(a?.input || "");
     const verdict = agents.decide(agent, tool);
-    if (!verdict.allow) return { ok: false, refused: true, error: verdict.reason };
-    if (verdict.approval && a?.approved !== true) return { ok: false, needs_approval: true, error: verdict.reason };
+    if (!verdict.allow) {
+      agentLog.record({ agent_id: agent.id, agent_name: agent.name, kind: "tool", tool, input, ok: false, detail: verdict.reason });
+      return { ok: false, refused: true, error: verdict.reason };
+    }
+    if (verdict.approval && a?.approved !== true) {
+      agentLog.record({ agent_id: agent.id, agent_name: agent.name, kind: "approval", tool, input });
+      return { ok: false, needs_approval: true, error: verdict.reason };
+    }
 
-    try {
+    const note = (ok, detail) =>
+      agentLog.record({ agent_id: agent.id, agent_name: agent.name, kind: "tool", tool, input, ok, detail });
+
+    // Wrapped so every outcome is recorded once, at one place. Recording at
+    // each return meant only the failures were being logged, which would have
+    // drawn an activity map where nothing ever succeeded.
+    const run = async () => {
       if (tool === "web_search") {
         // The same engine the person chose, and the same honest failure.
         const run = await search.search(settings.search_provider || "wikipedia", input, {
@@ -1314,10 +1327,32 @@ function register(win) {
         return { ok: true, result: `Written to ${filePath}` };
       }
       return { ok: false, error: `There is no tool called "${tool}".` };
+    };
+
+    try {
+      const r = await run();
+      note(Boolean(r.ok), r.ok ? String(r.result ?? "").slice(0, 120) : String(r.error ?? ""));
+      return r;
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      const why = e instanceof Error ? e.message : String(e);
+      note(false, why);
+      return { ok: false, error: why };
     }
   });
+
+  h("agent_event", (a) => agentLog.record({
+    agent_id: String(a?.id || ""),
+    agent_name: String(a?.name || ""),
+    kind: String(a?.kind || "started"),
+    detail: String(a?.detail || ""),
+  }));
+
+  h("agent_activity", () => ({
+    ...agentLog.summary(listAgents()),
+    recent: agentLog.recent(60),
+  }));
+
+  h("agent_activity_clear", () => { agentLog.clear(); return { cleared: true }; });
 
   // ── knowledge packs ──────────────────────────────────────
   h("knowledge_list", () => listPacks().map(packSummary));
@@ -1528,6 +1563,7 @@ app.whenReady().then(() => {
     return new Response(r.body, { status: r.status, headers: r.headers });
   });
   settings = loadSettings();
+  agentLog.load(root());
   // Sharing survives a restart when it was left on, so another machine or app
   // does not silently lose its endpoint.
   void restartShare();

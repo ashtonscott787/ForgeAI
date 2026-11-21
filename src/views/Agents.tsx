@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Agent, type AgentTool, type KnowledgePack, type MachineCapability } from "../lib/ipc";
 import { streamChat, type ChatMessage } from "../lib/chat";
+import { AgentMap } from "../components/AgentMap";
 
 /**
  * Agents: a saved worker, run one task at a time.
@@ -67,6 +68,7 @@ export function Agents({
     setBusy(true);
     setLog([{ kind: "note", text: `Goal: ${text}` }]);
     try {
+      void api.agentEvent({ id: agent.id, name: agent.name, kind: "started", detail: text.slice(0, 200) }).catch(() => undefined);
       const { system } = await api.agentPrompt(agent.id);
       // The engine serves one model at a time, so the agent's own model is
       // loaded before the loop starts rather than whatever happened to be up.
@@ -125,7 +127,10 @@ export function Agents({
         });
         turns.push({ role: "user", content: `Result of ${act.tool}:\n${outcome}` });
       }
-      if (!stop.current) setLog((l) => [...l, { kind: "note", text: "Finished." }]);
+      if (!stop.current) {
+        setLog((l) => [...l, { kind: "note", text: "Finished." }]);
+        void api.agentEvent({ id: agent.id, name: agent.name, kind: "finished" }).catch(() => undefined);
+      }
     } finally {
       setBusy(false);
       setPending(null);
@@ -144,6 +149,8 @@ export function Agents({
       </div>
       <div className="scroll">
         <div className="pbody">
+          <AgentMap />
+
           {advice && !advice.ok && <div className="banner warn" role="status">{advice.text}</div>}
           {advice?.warn && <div className="banner" role="status">{advice.text}</div>}
 
