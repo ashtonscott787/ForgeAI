@@ -6,6 +6,18 @@
  * server-sent events rather than something marshalled through IPC. The CSP in
  * `tauri.conf.json` permits exactly `http://127.0.0.1:*` for this.
  */
+
+/**
+ * A new seed for every request.
+ *
+ * llama.cpp will happily reuse one, and with a cached prompt the same question
+ * then comes back identical to the character. Drawn from the system's random
+ * source and kept inside the 32-bit range the server accepts.
+ */
+export function freshSeed(random: () => number = Math.random): number {
+  return Math.floor(random() * 0x7fffffff);
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -95,8 +107,14 @@ export function streamChat(
           ),
           stream: true,
           cache_prompt: true,
-          // Describing an image should give the same answer each time. Ordinary chat keeps the engine's sampling.
-          ...(messages.some((m) => m.images && m.images.length) ? { temperature: 0 } : {}),
+          // Describing an image should give the same answer each time, so that
+          // path is pinned. Ordinary chat is sampled, with a fresh seed on
+          // every request: asking the same question twice should not return
+          // the same sentences word for word, because a person asking again
+          // is usually asking for another go at it, not a replay.
+          ...(messages.some((m) => m.images && m.images.length)
+            ? { temperature: 0, seed: 0 }
+            : { temperature: 0.8, top_p: 0.95, seed: freshSeed() }),
         }),
         signal: controller.signal,
       });

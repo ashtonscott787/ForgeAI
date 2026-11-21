@@ -28,6 +28,7 @@ const openWeb = require("./open-web.cjs");
 // load time. Declared further down it is in the temporal dead zone, and the
 // app dies before it opens a window.
 const search = require("./search.cjs");
+const environment = require("./environment.cjs");
 // Keyless lookups leave through Electron's network stack, so they follow the system proxy.
 openWeb.useTransport((url, { timeoutMs, maxBytes, userAgent }) => new Promise((resolve, reject) => {
   const req = electronNet.request({ method: "GET", url, redirect: "error" });
@@ -296,6 +297,20 @@ async function listRepoFiles({ repo }) {
 // ── engine ──────────────────────────────────────────────────
 let engine = { proc: null, port: 0, model_file: null };
 const status = () => ({ running: !!engine.proc, port: engine.port, model_file: engine.model_file, base_url: engine.proc ? `http://127.0.0.1:${engine.port}` : "" });
+/** A small JSON GET, used only for the weather lookup. */
+const getJsonOverHttps = (url) => new Promise((resolve, reject) => {
+  const req = require("node:https").get(url, { headers: { accept: "application/json" } }, (res) => {
+    let out = "";
+    res.on("data", (c) => { out += c; });
+    res.on("end", () => {
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+      try { resolve(JSON.parse(out)); } catch (e) { reject(e); }
+    });
+  });
+  req.on("error", reject);
+  req.setTimeout(15_000, () => req.destroy(new Error("timed out")));
+});
+
 const freePort = () => new Promise((r, j) => { const s = net.createServer(); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => r(p)); }); s.on("error", j); });
 function stopEngine() { if (engine.proc) { try { engine.proc.kill(); } catch {} } engine = { proc: null, port: 0, model_file: null }; }
 const logFile = () => path.join(root(), "engine.log");
@@ -529,6 +544,17 @@ function register(win) {
   });
   h("preview_register", ({ html }) => preview.register(html));
   h("preview_forget", ({ id }) => { preview.forget(id); return null; });
+  // What is true right now, for the prompt. The weather is only fetched when
+  // the person has set a location themselves; see electron/environment.cjs.
+  h("environment-facts", async () => {
+    const st = loadSettings();
+    const place = st && st.location && typeof st.location.lat === "number" ? st.location : null;
+    const sky = place ? await environment.weather(place, getJsonOverHttps) : null;
+    const time = environment.now();
+    const computer = environment.machine();
+    return { brief: environment.brief({ time, computer, sky }), time, machine: computer, weather: sky };
+  });
+
   h("health", () => ({ runtime_available: fs.existsSync(serverBin()), runtime_id: RUNTIME_ID, models_dir: modelsDir(), app_version: app.getVersion() }));
   h("detect_hardware", hardware);
   h("cpu_label", cpuLabel);

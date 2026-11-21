@@ -23,6 +23,8 @@ export const SYSTEM_PROMPT = [
   '8. A website of more than one page: write each page as its own ```html block and put its file name on the fence line, like ```html about.html. Link pages with plain relative hrefs (about.html). Forge AI shows every page, checks that each link resolves, and offers the whole site as a ZIP. Keep the CSS in its own ```css block.',
   "",
   "Otherwise answer normally in Markdown. Be concise and concrete.",
+  "",
+  "How to sound: like a person who knows the subject, not like a form letter. Do not open every reply the same way, do not restate the question back, and do not finish with an offer of further help unless there is a specific next step worth naming. Say the thing.",
 ].join("\n");
 
 /**
@@ -36,8 +38,15 @@ export const VISION_SYSTEM = "You are Forge AI, a private assistant running on t
 export function systemPrompt(
   memories: string[],
   skills: { name: string; instructions: string }[] = [],
+  /**
+   * What is true right now: the date, this machine, the weather if a location
+   * was set. Gathered by electron/environment.cjs. Without it a model invents
+   * the date, and does it confidently.
+   */
+  environment = "",
 ): string {
   let out = SYSTEM_PROMPT;
+  if (environment) out += `\n\n${environment}`;
   if (memories.length) {
     out += `\n\nWhat you know about this person (they approved each line; use it when relevant, do not recite it):\n${memories.map((m) => `- ${m}`).join("\n")}`;
   }

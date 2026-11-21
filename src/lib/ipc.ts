@@ -474,6 +474,8 @@ export interface ContactRow {
 
 export const api = {
   health: () => invoke<Health>("health"),
+  /** The date, this machine and (if a location is set) the weather. */
+  environmentFacts: () => invoke<{ brief: string }>("environment-facts"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
   cpuLabel: () => invoke<string>("cpu_label"),
   getSettings: () => invoke<Settings>("get_settings"),

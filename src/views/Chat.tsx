@@ -14,6 +14,8 @@ import { systemPrompt, VISION_SYSTEM } from "../lib/prompt";
 import { choose } from "../lib/router";
 
 interface Props {
+  /** The date, this machine and the weather, for the system prompt. */
+  environment?: string;
   models: LocalModel[];
   installed: InstalledEntry[];
   value: string;
@@ -351,7 +353,7 @@ export function Chat(props: Props) {
     const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);
     if (run.stopped) return;
     // With an image, the short instruction is used: see VISION_SYSTEM.
-    const system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills);
+    const system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills, props.environment ?? "");
 
     const outbound: ChatMessage[] = next.map((m, i) =>
       i === next.length - 1

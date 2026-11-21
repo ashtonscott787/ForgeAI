@@ -193,6 +193,9 @@ export default function App() {
   // headers is the slow one on a first run, which is why it is last.
   const [boot, setBoot] = useState<BootStage>(inTauri ? "settings" : "ready");
   const [bootError, setBootError] = useState<string | null>(null);
+  // What is true right now, handed to the model with every question so it
+  // does not have to guess at the date or what it is running on.
+  const [envBrief, setEnvBrief] = useState("");
 
   // The starting screen is held for a moment and then faded out. Every stage
   // it reports is real, and on a warm machine all of them finish inside about
@@ -226,12 +229,14 @@ export default function App() {
         if (s.selected_model) setValue(s.selected_model);
 
         setBoot("hardware");
-        const [h, m] = await Promise.all([
+        const [h, m, envFacts] = await Promise.all([
           api.health().catch(() => null),
           api.detectHardware().catch(() => null),
+          api.environmentFacts().catch(() => null),
         ]);
         setHealth(h);
         setSelf(m);
+        if (envFacts && envFacts.brief) setEnvBrief(envFacts.brief);
 
         setBoot("models");
         const [c, inst] = await Promise.all([
@@ -351,7 +356,13 @@ export default function App() {
       {bootVisible && (
         <Boot stage={boot} error={bootError} onRetry={start} leaving={bootLeaving} />
       )}
-    <div className="app" aria-hidden={bootVisible && !bootLeaving ? true : undefined}>
+    {/* The app is not marked aria-hidden while the starting screen is up. It
+        was, and that hid every control from assistive technology and from
+        anything driving the app for just over a second — long enough to make
+        the interface tests intermittently fail to find a button that was
+        plainly on screen. The starting screen covers the window and takes the
+        pointer; that is enough. */}
+    <div className="app">
       <div className="titlebar" data-tauri-drag-region>
         <div className="brand">
           <Orb size={20} spin={engine.running} />
@@ -536,6 +547,7 @@ export default function App() {
               onHandoffUsed={() => setHandoff(null)}
               providers={providers}
               onMessagesFor={setMessagesFor}
+              environment={envBrief}
             />
             {panes[activeId] && (
               <aside className="chat-pane" aria-label="Browser">
