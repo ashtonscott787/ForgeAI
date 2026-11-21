@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../lib/ipc";
+import { api, type MailProvider } from "../lib/ipc";
 
 /**
  * The person's own outgoing mail account.
@@ -10,19 +10,43 @@ import { api } from "../lib/ipc";
  * offers to be copied instead.
  */
 export function MailPanel() {
-  const [s, setS] = useState({ host: "", port: 587, secure: false, user: "", from: "", has_password: false, configured: false });
+  const [s, setS] = useState({ host: "", port: 587, secure: false, user: "", from: "", has_password: false, configured: false, provider: "other", imap_host: "", imap_port: 993, can_read: false });
+  const [providers, setProviders] = useState<Record<string, MailProvider>>({});
+  const [checking, setChecking] = useState("");
   const [password, setPassword] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = () => void api.mailStatus().then(setS).catch(() => undefined);
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    void api.mailProviders().then(setProviders).catch(() => undefined);
+  }, []);
+
+  /** Choosing a provider fills in the servers; only the account is left. */
+  const choose = (id: string) => {
+    const p = providers[id];
+    if (!p) return;
+    setS((prev) => ({
+      ...prev,
+      provider: id,
+      host: p.smtp.host || prev.host,
+      port: p.smtp.port,
+      secure: p.smtp.secure,
+      imap_host: p.imap.host || prev.imap_host,
+      imap_port: p.imap.port,
+    }));
+  };
 
   const save = () => {
     setBusy(true);
     setNote("");
     void api
-      .mailSave({ host: s.host.trim(), port: Number(s.port) || 587, secure: s.secure, user: s.user.trim(), from: s.from.trim(), password: password || undefined })
+      .mailSave({
+        host: s.host.trim(), port: Number(s.port) || 587, secure: s.secure,
+        user: s.user.trim(), from: s.from.trim(), password: password || undefined,
+        provider: s.provider, imap_host: s.imap_host.trim(), imap_port: Number(s.imap_port) || 993,
+      })
       .then(() => { setPassword(""); setNote("Saved."); load(); })
       .catch((e) => setNote(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));
@@ -38,11 +62,36 @@ export function MailPanel() {
           the button — never by a model, and never on its own.
         </p>
 
+        <span className="fl">Who provides your email?</span>
+        <div className="provpick" role="radiogroup" aria-label="Email provider">
+          {Object.entries(providers).map(([id, p]) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={s.provider === id}
+              className={`provopt${s.provider === id ? " on" : ""}${p.works ? "" : " warn"}`}
+              onClick={() => choose(id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {(() => {
+          const chosen = providers[s.provider];
+          if (!chosen) return null;
+          return <p className={chosen.works ? "hint" : "banner warn"}>{chosen.note}</p>;
+        })()}
+
         <label className="fl" htmlFor="m-from">Send as</label>
         <input id="m-from" className="setinput" placeholder="Your Name &lt;you@example.com&gt;"
           value={s.from} onChange={(e) => setS({ ...s, from: e.target.value })} />
 
-        <label className="fl" htmlFor="m-host">Outgoing server (SMTP)</label>
+        <label className="fl" htmlFor="m-imap">Incoming server (IMAP), for reading</label>
+        <input id="m-imap" className="setinput" placeholder="imap.example.com"
+          value={s.imap_host} onChange={(e) => setS({ ...s, imap_host: e.target.value })} />
+
+        <label className="fl" htmlFor="m-host">Outgoing server (SMTP), for sending</label>
         <input id="m-host" className="setinput" placeholder="smtp.example.com"
           value={s.host} onChange={(e) => setS({ ...s, host: e.target.value })} />
 
@@ -75,11 +124,28 @@ export function MailPanel() {
           <button type="button" className="ghostbtn" disabled={busy || !s.host.trim() || !s.from.trim()} onClick={save}>
             {busy ? "Saving…" : "Save account"}
           </button>
-          {s.configured && <span className="hint">Set up. Drafted emails can be sent.</span>}
+          <button
+            type="button"
+            className="ghostbtn"
+            disabled={Boolean(checking) || !s.imap_host.trim()}
+            onClick={() => {
+              setChecking("yes");
+              setNote("");
+              void api.mailCheck()
+                .then((r) => setNote(r.ok ? `Reading works. Mailboxes found: ${(r.mailboxes ?? []).slice(0, 6).join(", ")}` : `Could not read: ${r.error}`))
+                .catch((e) => setNote(String(e)))
+                .finally(() => setChecking(""));
+            }}
+          >
+            {checking ? "Checking…" : "Test reading"}
+          </button>
+          {s.configured && <span className="hint">Sending is set up.</span>}
+          {s.can_read && <span className="hint">Reading is set up.</span>}
         </div>
         {note && <div className="hint">{note}</div>}
         <p className="hint">
-          Reading your inbox is not built. Forge AI can write and send, not receive.
+          Reading is read-only: Forge AI never deletes, moves or marks anything.
+          Replies are drafted for you and sent only when you press the button.
         </p>
       </div>
     </div>

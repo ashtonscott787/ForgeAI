@@ -143,6 +143,9 @@ export interface Settings {
   mail_secure?: boolean;
   mail_user?: string;
   mail_from?: string;
+  mail_provider?: string;
+  imap_host?: string;
+  imap_port?: number;
 }
 
 export interface EngineStatus {
@@ -389,6 +392,23 @@ export interface SiteReport {
   hasIndex: boolean;
 }
 
+export interface MailProvider {
+  label: string;
+  imap: { host: string; port: number };
+  smtp: { host: string; port: number; secure: boolean };
+  note: string;
+  works: boolean;
+}
+export interface MailHeader {
+  uid: number;
+  seq: number;
+  unread: boolean;
+  from: string;
+  to: string;
+  subject: string;
+  date: string;
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -432,8 +452,14 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
-  mailStatus: () => invoke<{ configured: boolean; host: string; port: number; secure: boolean; user: string; from: string; has_password: boolean }>("mail_status"),
-  mailSave: (a: { host: string; port: number; secure: boolean; user: string; from: string; password?: string }) =>
+  mailProviders: () => invoke<Record<string, MailProvider>>("mail_providers"),
+  mailCheck: () => invoke<{ ok: boolean; mailboxes?: string[]; error?: string }>("mail_check"),
+  mailInbox: (a?: { mailbox?: string; count?: number }) =>
+    invoke<{ ok: boolean; total?: number; messages?: MailHeader[]; error?: string }>("mail_inbox", a ?? {}),
+  mailRead: (a: { uid: number; mailbox?: string }) =>
+    invoke<{ ok: boolean; subject?: string; from?: string; date?: string; text?: string; error?: string }>("mail_read", a),
+  mailStatus: () => invoke<{ configured: boolean; host: string; port: number; secure: boolean; user: string; from: string; has_password: boolean; provider: string; imap_host: string; imap_port: number; can_read: boolean }>("mail_status"),
+  mailSave: (a: { host: string; port: number; secure: boolean; user: string; from: string; password?: string; provider?: string; imap_host?: string; imap_port?: number }) =>
     invoke<{ ok: boolean }>("mail_save", a),
   mailSend: (a: { to: string; cc?: string; subject: string; text: string; approved: true }) =>
     invoke<{ ok: boolean; recipients?: number; error?: string; stage?: string }>("mail_send", a),

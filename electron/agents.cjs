@@ -39,6 +39,7 @@ const TOOLS = [
   { id: "write_file", label: "Write or change a file", changes: true },
   { id: "create_reminder", label: "Create a reminder", changes: true },
   { id: "write_memory", label: "Save something to memory", changes: true },
+  { id: "read_email", label: "Read your email", changes: false, note: "Reads only. It cannot delete or move anything." },
   { id: "draft_email", label: "Draft an email", changes: false, note: "Writes it. Sending is separate." },
   { id: "send_email", label: "Send an email", changes: true, note: "Needs an outgoing account in Settings." },
 ];
@@ -245,7 +246,7 @@ function forgeAssistant(modelFile, verifiedLabel = "") {
     role: "general assistant on this computer",
     description: "Searches, reads pages and files, and writes documents. Says when it does not know.",
     model: modelFile || null,
-    tools: ["web_search", "read_page", "read_files", "knowledge", "write_file", "create_reminder", "write_memory", "draft_email"],
+    tools: ["web_search", "read_page", "read_files", "knowledge", "write_file", "create_reminder", "write_memory", "read_email", "draft_email"],
     preapproved: [],
     instructions: [
       "You are a general assistant running on this person's own computer. Nothing they say leaves the machine unless a tool you call sends it.",

@@ -965,3 +965,24 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 @media (prefers-reduced-motion: reduce) {
   .boot-ring, .boot-ring.two, .boot-core, .boot-stages li.now .boot-tick::before { animation: none; }
 }
+
+/* Mail. A list that is scannable, and a message that is readable. */
+.maillist { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mailrow { border-top: 1px solid var(--line); }
+.mailrow:first-child { border-top: 0; }
+.mailrow.on { background: var(--raised-2); }
+.mailmain { display: grid; grid-template-columns: minmax(90px, 1.1fr) 3fr auto; gap: 12px; align-items: baseline;
+  width: 100%; padding: 10px 12px; background: none; border: 0; color: inherit; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.mailmain:hover { background: var(--raised); }
+.mailrow.unread .mailfrom, .mailrow.unread .mailsubj { font-weight: 650; }
+.mailfrom, .mailsubj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mailsubj { color: var(--fg-2); }
+.mailrow.unread .mailsubj { color: var(--fg); }
+.maildate { font-size: 11px; color: var(--fg-3); white-space: nowrap; }
+.mailopen { margin-top: 14px; }
+.mailbody { white-space: pre-wrap; font: inherit; font-size: 13px; line-height: 1.55; margin: 10px 0 0; max-height: 420px; overflow-y: auto; }
+@media (max-width: 760px) { .mailmain { grid-template-columns: 1fr; gap: 2px; } .maildate { grid-column: 1; } }
+.provpick { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0; }
+.provopt { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+.provopt.on { border-color: var(--accent, #d9743f); color: var(--fg); }
+.provopt.warn { opacity: .7; }

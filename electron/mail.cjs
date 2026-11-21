@@ -229,4 +229,61 @@ async function sendMail({ host, port = 587, secure = false, user, pass, message,
   }
 }
 
-module.exports = { buildMessage, sendMail, quotedPrintable, address, addressOnly, encodeHeaderText, allowsPlainPassword, MailError, LIMITS };
+/**
+ * Known providers, so setting an account up is choosing a name rather than
+ * finding six numbers. Every one of these needs an app-specific password, not
+ * the password used to sign in to the website — providers stopped allowing
+ * that, and saying so here saves the failure.
+ *
+ * Microsoft is listed with a warning rather than left out. Basic authentication
+ * for IMAP is switched off on Microsoft 365 and on personal Outlook accounts,
+ * so a password will be refused however correct it is; the only route is OAuth,
+ * which Forge AI does not have. Offering it silently would waste someone's
+ * afternoon.
+ */
+const PROVIDERS = {
+  gmail: {
+    label: "Gmail",
+    imap: { host: "imap.gmail.com", port: 993 },
+    smtp: { host: "smtp.gmail.com", port: 587, secure: false },
+    note: "Needs an app password: Google Account, Security, 2-Step Verification, App passwords.",
+    works: true,
+  },
+  icloud: {
+    label: "iCloud Mail",
+    imap: { host: "imap.mail.me.com", port: 993 },
+    smtp: { host: "smtp.mail.me.com", port: 587, secure: false },
+    note: "Needs an app-specific password from appleid.apple.com, under Sign-In and Security.",
+    works: true,
+  },
+  fastmail: {
+    label: "Fastmail",
+    imap: { host: "imap.fastmail.com", port: 993 },
+    smtp: { host: "smtp.fastmail.com", port: 587, secure: false },
+    note: "Needs an app password from Settings, Privacy & Security, Integrations.",
+    works: true,
+  },
+  yahoo: {
+    label: "Yahoo Mail",
+    imap: { host: "imap.mail.yahoo.com", port: 993 },
+    smtp: { host: "smtp.mail.yahoo.com", port: 587, secure: false },
+    note: "Needs an app password from Account Security.",
+    works: true,
+  },
+  microsoft: {
+    label: "Outlook / Microsoft 365",
+    imap: { host: "outlook.office365.com", port: 993 },
+    smtp: { host: "smtp-mail.outlook.com", port: 587, secure: false },
+    note: "Microsoft has switched off password sign-in for mail apps. A password will be refused here however correct it is; this needs OAuth, which Forge AI does not have yet.",
+    works: false,
+  },
+  other: {
+    label: "Something else",
+    imap: { host: "", port: 993 },
+    smtp: { host: "", port: 587, secure: false },
+    note: "Your provider's help pages will give the IMAP and SMTP servers.",
+    works: true,
+  },
+};
+
+module.exports = { PROVIDERS, buildMessage, sendMail, quotedPrintable, address, addressOnly, encodeHeaderText, allowsPlainPassword, MailError, LIMITS };

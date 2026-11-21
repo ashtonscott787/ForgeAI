@@ -136,8 +136,19 @@ const BRIDGE = `(() => {
       { id: "write_file", label: "Write or change a file", changes: true },
     ]),
     agent_list: () => (state.agents || (state.agents = [])),
-    mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady) }),
+    mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady), provider: "other", imap_host: cfg.mailReady ? "imap.example.com" : "", imap_port: 993, can_read: Boolean(cfg.mailReady) }),
     mail_save: () => ({ ok: true }),
+    mail_providers: () => ({
+      gmail: { label: "Gmail", imap: { host: "imap.gmail.com", port: 993 }, smtp: { host: "smtp.gmail.com", port: 587, secure: false }, note: "Needs an app password.", works: true },
+      microsoft: { label: "Outlook / Microsoft 365", imap: { host: "outlook.office365.com", port: 993 }, smtp: { host: "smtp-mail.outlook.com", port: 587, secure: false }, note: "Microsoft has switched off password sign-in for mail apps.", works: false },
+      other: { label: "Something else", imap: { host: "", port: 993 }, smtp: { host: "", port: 587, secure: false }, note: "Your provider's help pages will give the servers.", works: true },
+    }),
+    mail_check: () => ({ ok: true, mailboxes: ["INBOX", "Sent"] }),
+    mail_inbox: () => (cfg.mailReady ? { ok: true, total: 2, messages: [
+      { uid: 102, seq: 2, unread: true, from: "Dana Patel <dana@supplier.example>", to: "you@example.com", subject: "Order 1042 delayed", date: "Thu, 20 Nov 2026 09:14:00" },
+      { uid: 101, seq: 1, unread: false, from: "Jo Lee <jo@client.example>", to: "you@example.com", subject: "Thanks", date: "Wed, 19 Nov 2026 16:02:00" },
+    ] } : { ok: false, error: "No incoming mail server is set up.", messages: [], total: 0 }),
+    mail_read: ({ uid }) => ({ ok: true, uid, from: "Dana Patel <dana@supplier.example>", subject: "Order 1042 delayed", date: "Thu, 20 Nov 2026 09:14:00", text: "The pallets are held at customs. New date is 3 December." }),
     mail_send: (a) => (a && a.approved === true
       ? { ok: true, recipients: 1, response: "250 OK queued" }
       : { ok: false, error: "A message is only sent when you approve it." }),

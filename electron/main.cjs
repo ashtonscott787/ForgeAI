@@ -127,6 +127,9 @@ const DEFAULTS = {
   knowledge_active: [],
   // The person's own outgoing mail account. The password lives in the key
   // store, never here.
+  mail_provider: "other",
+  imap_host: "",
+  imap_port: 993,
   mail_host: "",
   mail_port: 587,
   mail_secure: false,
@@ -236,6 +239,7 @@ const agents = require("./agents.cjs");
 const documents = require("./documents.cjs");
 const gguf = require("./gguf.cjs");
 const mail = require("./mail.cjs");
+const imap = require("./imap.cjs");
 const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
@@ -912,6 +916,48 @@ function register(win) {
     total_memory_bytes: os.totalmem(),
   }));
   // ── email ────────────────────────────────────────────────
+  h("mail_providers", () => mail.PROVIDERS);
+
+  /** Opens the mailbox, does one thing, and always closes. */
+  async function withMailbox(fn) {
+    const host = settings.imap_host;
+    if (!host) throw new Error("No incoming mail server is set up. Add one in Settings, under Email.");
+    const session = await imap.connect({
+      host,
+      port: Number(settings.imap_port) || 993,
+      user: settings.mail_user || settings.mail_from,
+      pass: secrets.get("mail") || "",
+    });
+    try { return await fn(session); } finally { await imap.close(session); }
+  }
+
+  h("mail_check", async () => {
+    try {
+      const boxes = await withMailbox((s) => imap.listMailboxes(s));
+      return { ok: true, mailboxes: boxes.map((b) => b.name) };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e), stage: e?.stage || "read" };
+    }
+  });
+
+  h("mail_inbox", async (a) => {
+    try {
+      const r = await withMailbox((s) => imap.recent(s, String(a?.mailbox || "INBOX"), Number(a?.count) || 25));
+      return { ok: true, ...r };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e), messages: [], total: 0 };
+    }
+  });
+
+  h("mail_read", async (a) => {
+    try {
+      const m = await withMailbox((s) => imap.message(s, String(a?.mailbox || "INBOX"), Number(a?.uid)));
+      return { ok: true, ...m };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   h("mail_status", () => ({
     configured: Boolean(settings.mail_host && settings.mail_from),
     host: settings.mail_host || "",
@@ -920,6 +966,10 @@ function register(win) {
     user: settings.mail_user || "",
     from: settings.mail_from || "",
     has_password: Boolean(secrets.get("mail")),
+    provider: settings.mail_provider || "other",
+    imap_host: settings.imap_host || "",
+    imap_port: Number(settings.imap_port) || 993,
+    can_read: Boolean(settings.imap_host && secrets.get("mail")),
   }));
 
   h("mail_save", (a) => {
@@ -930,6 +980,9 @@ function register(win) {
       mail_secure: Boolean(a?.secure),
       mail_user: String(a?.user || "").trim(),
       mail_from: String(a?.from || "").trim(),
+      mail_provider: String(a?.provider || settings.mail_provider || "other"),
+      imap_host: String(a?.imap_host || "").trim(),
+      imap_port: Number(a?.imap_port) > 0 ? Number(a.imap_port) : 993,
     };
     saveSettings(settings);
     if (typeof a?.password === "string" && a.password) secrets.set("mail", a.password);
@@ -1155,6 +1208,33 @@ function register(win) {
         if (!when?.at) return { ok: false, error: "I could not work out a time from that." };
         const r = reminders.create({ text: input, at: when.at, repeat: when.repeat || null });
         return { ok: true, result: `Reminder set: ${r.text} at ${new Date(r.at).toLocaleString()}` };
+      }
+      if (tool === "read_email") {
+        if (!settings.imap_host) return { ok: false, error: "No incoming mail account is set up, so there is nothing to read. Add one in Settings, under Email." };
+        const session = await imap.connect({
+          host: settings.imap_host,
+          port: Number(settings.imap_port) || 993,
+          user: settings.mail_user || settings.mail_from,
+          pass: secrets.get("mail") || "",
+        });
+        try {
+          // A number means one message; anything else lists what is recent.
+          const uid = Number(String(input).trim());
+          if (Number.isFinite(uid) && uid > 0) {
+            const m = await imap.message(session, "INBOX", uid);
+            return { ok: true, result: `From: ${m.from}\nDate: ${m.date}\nSubject: ${m.subject}\n\n${m.text}` };
+          }
+          const r = await imap.recent(session, "INBOX", 20);
+          if (!r.messages.length) return { ok: true, result: "The inbox is empty." };
+          return {
+            ok: true,
+            result: r.messages
+              .map((m) => `[${m.uid}]${m.unread ? " UNREAD" : ""} ${m.from} — ${m.subject} (${m.date})`)
+              .join("\n") + "\n\nAsk for one by its number in brackets to read it.",
+          };
+        } finally {
+          await imap.close(session);
+        }
       }
       if (tool === "draft_email") {
         // Drafting changes nothing, so it runs freely; the draft comes back for

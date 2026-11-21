@@ -10,7 +10,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 : "${FORGE_CHROMIUM:=}"
-SUITES=(cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui)
+SUITES=(cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui boot-ui mailbox-ui)
 FAILED=()
 
 echo "== unit tests"
