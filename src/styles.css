@@ -921,3 +921,47 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
   .perm-main { flex-wrap: wrap; }
 }
 .emailnote { margin-top: 8px; font-size: 12.5px; }
+
+/* ── starting up ─────────────────────────────────────────────
+   Real stages, not a bar on a timer. */
+.boot {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; background: var(--page); color: var(--fg);
+  animation: bootIn 220ms ease both;
+}
+@keyframes bootIn { from { opacity: 0; } to { opacity: 1; } }
+.boot-mark { position: relative; width: 74px; height: 74px; margin-bottom: 20px; display: grid; place-items: center; }
+.boot-ring, .boot-ring.two {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid transparent; border-top-color: var(--accent, #d9743f);
+  animation: bootSpin 1.5s cubic-bezier(.5,.1,.4,.9) infinite;
+}
+.boot-ring.two { inset: 11px; border-top-color: transparent; border-bottom-color: var(--accent-2, #6aa3ff); animation-duration: 2.1s; animation-direction: reverse; }
+@keyframes bootSpin { to { transform: rotate(360deg); } }
+.boot-core {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent, #d9743f), var(--accent-2, #6aa3ff));
+  animation: bootPulse 1.9s ease-in-out infinite;
+}
+@keyframes bootPulse { 0%,100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.22); opacity: 1; } }
+.boot-name { font-size: 19px; font-weight: 650; letter-spacing: -.01em; }
+.boot-sub { font-size: 12.5px; color: var(--fg-2); margin-bottom: 22px; }
+.boot-stages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; min-width: 210px; }
+.boot-stages li { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--fg-3); opacity: .5; transition: opacity 200ms ease, color 200ms ease; }
+/* The stage in progress is the brightest thing in the list; a finished one
+   steps back. Previously the current stage read as the dimmest. */
+.boot-stages li.now { opacity: 1; color: var(--fg); font-weight: 550; }
+.boot-stages li.done { opacity: 1; color: var(--fg-2); }
+.boot-tick { width: 14px; display: inline-grid; place-items: center; }
+.boot-stages li.now .boot-tick::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent, #d9743f); animation: bootPulse 1.1s ease-in-out infinite;
+}
+.boot-stages li.done .boot-tick { color: var(--ok, #5fbf7f); }
+.boot-slow { margin-top: 16px; font-size: 12px; color: var(--fg-3); }
+.boot-error { margin-top: 10px; max-width: 340px; text-align: center; font-size: 13px; }
+.boot-error p { color: var(--warn, #e0a24b); margin: 0 0 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .boot-ring, .boot-ring.two, .boot-core, .boot-stages li.now .boot-tick::before { animation: none; }
+}

@@ -1,6 +1,7 @@
 import { Agents } from "./views/Agents";
 import { Browser } from "./views/Browser";
 import { GhostMark } from "./components/GhostMark";
+import { Boot, type BootStage } from "./components/Boot";
 import type { BrowserActivity } from "./lib/chat";
 import { cloudRows } from "./lib/cloud";
 import { publisherFor } from "./lib/publisher";
@@ -180,27 +181,52 @@ export default function App() {
     });
   };
 
-  // boot
-  useEffect(() => {
+  // Starting up. The stages are reported as each one actually finishes, rather
+  // than on a timer, so a slow stage is visible as itself. Reading model
+  // headers is the slow one on a first run, which is why it is last.
+  const [boot, setBoot] = useState<BootStage>(inTauri ? "settings" : "ready");
+  const [bootError, setBootError] = useState<string | null>(null);
+
+  const start = useCallback(() => {
     if (!inTauri) return;
+    setBootError(null);
+    setBoot("settings");
     void (async () => {
-      const [h, m, c, s, e, inst] = await Promise.all([
-        api.health().catch(() => null),
-        api.detectHardware().catch(() => null),
-        api.catalogue().catch(() => null),
-        api.getSettings().catch(() => DEFAULT_SETTINGS),
-        api.engineStatus().catch(() => null),
-        api.installedModels().catch(() => []),
-      ]);
-      setHealth(h);
-      setSelf(m);
-      setCat(c);
-      setSettings(s);
-      if (e) setEngine(e);
-      setInstalledFiles(inst);
-      if (s.selected_model) setValue(s.selected_model);
+      try {
+        const [s, e] = await Promise.all([
+          api.getSettings().catch(() => DEFAULT_SETTINGS),
+          api.engineStatus().catch(() => null),
+        ]);
+        setSettings(s);
+        if (e) setEngine(e);
+        if (s.selected_model) setValue(s.selected_model);
+
+        setBoot("hardware");
+        const [h, m] = await Promise.all([
+          api.health().catch(() => null),
+          api.detectHardware().catch(() => null),
+        ]);
+        setHealth(h);
+        setSelf(m);
+
+        setBoot("models");
+        const [c, inst] = await Promise.all([
+          api.catalogue().catch(() => null),
+          api.installedModels().catch(() => []),
+        ]);
+        setCat(c);
+        setInstalledFiles(inst);
+
+        setBoot("ready");
+      } catch (err) {
+        // The app still opens; it says what failed rather than hanging on a
+        // screen that cannot finish.
+        setBootError(err instanceof Error ? err.message : String(err));
+      }
     })();
   }, []);
+
+  useEffect(start, [start]);
 
   const refreshInstalled = useCallback(() => {
     void api
@@ -295,6 +321,10 @@ export default function App() {
     setSettings(next);
     void api.setSettings(next).catch(() => undefined);
   }, [value, settings]);
+
+  if (inTauri && boot !== "ready") {
+    return <Boot stage={boot} error={bootError} onRetry={start} />;
+  }
 
   return (
     <div className="app">

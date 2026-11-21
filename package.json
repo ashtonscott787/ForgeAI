@@ -24,7 +24,8 @@
     "test:ui:mail": "node tests/ui/mail-ui.cjs",
     "test:all": "bash scripts/test-all.sh",
     "engine:get": "node scripts/get-engine.cjs",
-    "engine:check": "node scripts/check-engine.cjs"
+    "engine:check": "node scripts/check-engine.cjs",
+    "test:ui:boot": "node tests/ui/boot-ui.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",

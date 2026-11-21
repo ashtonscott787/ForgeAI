@@ -268,6 +268,13 @@ const BRIDGE = `(() => {
   window.forge = {
     invoke: async (cmd, args) => {
       calls.push({ cmd, args });
+      // Startup is instant here, which leaves nothing to look at. A scenario
+      // can slow it or break it to exercise the starting screen.
+      const BOOT = ["get_settings", "engine_status", "health", "detect_hardware", "catalogue", "installed_models"];
+      if (cfg.bootFails && cmd === "detect_hardware") throw new Error("deliberate boot failure");
+      if (cfg.slowBoot && BOOT.indexOf(cmd) >= 0) {
+        await new Promise((r) => setTimeout(r, Math.round(cfg.slowBoot / 3)));
+      }
       const fn = handlers[cmd];
       if (!fn) return null;
       // IPC copies values across the boundary; so does the stand-in.
