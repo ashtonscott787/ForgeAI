@@ -244,6 +244,7 @@ const imap = require("./imap.cjs");
 const sysStatus = require("./status.cjs");
 const security = require("./security.cjs");
 const agentLog = require("./agent-log.cjs");
+const contacts = require("./contacts.cjs");
 const website = require("./website.cjs");
 
 async function searchHub({ query, sort, author, limit }) {
@@ -920,6 +921,62 @@ function register(win) {
     total_memory_bytes: os.totalmem(),
   }));
   // ── email ────────────────────────────────────────────────
+  // ── people ───────────────────────────────────────────────
+  h("contacts_list", (a) => contacts.list({ onlyPending: Boolean(a?.pending_only) }));
+  h("contacts_decide", (a) => contacts.decide(String(a?.email || ""), String(a?.fact_id || ""), String(a?.state || "")));
+  h("contacts_state", (a) => contacts.state(String(a?.email || ""), String(a?.field || ""), String(a?.value || "")));
+  h("contacts_forget", (a) => ({ forgotten: contacts.forget(String(a?.email || "")) }));
+
+  /**
+   * Reads the inbox and learns who wrote. Everything found is a suggestion;
+   * nothing becomes known without a person saying so.
+   */
+  h("contacts_scan", async (a) => {
+    if (!settings.imap_host) return { ok: false, error: "No incoming mail account is set up, so there is nobody to learn about." };
+    try {
+      const session = await imap.connect({
+        host: settings.imap_host,
+        port: Number(settings.imap_port) || 993,
+        user: settings.mail_user || settings.mail_from,
+        pass: secrets.get("mail") || "",
+      });
+      try {
+        const r = await imap.recent(session, "INBOX", Math.min(Number(a?.count) || 40, 100));
+        let people = 0;
+        for (const m of r.messages) {
+          if (contacts.fromMessage({ from: m.from, date: m.date, subject: m.subject })) people++;
+        }
+        return { ok: true, read: r.messages.length, people };
+      } finally {
+        await imap.close(session);
+      }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  /** Reads one message's signature for things worth asking about. */
+  h("contacts_learn_from", async (a) => {
+    try {
+      const session = await imap.connect({
+        host: settings.imap_host,
+        port: Number(settings.imap_port) || 993,
+        user: settings.mail_user || settings.mail_from,
+        pass: secrets.get("mail") || "",
+      });
+      try {
+        const m = await imap.message(session, "INBOX", Number(a?.uid));
+        contacts.fromMessage({ from: m.from, date: m.date, subject: m.subject });
+        const found = contacts.suggestFromBody(m.from, m.text, `their email "${String(m.subject).slice(0, 60)}"`);
+        return { ok: true, suggested: found.length, email: contacts.normalise(m.from) };
+      } finally {
+        await imap.close(session);
+      }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   h("mail_providers", () => mail.PROVIDERS);
 
   /** What is actually connected, measured each time it is asked. */
@@ -1564,6 +1621,7 @@ app.whenReady().then(() => {
   });
   settings = loadSettings();
   agentLog.load(root());
+  contacts.load(root());
   // Sharing survives a restart when it was left on, so another machine or app
   // does not silently lose its endpoint.
   void restartShare();

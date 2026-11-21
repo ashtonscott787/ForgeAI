@@ -1,6 +1,7 @@
 import { Agents } from "./views/Agents";
 import { Mail } from "./views/Mail";
 import { Systems } from "./views/Systems";
+import { People } from "./views/People";
 import { Browser } from "./views/Browser";
 import { GhostMark } from "./components/GhostMark";
 import { Boot, type BootStage } from "./components/Boot";
@@ -37,7 +38,7 @@ import { UpdateCard } from "./components/UpdateCard";
 import { markFor } from "./components/Marks";
 import "./styles.css";
 
-type View = "chat" | "mail" | "agents" | "systems" | "models" | "memory" | "integrations" | "setup" | "settings";
+type View = "chat" | "mail" | "people" | "agents" | "systems" | "models" | "memory" | "integrations" | "setup" | "settings";
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -404,6 +405,7 @@ export default function App() {
               [
                 ["chat", "Chat"],
                 ["mail", "Mail"],
+                ["people", "People"],
                 ["agents", "Agents"],
                 ["systems", "Systems"],
                 ["models", "Models"],
@@ -528,6 +530,10 @@ export default function App() {
 
           <section className={`view${view === "mail" ? " active" : ""}`}>
             <Mail onAsk={(text) => { setHandoff({ text, images: [] }); setView("chat"); }} />
+          </section>
+
+          <section className={`view${view === "people" ? " active" : ""}`}>
+            <People onAsk={(text) => { setHandoff({ text, images: [] }); setView("chat"); }} />
           </section>
 
           <section className={`view${view === "systems" ? " active" : ""}`}>

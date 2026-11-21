@@ -460,6 +460,18 @@ export interface AgentActivity {
   recent: AgentEvent[];
 }
 
+export interface ContactFact {
+  id: string; field: string; value: string;
+  state: "suggested" | "confirmed" | "rejected" | "superseded";
+  times: number; source: string; last_source?: string; at: number;
+}
+export interface ContactRow {
+  id: string; email: string; seen: number; last_seen: number | null;
+  known: { email: string; notes: string[]; name?: string; organisation?: string; role?: string; phone?: string; location?: string } | null;
+  pending: ContactFact[];
+  facts: ContactFact[];
+}
+
 export const api = {
   health: () => invoke<Health>("health"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
@@ -503,6 +515,12 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   shareStatus: () => invoke<ShareStatus>("share_status"),
+  contactsList: (pendingOnly = false) => invoke<ContactRow[]>("contacts_list", { pending_only: pendingOnly }),
+  contactsDecide: (a: { email: string; fact_id: string; state: "confirmed" | "rejected" }) => invoke<ContactFact | null>("contacts_decide", a),
+  contactsState: (a: { email: string; field: string; value: string }) => invoke<ContactFact | null>("contacts_state", a),
+  contactsForget: (email: string) => invoke<{ forgotten: boolean }>("contacts_forget", { email }),
+  contactsScan: (count = 40) => invoke<{ ok: boolean; read?: number; people?: number; error?: string }>("contacts_scan", { count }),
+  contactsLearnFrom: (uid: number) => invoke<{ ok: boolean; suggested?: number; email?: string; error?: string }>("contacts_learn_from", { uid }),
   agentActivity: () => invoke<AgentActivity>("agent_activity"),
   agentActivityClear: () => invoke<{ cleared: boolean }>("agent_activity_clear"),
   agentEvent: (a: { id: string; name: string; kind: string; detail?: string }) => invoke<unknown>("agent_event", a),

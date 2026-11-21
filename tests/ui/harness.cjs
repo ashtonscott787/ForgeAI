@@ -163,6 +163,27 @@ const BRIDGE = `(() => {
         { id: "share-mesh", severity: "low", area: "Sharing", title: "Your models are reachable from your private mesh", found: "Bound to 100.88.1.4.", fix: "This is what the setting is for." },
       ],
     }),
+    contacts_list: () => {
+      if (!state.people) state.people = [
+        { id: "c1", email: "dana@supplier.example", seen: 4, last_seen: Date.now(),
+          known: { email: "dana@supplier.example", name: "Dana Patel", organisation: "Patel Logistics", notes: ["Prefers email to phone"] },
+          pending: [
+            { id: "f1", field: "role", value: "Operations Manager", state: "suggested", times: 3, source: "their email", last_source: 'their email Order 1042', at: Date.now() },
+            { id: "f2", field: "phone", value: "+64 21 555 0199", state: "suggested", times: 1, source: "their signature", at: Date.now() },
+          ], facts: [] },
+        { id: "c2", email: "jo@client.example", seen: 1, last_seen: Date.now() - 86400000,
+          known: { email: "jo@client.example", notes: [] }, pending: [], facts: [] },
+      ];
+      return state.people;
+    },
+    contacts_decide: ({ email, fact_id, state: st }) => {
+      const p = (state.people || []).find((x) => x.email === email);
+      if (p) p.pending = p.pending.filter((f) => f.id !== fact_id);
+      return { id: fact_id, state: st };
+    },
+    contacts_forget: ({ email }) => { state.people = (state.people || []).filter((x) => x.email !== email); return { forgotten: true }; },
+    contacts_scan: () => (cfg.mailReady ? { ok: true, read: 40, people: 2 } : { ok: false, error: "No incoming mail account is set up, so there is nobody to learn about." }),
+    contacts_state: () => ({ id: "new", state: "confirmed" }),
     mail_providers: () => ({
       gmail: { label: "Gmail", imap: { host: "imap.gmail.com", port: 993 }, smtp: { host: "smtp.gmail.com", port: 587, secure: false }, note: "Needs an app password.", works: true },
       microsoft: { label: "Outlook / Microsoft 365", imap: { host: "outlook.office365.com", port: 993 }, smtp: { host: "smtp-mail.outlook.com", port: 587, secure: false }, note: "Microsoft has switched off password sign-in for mail apps.", works: false },
