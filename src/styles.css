@@ -2,36 +2,41 @@
 
 /* ───────── theme tokens ───────── */
 [data-theme="dark"]{
-  --page:#08080a; --surface:#101013; --raised:#17171b; --raised-2:#1e1e23; --sunken:rgba(0,0,0,.2);
-  --line:rgba(255,255,255,.07); --line-strong:rgba(255,255,255,.13);
-  --fg:#f4f4f5; --fg-2:#a1a1aa; --fg-3:#6b6b74;
-  --hover:rgba(255,255,255,.05); --active:rgba(255,255,255,.08);
-  --ember:#ff7a1a; --on-ember:#140800;
-  --ember-soft:rgba(255,122,26,.12); --ember-line:rgba(255,122,26,.32); --ember-fg:#ffb074;
-  --ok:#3ddc84; --ok-fg:#7ee2a8; --ok-soft:rgba(61,220,132,.13);
-  --warn:#ffc53d; --warn-fg:#f0cd72; --warn-soft:rgba(255,197,61,.13);
-  --vio-fg:#a5b4fc; --vio-soft:rgba(129,140,248,.15);
-  --off:#52525b; --track:rgba(255,255,255,.08);
-  --shadow:0 40px 80px -20px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.5);
-  --shadow-pop:0 24px 56px -12px rgba(0,0,0,.85),0 0 0 1px rgba(0,0,0,.4);
-  --sheen:linear-gradient(180deg,rgba(255,255,255,.035),transparent);
-  --glow:rgba(255,122,26,.085);
+  /* Warm charcoal, not cold grey. The difference is small in hex and large on
+     screen: a neutral near-black reads as a terminal, paper reads as a place
+     to write. */
+  --page:#1a1a18; --surface:#262624; --raised:#30302e; --raised-2:#1c1c1a; --sunken:#1e1e1c;
+  --line:rgba(242,240,232,.09); --line-strong:rgba(242,240,232,.17);
+  --fg:#f2f0e8; --fg-2:#b0ada3; --fg-3:#94918a;
+  --hover:rgba(242,240,232,.05); --active:rgba(242,240,232,.085);
+  /* Deep warm brown on the terracotta, not white: white on this colour is
+     about 2.6:1, which is below the 4.5:1 a button label needs to be read. */
+  --ember:#d57a58; --on-ember:#241209;
+  --ember-soft:rgba(213,122,88,.14); --ember-line:rgba(213,122,88,.34); --ember-fg:#e79a7e;
+  --ok:#6fbf8b; --ok-fg:#8fd0a5; --ok-soft:rgba(111,191,139,.14);
+  --warn:#e0b45a; --warn-fg:#e8c580; --warn-soft:rgba(224,180,90,.14);
+  --vio-fg:#a9aee0; --vio-soft:rgba(141,146,214,.16);
+  --off:#56554e; --track:rgba(242,240,232,.09);
+  --shadow:0 40px 80px -20px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.4);
+  --shadow-pop:0 24px 56px -12px rgba(0,0,0,.75),0 0 0 1px rgba(0,0,0,.35);
+  --sheen:linear-gradient(180deg,rgba(242,240,232,.03),transparent);
+  --glow:rgba(213,122,88,.075);
 }
 [data-theme="light"]{
-  --page:#f4f4f2; --surface:#fdfdfc; --raised:#ffffff; --raised-2:#f8f8f6; --sunken:rgba(0,0,0,.022);
-  --line:rgba(16,16,20,.085); --line-strong:rgba(16,16,20,.15);
-  --fg:#18181b; --fg-2:#52525b; --fg-3:#8b8b94;
-  --hover:rgba(16,16,20,.045); --active:rgba(16,16,20,.075);
-  --ember:#e2620a; --on-ember:#fff6ef;
-  --ember-soft:rgba(226,98,10,.085); --ember-line:rgba(226,98,10,.26); --ember-fg:#b44c05;
-  --ok:#17a35a; --ok-fg:#117a43; --ok-soft:rgba(23,163,90,.1);
-  --warn:#c98a00; --warn-fg:#8f6200; --warn-soft:rgba(201,138,0,.1);
-  --vio-fg:#4f46c9; --vio-soft:rgba(99,91,255,.1);
-  --off:#b4b4bb; --track:rgba(16,16,20,.08);
-  --shadow:0 30px 70px -24px rgba(24,24,27,.22),0 0 0 1px rgba(16,16,20,.06);
-  --shadow-pop:0 20px 48px -14px rgba(24,24,27,.26),0 0 0 1px rgba(16,16,20,.07);
-  --sheen:linear-gradient(180deg,rgba(16,16,20,.018),transparent);
-  --glow:rgba(226,98,10,.07);
+  --page:#f4f2ea; --surface:#faf9f5; --raised:#ffffff; --raised-2:#efece2; --sunken:#f4f2ea;
+  --line:#e3e0d5; --line-strong:#d4d0c1;
+  --fg:#1f1e1c; --fg-2:#56544e; --fg-3:#747168;
+  --hover:#eae7dc; --active:#e5e1d4;
+  --ember:#c96a4a; --on-ember:#2a1309;
+  --ember-soft:rgba(201,106,74,.1); --ember-line:rgba(201,106,74,.3); --ember-fg:#a8512f;
+  --ok:#2f8f5b; --ok-fg:#246b44; --ok-soft:rgba(47,143,91,.11);
+  --warn:#b7822a; --warn-fg:#8a6016; --warn-soft:rgba(183,130,42,.12);
+  --vio-fg:#5a54b8; --vio-soft:rgba(90,84,184,.1);
+  --off:#b7b3a7; --track:rgba(31,30,28,.09);
+  --shadow:0 30px 70px -24px rgba(43,40,33,.2),0 0 0 1px rgba(31,30,28,.06);
+  --shadow-pop:0 20px 48px -14px rgba(43,40,33,.24),0 0 0 1px rgba(31,30,28,.07);
+  --sheen:linear-gradient(180deg,rgba(31,30,28,.016),transparent);
+  --glow:rgba(201,106,74,.08);
 }
 :root{
   --r:10px; --r-lg:14px; --r-xl:20px; --r-pill:999px;
@@ -53,6 +58,10 @@
      for the light theme. */
   --ic-plus:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="black" stroke-width="1.6" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>');
   --ic-arrow-up:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.8 7.7 8 3.4l4.2 4.3"/></svg>');
+  /* Headings are set in a serif against a sans body. It is the one typographic
+     move that makes an interface look drawn rather than assembled, and it
+     costs nothing: both families are already on every machine. */
+  --serif:"Iowan Old Style","Georgia","Palatino Linotype",Palatino,ui-serif,serif;
   --font:"Inter var","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
 }
@@ -150,7 +159,7 @@ input,textarea,select{font:inherit;color:inherit;background:none;border:none;out
 .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 40px;position:relative}
 .hero::before{content:"";position:absolute;top:6%;left:50%;width:640px;height:380px;transform:translateX(-50%);background:radial-gradient(ellipse at center,var(--glow),transparent 68%);filter:blur(8px);pointer-events:none}
 .hero-in{position:relative;width:100%;max-width:620px;text-align:center}
-h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
+h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018em;line-height:1.14}
 .tagline{margin-top:10px;font-size:14.5px;color:var(--fg-3);letter-spacing:-.008em}
 .tagline b{color:var(--fg-2);font-weight:500}
 
@@ -267,7 +276,7 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 /* ───────── pages ───────── */
 .phead{flex:none;width:100%;max-width:calc(var(--measure) + var(--gutter) * 2);margin:0 auto;
   padding:34px var(--gutter) 16px}
-.phead h2{font-size:26px;font-weight:620;letter-spacing:-.028em}
+.phead h2{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.014em}
 .phead p{margin-top:6px;font-size:13.5px;color:var(--fg-3);max-width:46rem}
 .pbody{width:100%;max-width:calc(var(--measure) + var(--gutter) * 2);margin:0 auto;
   padding:4px var(--gutter) 56px;display:flex;flex-direction:column;gap:30px}
@@ -905,7 +914,7 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
 /* Settings, grouped so a long page can be scanned. */
 .setgroup { margin: 0; }
 .setgroup-h { margin: 0 0 12px; }
-.setgroup-h h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.012em; text-transform: none; color: var(--fg); }
+.setgroup-h h3 { margin: 0; font-family: var(--serif); font-size: 17px; font-weight: 600; letter-spacing: -.006em; text-transform: none; color: var(--fg); }
 .setgroup-h .hint { margin: 2px 0 0; }
 
 /* Agent permissions. Each row is one decision, on one line, with room for it. */
@@ -1046,7 +1055,7 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
   animation: bootPulse 1.9s ease-in-out infinite;
 }
 @keyframes bootPulse { 0%,100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.22); opacity: 1; } }
-.boot-name { font-size: 19px; font-weight: 650; letter-spacing: -.01em; }
+.boot-name { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -.006em; }
 .boot-sub { font-size: 12.5px; color: var(--fg-2); margin-bottom: 22px; }
 .boot-stages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; min-width: 210px; }
 .boot-stages li { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--fg-3); opacity: .5; transition: opacity 200ms ease, color 200ms ease; }
@@ -1209,4 +1218,9 @@ h1{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
     animation-duration:1ms!important;animation-iteration-count:1!important;
     transition-duration:1ms!important;scroll-behavior:auto!important;
   }
+}
+
+/* Headings inside an answer follow the same rule as headings on a page. */
+.md h1,.md h2,.md h3,.markdown h1,.markdown h2,.markdown h3{
+  font-family:var(--serif);font-weight:600;letter-spacing:-.008em;
 }
