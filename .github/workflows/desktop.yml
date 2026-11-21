@@ -293,12 +293,14 @@ jobs:
 
       - name: "Verify PDF generation really works"
         if: runner.os == 'macOS'
-        # Blocking again. It was allowed to report without gating while the fix
-        # for the DisallowJavascriptExecution crash had never run anywhere;
-        # it has now passed on this runner, so a regression here should stop a
-        # release rather than be noted in a log nobody reads.
+        # Blocking: a regression here should stop a release rather than be
+        # noted in a log nobody reads. This step is macOS-only and macOS has a
+        # display, so Electron runs directly. It used to be wrapped in
+        # xvfb-run, which does not exist on the runner: the wrapper always
+        # failed with "command not found" and the fallback after `||` did the
+        # real work, which also gave a genuine failure a free second attempt.
         shell: bash
-        run: xvfb-run -a pnpm exec electron scripts/verify-pdf.cjs || pnpm exec electron scripts/verify-pdf.cjs
+        run: pnpm exec electron scripts/verify-pdf.cjs
 
       - uses: actions/upload-artifact@v4
         with:
