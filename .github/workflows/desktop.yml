@@ -293,12 +293,10 @@ jobs:
 
       - name: "Verify PDF generation really works"
         if: runner.os == 'macOS'
-        # Reports but does not gate: the fix for the DisallowJavascriptExecution
-        # crash has never been executed anywhere, and holding a release for a
-        # check that has never passed would be holding it for an unknown. The
-        # result is recorded either way and the step goes back to blocking once
-        # it has passed once.
-        continue-on-error: true
+        # Blocking again. It was allowed to report without gating while the fix
+        # for the DisallowJavascriptExecution crash had never run anywhere;
+        # it has now passed on this runner, so a regression here should stop a
+        # release rather than be noted in a log nobody reads.
         shell: bash
         run: xvfb-run -a pnpm exec electron scripts/verify-pdf.cjs || pnpm exec electron scripts/verify-pdf.cjs
 
