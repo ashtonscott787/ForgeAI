@@ -1224,3 +1224,40 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 .md h1,.md h2,.md h3,.markdown h1,.markdown h2,.markdown h3{
   font-family:var(--serif);font-weight:600;letter-spacing:-.008em;
 }
+
+/* ───────── settings: a list, and one category at a time ─────────
+   Eight groups stacked on one page meant finding a single switch by
+   scrolling past every other one. The categories are a list on the left and
+   the chosen one fills the right, which is how a settings window has worked
+   since before any of this. */
+/* This page is not one column, so its heading is not centred over one: it
+   sits above the list, where the eye starts. */
+.phead.wide{max-width:none;padding-left:18px;padding-right:18px}
+.setshell{flex:1;min-height:0;display:flex;align-items:stretch}
+.setnav{
+  width:232px;flex:none;padding:10px 10px 16px;display:flex;flex-direction:column;gap:1px;
+  border-right:1px solid var(--line);overflow-y:auto;
+}
+.setsearch{margin-bottom:10px}
+.setcat{height:33px;font-size:13.5px}
+.setcat span{white-space:normal;line-height:1.25}
+.setnone{padding:4px 10px}
+.setpane{flex:1;min-width:0}
+/* The pane already has its own column, so it is not centred twice. */
+.setpane .pbody{margin:0;padding-top:22px}
+.setgroup-h{margin-bottom:14px}
+
+@media (max-width:900px){
+  /* Too narrow for two columns: the list becomes a row of chips above. */
+  .setshell{flex-direction:column}
+  .setnav{
+    /* Wrapped, not scrolled sideways: a chip parked off the right edge of a
+       narrow window is a control nobody can reach, and the responsive check
+       counts it as exactly that. */
+    width:auto;flex-direction:row;flex-wrap:wrap;gap:6px;overflow:visible;
+    border-right:none;border-bottom:1px solid var(--line);padding:8px 10px;
+  }
+  .setsearch{display:none}
+  .setcat{flex:none;height:30px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--line)}
+  .setcat span{white-space:nowrap}
+}

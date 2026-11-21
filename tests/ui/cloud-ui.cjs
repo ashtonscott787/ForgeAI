@@ -41,6 +41,8 @@ async function pendingIds(page) { return page.evaluate(() => Object.keys(window.
 
 async function connectAnthropic(page) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  // Settings is a list of categories now; this panel lives under "AI models".
+  await page.getByRole("button", { name: "AI models", exact: true }).click();
   const card = page.getByLabel("Anthropic connection");
   await card.getByLabel("Anthropic API key").fill(KEY);
   await card.getByRole("button", { name: "Connect", exact: true }).click();
@@ -67,6 +69,8 @@ async function sendInChat(page, text) {
 
   await scenario("connect a key: saved, then verified by an authenticated test", server, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    // Settings is a list of categories now; this panel lives under "AI models".
+    await page.getByRole("button", { name: "AI models", exact: true }).click();
     const card = page.getByLabel("Anthropic connection");
     await card.getByText("No key saved").waitFor();
     await card.getByLabel("Anthropic API key").fill(KEY);
@@ -82,6 +86,8 @@ async function sendInChat(page, text) {
 
   await scenario("a rejected key is shown as saved but failed, with the provider's reason", server, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    // Settings is a list of categories now; this panel lives under "AI models".
+    await page.getByRole("button", { name: "AI models", exact: true }).click();
     const card = page.getByLabel("Anthropic connection");
     await card.getByLabel("Anthropic API key").fill(KEY);
     await card.getByRole("button", { name: "Connect", exact: true }).click();

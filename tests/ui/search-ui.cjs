@@ -81,6 +81,8 @@ async function scenario(name, server, cfg, fn, convo = seed(SEARCH_REPLY)) {
 
   await scenario("Each engine says what it needs, and one that is not set up is marked", server, {}, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    // Settings is a list of categories now; this panel lives under "Internet and search".
+    await page.getByRole("button", { name: "Internet and search", exact: true }).click();
     const panel = page.getByLabel("Internet search");
     await panel.waitFor({ timeout: 5000 });
     const rows = await panel.locator(".permrow").allInnerTexts();
@@ -93,6 +95,8 @@ async function scenario(name, server, cfg, fn, convo = seed(SEARCH_REPLY)) {
 
   await scenario("Choosing SearXNG asks for its address", server, {}, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    // Settings is a list of categories now; this panel lives under "Internet and search".
+    await page.getByRole("button", { name: "Internet and search", exact: true }).click();
     const panel = page.getByLabel("Internet search");
     await panel.waitFor();
     assert.equal(await panel.getByLabel("SearXNG address").count(), 0, "not shown until it is chosen");
@@ -102,6 +106,8 @@ async function scenario(name, server, cfg, fn, convo = seed(SEARCH_REPLY)) {
 
   await scenario("A key is only kept once a real search has accepted it", server, {}, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    // Settings is a list of categories now; this panel lives under "Internet and search".
+    await page.getByRole("button", { name: "Internet and search", exact: true }).click();
     const panel = page.getByLabel("Internet search");
     await panel.waitFor();
     await panel.getByLabel("Brave Search", { exact: true }).check();

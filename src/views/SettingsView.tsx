@@ -8,8 +8,17 @@ import { useEffect, useState } from "react";
 import { api, type ProviderStatus, type Settings, type UpdateInfo } from "../lib/ipc";
 import type { LocalModel } from "../lib/models";
 
-/** A labelled group of panels, so a long page can be scanned rather than read. */
-function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+/**
+ * One category of settings.
+ *
+ * The page used to be all eight of these stacked, which is why it was hard to
+ * work: finding one switch meant scrolling past every other. They are now a
+ * list on the left and one category at a time on the right. The group still
+ * renders its own heading, so a category reads as a page rather than as a
+ * fragment that lost its title.
+ */
+function Group({ title, note, children, active }: { title: string; note?: string; children: React.ReactNode; active: string }) {
+  if (active !== title) return null;
   return (
     <section className="setgroup" aria-label={title}>
       <div className="setgroup-h">
@@ -20,6 +29,19 @@ function Group({ title, note, children }: { title: string; note?: string; childr
     </section>
   );
 }
+
+/** The categories, in the order they are listed. Titles match the groups. */
+const CATEGORIES = [
+  "Answering",
+  "AI models",
+  "Internet and search",
+  "Email",
+  "Files and documents",
+  "Sharing and privacy",
+  "Agents and tools",
+  "Inference, appearance and updates",
+] as const;
+type Category = (typeof CATEGORIES)[number];
 
 export function SettingsView({
   settings,
@@ -45,6 +67,8 @@ export function SettingsView({
   onUseModel: (value: string) => void;
 }) {
   const [saved, setSaved] = useState(false);
+  const [category, setCategory] = useState<Category>("Answering");
+  const [query, setQuery] = useState("");
 
   const save = async (patch: Partial<Settings>) => {
     const next = { ...settings, ...patch };
@@ -58,15 +82,44 @@ export function SettingsView({
     }
   };
 
+  const shown = CATEGORIES.filter((c) => c.toLowerCase().includes(query.trim().toLowerCase()));
+
   return (
     <>
-      <div className="phead">
+      <div className="phead wide">
         <h2>Settings</h2>
         <p>Applied the next time a model is loaded. {saved && <span className="savedtag">Saved</span>}</p>
       </div>
-      <div className="scroll">
+      <div className="setshell">
+        <nav className="setnav" aria-label="Settings categories">
+          <input
+            className="convsearch setsearch"
+            type="search"
+            aria-label="Search settings"
+            placeholder="Search settings"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              const hit = CATEGORIES.find((c) => c.toLowerCase().includes(e.target.value.trim().toLowerCase()));
+              if (e.target.value.trim() && hit) setCategory(hit);
+            }}
+          />
+          {shown.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`sitem setcat${c === category ? " active" : ""}`}
+              aria-current={c === category ? "page" : undefined}
+              onClick={() => setCategory(c)}
+            >
+              <span>{c}</span>
+            </button>
+          ))}
+          {!shown.length && <p className="hint setnone">Nothing matches that.</p>}
+        </nav>
+        <div className="scroll setpane">
         <div className="pbody">
-          <Group title="Answering" note="How replies are produced, and what you see while they are.">
+          <Group active={category} title="Answering" note="How replies are produced, and what you see while they are.">
             <div className="panel">
               <div className="panel-h"><span className="t">While it answers</span></div>
               <div className="panel-b">
@@ -80,31 +133,31 @@ export function SettingsView({
             </div>
           </Group>
 
-          <Group title="AI models" note="Where models come from, and which ones you can use.">
+          <Group active={category} title="AI models" note="Where models come from, and which ones you can use.">
             <CloudPanel providers={providers} onProviders={onProviders} models={models} onUseModel={onUseModel} />
           </Group>
 
-          <Group title="Internet and search" note="Where Forge AI looks things up, and what it needs to do so.">
+          <Group active={category} title="Internet and search" note="Where Forge AI looks things up, and what it needs to do so.">
             <SearchSettings settings={settings} onChange={onChange} />
           </Group>
 
-          <Group title="Email" note="Your own outgoing account. Forge AI drafts; you send.">
+          <Group active={category} title="Email" note="Your own outgoing account. Forge AI drafts; you send.">
             <MailPanel />
           </Group>
 
-          <Group title="Files and documents" note="Your own documents and notes, which Forge AI can answer from. They stay on this computer.">
+          <Group active={category} title="Files and documents" note="Your own documents and notes, which Forge AI can answer from. They stay on this computer.">
             <KnowledgePanel settings={settings} onChange={onChange} />
           </Group>
 
-          <Group title="Sharing and privacy" note="Letting other apps, and other computers, use the models here. Off until you switch it on.">
+          <Group active={category} title="Sharing and privacy" note="Letting other apps, and other computers, use the models here. Off until you switch it on.">
             <SharePanel />
           </Group>
 
-          <Group title="Agents and tools" note="Skills you write, and connectors to other tools. Agents themselves live on the Agents page.">
+          <Group active={category} title="Agents and tools" note="Skills you write, and connectors to other tools. Agents themselves live on the Agents page.">
             <SkillsPanel />
             <ConnectorsPanel />
           </Group>
-          <Group title="Inference, appearance and updates" note="How models run on this machine, how Forge AI looks, and how it updates.">
+          <Group active={category} title="Inference, appearance and updates" note="How models run on this machine, how Forge AI looks, and how it updates.">
           <div className="panel">
             <div className="panel-h"><span className="t">Updates</span></div>
             <div className="panel-b">
@@ -249,6 +302,7 @@ export function SettingsView({
             </div>
           </div>
           </Group>
+        </div>
         </div>
       </div>
     </>

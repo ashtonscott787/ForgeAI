@@ -82,6 +82,8 @@ async function scenario(name, server, cfg, fn) {
 
   await scenario("An account can be set up in Settings, and reading is described honestly", server, {}, async (page) => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    // Settings is a list of categories now; this panel lives under "Email".
+    await page.getByRole("button", { name: "Email", exact: true }).click();
     const panel = page.getByLabel("Outgoing email account");
     await panel.waitFor({ timeout: 5000 });
     await panel.getByLabel("Send as").fill("Ash <ash@example.com>");
