@@ -11,6 +11,7 @@
  * `value`, `configurations` and `prompt`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
 import { Mark, type MarkKind } from "./Marks";
 import { Logo } from "./Logo";
 import {
@@ -43,6 +44,10 @@ export interface ModelSelectorPromptProps {
   onModelChange: (model: LocalModel) => void;
   onConfigurationChange: (modelValue: string, configuration: ModelConfiguration) => void;
   onPromptChange: (prompt: string) => void;
+  /** Rendered at the start of the control row, inside the composer. The
+   * attach button lives there rather than floating beside the composer: a
+   * control that acts on the message belongs in the thing you type it in. */
+  leading?: React.ReactNode;
   onSubmit: (args: {
     model: LocalModel;
     configuration: ModelConfiguration;
@@ -182,6 +187,7 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
       />
 
       <div className="crow">
+        {props.leading}
         <div className="pop-wrap" ref={popRef}>
           <button
             className="trigger"

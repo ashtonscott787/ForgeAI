@@ -627,11 +627,6 @@ export function Chat(props: Props) {
           <Attachments files={files} reading={reading} onRemove={(n) => setFiles((p) => p.filter((f) => f.name !== n))} />
 
           <div className="composerow">
-            <button className="attachbtn" title="Attach files" onClick={() => void pick()}>
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <path d="M20 11.5l-7.6 7.6a4.6 4.6 0 01-6.5-6.5l8-8a3 3 0 014.3 4.3l-8 8a1.5 1.5 0 01-2.1-2.1l7.3-7.3" />
-              </svg>
-            </button>
             <div className="composergrow">
           <ModelSelectorPrompt
             models={props.models}
@@ -645,6 +640,13 @@ export function Chat(props: Props) {
             onPromptChange={setPrompt}
             onStop={stopRun}
             onSubmit={({ prompt: text }) => void send(text)}
+            leading={
+              <button className="attachbtn" title="Attach files" onClick={() => void pick()}>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M20 11.5l-7.6 7.6a4.6 4.6 0 01-6.5-6.5l8-8a3 3 0 014.3 4.3l-8 8a1.5 1.5 0 01-2.1-2.1l7.3-7.3" />
+                </svg>
+              </button>
+            }
           />
             </div>
           </div>

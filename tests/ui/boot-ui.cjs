@@ -35,9 +35,13 @@ async function scenario(name, server, cfg, fn) {
     await boot.waitFor({ timeout: 4000 });
     assert.match(await boot.innerText(), /Forge AI/);
     assert.match(await boot.innerText(), /runs on this computer/, "it says what the app is while you wait");
-    // It must go away on its own when the real work finishes.
-    await page.waitForSelector(".app", { timeout: 8000 });
+    // It must go away on its own when the real work finishes. The app is
+    // mounted behind it from the start and the screen fades off it, so what
+    // proves the screen cleared is the screen being gone — not some other
+    // element having appeared.
+    await page.locator(".boot").waitFor({ state: "detached", timeout: 10000 });
     assert.equal(await page.locator(".boot").count(), 0, "the screen clears itself");
+    assert.equal(await page.locator(".app").count(), 1, "and the app is underneath it");
   });
 
   await scenario("It names the stage it is on, not a percentage", server, { slowBoot: 1500 }, async (page) => {
@@ -48,21 +52,33 @@ async function scenario(name, server, cfg, fn) {
       assert.ok(text.includes(stage), `${stage} is listed`);
     }
     assert.ok(!/\d+\s*%/.test(text), "no invented percentage");
-    await page.waitForSelector(".app", { timeout: 10000 });
+    await page.locator(".boot").waitFor({ state: "detached", timeout: 12000 });
   });
 
   await scenario("It marks the current stage, and ticks the ones that are done", server, { slowBoot: 1200 }, async (page) => {
     await page.getByLabel("Starting Forge AI").waitFor({ timeout: 4000 });
     await page.waitForFunction(() => document.querySelectorAll(".boot-stages li.done").length >= 1, null, { timeout: 8000 });
     assert.equal(await page.locator(".boot-stages li.now").count(), 1, "exactly one stage is current");
-    await page.waitForSelector(".app", { timeout: 10000 });
+    await page.locator(".boot").waitFor({ state: "detached", timeout: 12000 });
+  });
+
+  await scenario("It is held long enough to be seen, even when startup is instant", server, {}, async (page) => {
+    // The reported bug: on a warm machine every stage finished in about a
+    // tenth of a second, so the screen was drawn and removed between two
+    // frames and was never actually seen. Nothing is faked to fill the time —
+    // the stages shown are the real ones — but the screen is held.
+    const boot = page.getByLabel("Starting Forge AI");
+    await boot.waitFor({ timeout: 4000 });
+    await page.waitForTimeout(700);
+    assert.equal(await page.locator(".boot").count(), 1, "still on screen after two thirds of a second");
+    await page.locator(".boot").waitFor({ state: "detached", timeout: 8000 });
   });
 
   await scenario("A startup step that fails does not stop the app opening", server, { bootFails: true }, async (page) => {
     // Each startup call has its own catch, so hardware detection failing
     // degrades rather than blocks — the app opens without that information
     // instead of stranding someone on a screen that cannot finish.
-    await page.waitForSelector(".app", { timeout: 8000 });
+    await page.locator(".boot").waitFor({ state: "detached", timeout: 10000 });
     assert.equal(await page.locator(".boot").count(), 0, "the starting screen cleared");
     assert.ok(await page.locator('textarea[placeholder^="Ask anything"]').count() >= 1, "and the app is usable");
   });

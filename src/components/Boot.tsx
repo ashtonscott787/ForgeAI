@@ -17,7 +17,7 @@ const STAGES = [
 
 export type BootStage = (typeof STAGES)[number]["id"];
 
-export function Boot({ stage, error, onRetry }: { stage: BootStage; error?: string | null; onRetry?: () => void }) {
+export function Boot({ stage, error, onRetry, leaving }: { stage: BootStage; error?: string | null; onRetry?: () => void; leaving?: boolean }) {
   const at = STAGES.findIndex((s) => s.id === stage);
   const [slow, setSlow] = useState(false);
 
@@ -29,7 +29,7 @@ export function Boot({ stage, error, onRetry }: { stage: BootStage; error?: stri
   }, [stage]);
 
   return (
-    <div className="boot" role="status" aria-live="polite" aria-label="Starting Forge AI">
+    <div className={`boot${leaving ? " leaving" : ""}`} role="status" aria-live="polite" aria-label="Starting Forge AI">
       <div className="boot-mark" aria-hidden="true">
         <span className="boot-ring" />
         <span className="boot-ring two" />

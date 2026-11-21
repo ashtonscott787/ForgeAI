@@ -6,11 +6,15 @@ import { Browser } from "./views/Browser";
 import { GhostMark } from "./components/GhostMark";
 import { Boot, type BootStage } from "./components/Boot";
 import type { BrowserActivity } from "./lib/chat";
+
+// Long enough to be seen and read, short enough that nobody waits on it.
+const BOOT_MIN_MS = 1150;
+const BOOT_FADE_MS = 420;
 import { cloudRows } from "./lib/cloud";
 import { publisherFor } from "./lib/publisher";
 import { loadConversations, newConversation, newTempConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
 import type { ChatMessage } from "./lib/chat";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat } from "./views/Chat";
 import { Integrations } from "./views/Integrations";
 import { MemoryView } from "./views/MemoryView";
@@ -190,6 +194,23 @@ export default function App() {
   const [boot, setBoot] = useState<BootStage>(inTauri ? "settings" : "ready");
   const [bootError, setBootError] = useState<string | null>(null);
 
+  // The starting screen is held for a moment and then faded out. Every stage
+  // it reports is real, and on a warm machine all of them finish inside about
+  // a tenth of a second — so the screen was drawn and removed between two
+  // frames and nobody ever saw it. Holding it is honest as long as what it
+  // says is true; what would not be honest is inventing stages to fill it.
+  const [bootVisible, setBootVisible] = useState(inTauri);
+  const [bootLeaving, setBootLeaving] = useState(false);
+  const bootBegan = useRef(Date.now());
+
+  useEffect(() => {
+    if (!bootVisible || boot !== "ready") return;
+    const wait = Math.max(0, BOOT_MIN_MS - (Date.now() - bootBegan.current));
+    const fade = setTimeout(() => setBootLeaving(true), wait);
+    const gone = setTimeout(() => setBootVisible(false), wait + BOOT_FADE_MS);
+    return () => { clearTimeout(fade); clearTimeout(gone); };
+  }, [boot, bootVisible]);
+
   const start = useCallback(() => {
     if (!inTauri) return;
     setBootError(null);
@@ -325,12 +346,12 @@ export default function App() {
     void api.setSettings(next).catch(() => undefined);
   }, [value, settings]);
 
-  if (inTauri && boot !== "ready") {
-    return <Boot stage={boot} error={bootError} onRetry={start} />;
-  }
-
   return (
-    <div className="app">
+    <>
+      {bootVisible && (
+        <Boot stage={boot} error={bootError} onRetry={start} leaving={bootLeaving} />
+      )}
+    <div className="app" aria-hidden={bootVisible && !bootLeaving ? true : undefined}>
       <div className="titlebar" data-tauri-drag-region>
         <div className="brand">
           <Orb size={20} spin={engine.running} />
@@ -354,6 +375,30 @@ export default function App() {
           <button className="newchat" onClick={startNewChat}>
             New chat
           </button>
+          <nav className="side-nav" aria-label="Sections">
+            {(
+              [
+                ["chat", "Chat"],
+                ["mail", "Mail"],
+                ["people", "People"],
+                ["agents", "Agents"],
+                ["systems", "Systems"],
+                ["models", "Models"],
+                ["memory", "Memory"],
+                ["integrations", "Integrations"],
+                ["setup", "Hardware"],
+                ["settings", "Settings"],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                className={`sitem nav${view === v ? " active" : ""}`}
+                onClick={() => setView(v)}
+              >
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
           {convos.filter((c) => c.messages.length > 0).length > 3 && (
             <input
               className="convsearch"
@@ -364,6 +409,7 @@ export default function App() {
               onChange={(e) => setConvQuery(e.target.value)}
             />
           )}
+          <div className="side-label">Chats</div>
           <div className="convlist">
             {convos
               .filter((c) => c.messages.length > 0 && !c.temporary)
@@ -399,30 +445,6 @@ export default function App() {
                   </button>
                 </div>
               ))}
-          </div>
-          <div className="side-bottom">
-            {(
-              [
-                ["chat", "Chat"],
-                ["mail", "Mail"],
-                ["people", "People"],
-                ["agents", "Agents"],
-                ["systems", "Systems"],
-                ["models", "Models"],
-                ["memory", "Memory"],
-                ["integrations", "Integrations"],
-                ["setup", "Hardware"],
-                ["settings", "Settings"],
-              ] as const
-            ).map(([v, label]) => (
-              <button
-                key={v}
-                className={`sitem nav${view === v ? " active" : ""}`}
-                onClick={() => setView(v)}
-              >
-                <span>{label}</span>
-              </button>
-            ))}
           </div>
           {self && (
             <div className="sidefoot">
@@ -590,5 +612,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </>
   );
 }
