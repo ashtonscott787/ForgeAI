@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type AgentActivity } from "../lib/ipc";
+import { AgentJourneys } from "./AgentJourneys";
 
 /**
  * What the agents have been doing, drawn.
@@ -53,6 +54,10 @@ export function AgentMap() {
         <p className="hint amap-pad">No agents yet.</p>
       ) : (
         <>
+          {/* Where they went, before how often they ran: the journey is the
+              part worth looking at. */}
+          <AgentJourneys agents={data.agents} />
+
           <div className="amap-grid">
             {data.agents.map((a) => (
               <div key={a.id} className={`anode${a.failures ? " hasfail" : ""}${a.calls ? " active" : ""}`}>

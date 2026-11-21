@@ -1261,3 +1261,25 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   .setcat{flex:none;height:30px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--line)}
   .setcat span{white-space:nowrap}
 }
+
+/* ───────── where agents have been ───────── */
+.ajourneys{margin-top:4px}
+.ajsvg{width:100%;height:auto;display:block;overflow:visible}
+.ajbox{fill:var(--raised);stroke:var(--line);stroke-width:1}
+.ajtext{fill:var(--fg);font-size:12.5px;font-family:var(--font);font-weight:500}
+.ajsub{fill:var(--fg-3);font-size:11px;font-family:var(--font)}
+.ajdot{fill:var(--ember)}
+.ajlink{transition:opacity 200ms var(--ease);cursor:default}
+.ajpath{stroke-linecap:round}
+.ajlink.on .ajpath{stroke:var(--ember);stroke-opacity:.75}
+.ajmote{fill:var(--ember)}
+.ajsay{margin-top:10px;font-size:12.5px;color:var(--fg-2);min-height:2.4em}
+.ajlegend{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;
+  font-size:12px;color:var(--fg-3)}
+.ajlegend b{color:var(--fg-2);font-weight:550}
+.ajlegend .unused{opacity:.45}
+.ajnone{margin:0}
+@media (prefers-reduced-motion: reduce){
+  /* The motes are the only thing on this page that moves on its own. */
+  .ajmote{display:none}
+}

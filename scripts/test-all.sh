@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 if [ -z "$FORGE_CHROMIUM" ] && [ -x /opt/pw-browsers/chromium ]; then
   export FORGE_CHROMIUM=/opt/pw-browsers/chromium
 fi
-SUITES=(settings-ui cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui boot-ui mailbox-ui systems-ui people-ui)
+SUITES=(settings-ui journeys-ui cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui boot-ui mailbox-ui systems-ui people-ui)
 FAILED=()
 
 echo "== unit tests"
