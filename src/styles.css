@@ -498,11 +498,19 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 
 /* ───────── model library ───────── */
 .pane{padding:26px 36px 40px}
-.pane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
-.pane h2{font-size:19px;font-weight:620;letter-spacing:-.02em}
-.pane .sub{font-size:12.5px;color:var(--fg-3);margin-top:3px;max-width:62ch}
-.secthead{font-size:11px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);
-  margin:24px 0 11px}
+/* Models, Memory and Integrations are built on .pane rather than the page
+   frame the other views use. Rather than rebuild three working pages, the
+   frame is given to them here: the same column, the same heading, the same
+   section rule as everywhere else. */
+.pane{width:100%;max-width:calc(var(--measure) + var(--gutter) * 2);margin:0 auto;
+  padding-left:var(--gutter);padding-right:var(--gutter)}
+.pane-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  margin:12px 0 22px;padding-top:22px}
+.pane h2{font-family:var(--serif);font-size:28px;font-weight:600;letter-spacing:-.014em}
+.pane .sub{font-size:13.5px;color:var(--fg-3);margin-top:6px;max-width:62ch}
+/* A heading, not a shouted label. */
+.secthead{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.006em;
+  text-transform:none;color:var(--fg);margin:30px 0 12px}
 .customrow{display:flex;gap:8px;margin-bottom:14px}
 .filters{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
 .inp.search{max-width:420px}
