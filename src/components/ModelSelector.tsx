@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Mark, type MarkKind } from "./Marks";
+import { MentionPicker, mentionAt, type Mention } from "./MentionPicker";
 import { Logo } from "./Logo";
 import {
   DEFAULT_CONFIGURATION,
@@ -63,6 +64,7 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
   const { models, value, configurations, prompt, usableBytes } = props;
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [mention, setMention] = useState<Mention | null>(null);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const popRef = useRef<HTMLDivElement>(null);
@@ -171,6 +173,25 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
 
   return (
     <div className={`composer${sent ? " sent" : ""}`}>
+      {mention && (
+        <MentionPicker
+          mention={mention}
+          onDismiss={() => setMention(null)}
+          onPick={(a) => {
+            // Replace what was typed after the "@" with the whole handle.
+            const el = taRef.current;
+            const caret = el?.selectionStart ?? prompt.length;
+            const next = `${prompt.slice(0, mention.at)}${a.handle} ${prompt.slice(caret)}`;
+            props.onPromptChange(next);
+            setMention(null);
+            requestAnimationFrame(() => {
+              const pos = mention.at + a.handle.length + 1;
+              el?.focus();
+              el?.setSelectionRange(pos, pos);
+            });
+          }}
+        />
+      )}
       <textarea
         ref={taRef}
         rows={1}
@@ -178,10 +199,17 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
         value={prompt}
         onChange={(e) => {
           props.onPromptChange(e.target.value);
+          setMention(mentionAt(e.target.value, e.target.selectionStart ?? e.target.value.length));
           const el = e.target;
           el.style.height = "auto";
           el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
         }}
+        onKeyUp={(e) => {
+          // Moving the caret can take you into or out of a mention too.
+          const el = e.currentTarget;
+          setMention(mentionAt(el.value, el.selectionStart ?? el.value.length));
+        }}
+        onBlur={() => setMention(null)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();

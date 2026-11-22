@@ -10,7 +10,10 @@ import { EMPTY, add as addUsage, describe as describeUsage, money, wouldHaveCost
 import type { BrowserActivity } from "./lib/chat";
 
 // Long enough to be seen and read, short enough that nobody waits on it.
-const BOOT_MIN_MS = 1150;
+// Long enough to be watched rather than glimpsed. It was 1150ms, which on a
+// warm machine is one blink: the stages were drawn and gone before anybody
+// could read them.
+const BOOT_MIN_MS = 2200;
 const BOOT_FADE_MS = 420;
 import { cloudRows } from "./lib/cloud";
 import { publisherFor } from "./lib/publisher";

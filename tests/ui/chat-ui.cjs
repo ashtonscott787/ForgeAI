@@ -127,6 +127,27 @@ async function scenario(name, server, fn) {
     assert.ok(await page.locator(".msg").count() < before, "and the exchange it produced is gone");
   });
 
+  await scenario("typing @ offers the assistants, and picking one completes the handle", server, async (page) => {
+    const box = page.locator('textarea[placeholder^="Ask anything"]');
+    await box.fill("");
+    await box.type("@");
+    await page.locator(".mentions").waitFor({ timeout: 4000 });
+    assert.ok(await page.locator(".mention").count() >= 5, "all of them are offered");
+    await box.type("th");
+    assert.equal(await page.locator(".mention").count(), 1, "typing narrows it");
+    assert.match(await page.locator(".mention").first().innerText(), /Theo/);
+    await page.locator(".mention").first().click();
+    assert.equal((await box.inputValue()).trim(), "@theo", "the handle is completed");
+    assert.equal(await page.locator(".mentions").count(), 0, "and the list closes");
+  });
+
+  await scenario("an email address in the text does not open the picker", server, async (page) => {
+    const box = page.locator('textarea[placeholder^="Ask anything"]');
+    await box.fill("");
+    await box.type("write to sam@theo");
+    assert.equal(await page.locator(".mentions").count(), 0);
+  });
+
   server.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

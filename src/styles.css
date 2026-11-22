@@ -1523,3 +1523,22 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 .facepick-btn{position:relative;overflow:hidden;cursor:pointer;display:inline-flex;align-items:center}
 .facepick-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .warnhint{color:var(--warn-fg)}
+
+/* ───────── the "@" picker ───────── */
+.mentions{
+  position:absolute;left:12px;right:12px;bottom:calc(100% + 8px);z-index:50;
+  max-height:min(280px,50vh);overflow-y:auto;
+  display:flex;flex-direction:column;padding:5px;
+  background:var(--raised);border:1px solid var(--line-strong);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-pop);
+  animation:sheetIn 150ms var(--ease-out) both;
+}
+.mention{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:9px;text-align:left;
+  transition:background var(--t-fast)}
+.mention.on{background:var(--hover)}
+.mention-id{display:flex;flex-direction:column;gap:0;min-width:0}
+.mention-id b{font-size:13.5px}
+.mention-handle{font-size:11.5px;color:var(--ember-fg)}
+.mention-role{margin-left:auto;font-size:11.5px;color:var(--fg-3);white-space:nowrap}
+.withwho-faces{display:flex}
+.withwho-faces .face.sm + .face.sm{margin-left:-8px}

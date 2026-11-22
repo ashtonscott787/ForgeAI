@@ -118,17 +118,60 @@ export const ASSISTANTS: Assistant[] = [
 export const byHandle = (h: string): Assistant | undefined =>
   ASSISTANTS.find((a) => a.handle.toLowerCase() === (h.startsWith("@") ? h : `@${h}`).toLowerCase());
 
+const HANDLE_AT_START = /^\s*@([a-z][a-z0-9_-]*)[\s,:]*/i;
+
+/** The assistant a single message is addressed to, if it opens with a handle. */
+export function addressedIn(content: string): Assistant | undefined {
+  const m = HANDLE_AT_START.exec(content);
+  return m ? byHandle(m[1]!) : undefined;
+}
+
 /**
- * Which assistant a conversation is with.
+ * The handle removed from what the model is given.
  *
- * Addressing one by handle is not a single-message thing: writing "@theo" is
- * starting a conversation with Theo, and it stays Theo's for as long as it
- * goes on. The handle is looked for in the first thing said, so later use of
- * someone's name in passing does not quietly hand the conversation over.
+ * "@nora hey what's going on" is a message addressed to Nora, not a message
+ * about somebody called Nora — but the model only saw the text, so it read
+ * the handle as the subject and answered "Hi, @nora! How are you today?",
+ * greeting the person it was supposed to be. The handle is routing; it is
+ * taken off before the words are sent.
+ */
+export function withoutHandle(content: string): string {
+  return addressedIn(content) ? content.replace(HANDLE_AT_START, "") : content;
+}
+
+/**
+ * Who should answer now.
+ *
+ * The latest message wins: addressing somebody new mid-conversation hands it
+ * to them from that point, which is what writing their name is for. With no
+ * handle anywhere, nobody in particular is answering.
  */
 export function hostOf(messages: { role: string; content: string }[]): Assistant | undefined {
-  const first = messages.find((m) => m.role === "user");
-  if (!first) return undefined;
-  const m = /^\s*@([a-z][a-z0-9_-]*)\b/i.exec(first.content);
-  return m ? byHandle(m[1]!) : undefined;
+  const users = messages.filter((m) => m.role === "user");
+  for (let i = users.length - 1; i >= 0; i--) {
+    const who = addressedIn(users[i]!.content);
+    if (who) return who;
+  }
+  return undefined;
+}
+
+/**
+ * Everybody who has been addressed in this conversation, in the order they
+ * first were. More than one assistant can be in a chat; this is who they are.
+ */
+export function castOf(messages: { role: string; content: string }[]): Assistant[] {
+  const out: Assistant[] = [];
+  for (const m of messages) {
+    if (m.role !== "user") continue;
+    const who = addressedIn(m.content);
+    if (who && !out.some((x) => x.id === who.id)) out.push(who);
+  }
+  return out;
+}
+
+/** Assistants whose handle begins with what has been typed after an "@". */
+export function matching(partial: string): Assistant[] {
+  const q = partial.replace(/^@/, "").toLowerCase();
+  if (!q) return ASSISTANTS;
+  return ASSISTANTS.filter((a) => a.handle.slice(1).startsWith(q) || a.name.toLowerCase().startsWith(q));
 }

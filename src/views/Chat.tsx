@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { hostOf } from "../lib/assistants";
+import { castOf, hostOf, withoutHandle } from "../lib/assistants";
 import { Attachments } from "../components/Attachments";
 import { AssistantMessage } from "../components/Message";
 import { PerfLine } from "../components/Perf";
@@ -379,19 +379,30 @@ export function Chat(props: Props) {
     const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);
     if (run.stopped) return;
     // With an image, the short instruction is used: see VISION_SYSTEM.
-    // A conversation addressed to an assistant is that assistant's for its
-    // whole length, not only for the message that named them.
-    const host = hostOf([...(base ?? messages), { role: "user", content: body }]);
+    // Whoever was addressed most recently answers: naming somebody new
+    // mid-conversation hands it to them, which is what writing their name is
+    // for. More than one assistant can be in a chat; the others are listed so
+    // the one answering knows who else is here.
+    const everyone = [...(base ?? messages), { role: "user" as const, content: body }];
+    const host = hostOf(everyone);
+    const others = castOf(everyone).filter((x) => x.id !== host?.id);
     let system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills, props.environment ?? "");
     if (host) {
       system += `\n\nYou are ${host.name} (${host.handle}), ${host.role.toLowerCase()}. ${host.instructions}`
-        + ` Answer as ${host.name} for the whole of this conversation.`;
+        + ` Answer as ${host.name}. The person writing to you is not ${host.name} — ${host.handle} is how they`
+        + " address you, so never greet them by your own name.";
+      if (others.length) {
+        system += ` Also in this conversation: ${others.map((o) => `${o.name} (${o.handle}, ${o.role.toLowerCase()})`).join("; ")}.`
+          + " Answer only as yourself. If something belongs to one of them, say so and leave it to them.";
+      }
     }
 
     const outbound: ChatMessage[] = next.map((m, i) =>
       i === next.length - 1
-        ? { role: "user" as const, content: sendContent, images: images.length ? images : undefined }
-        : { role: m.role, content: m.content },
+        // The handle is routing, not words. Left in, the model read "@nora"
+        // as the subject and greeted the person by its own name.
+        ? { role: "user" as const, content: withoutHandle(sendContent), images: images.length ? images : undefined }
+        : { role: m.role, content: withoutHandle(m.content) },
     );
 
     if (cloud) {
@@ -564,6 +575,7 @@ export function Chat(props: Props) {
 
   // Who this conversation belongs to, if it was addressed to somebody.
   const withAssistant = hostOf(messages);
+  const cast = castOf(messages);
   const empty = messages.length === 0;
 
 
@@ -590,13 +602,22 @@ export function Chat(props: Props) {
       {dragging && <div className="dropnote">Drop files to attach them</div>}
       {!empty && (
         <div className="scroll chatlog">
-          {withAssistant && (
+          {cast.length > 0 && (
             <div className="withwho">
-              {withAssistant.portrait
-                ? <img className="face sm" src={withAssistant.portrait} alt="" width={28} height={28} />
-                : <span className="face sm initials" style={{ background: withAssistant.accent }} aria-hidden="true">{withAssistant.initials}</span>}
+              <span className="withwho-faces">
+                {cast.map((w) => (
+                  w.portrait
+                    ? <img key={w.id} className="face sm" src={w.portrait} alt="" width={28} height={28} title={w.name} />
+                    : <span key={w.id} className="face sm initials" style={{ background: w.accent }} title={w.name} aria-hidden="true">{w.initials}</span>
+                ))}
+              </span>
               <span>
-                This conversation is with <b>{withAssistant.name}</b> — {withAssistant.role.toLowerCase()}.
+                {cast.length === 1
+                  ? <>This conversation is with <b>{cast[0]!.name}</b> — {cast[0]!.role.toLowerCase()}.</>
+                  : <>In this conversation: {cast.map((w, i) => (
+                      <span key={w.id}><b>{w.name}</b>{i < cast.length - 1 ? ", " : ". "}</span>
+                    ))}
+                    {withAssistant && <>Last addressed: <b>{withAssistant.name}</b>.</>}</>}
               </span>
             </div>
           )}

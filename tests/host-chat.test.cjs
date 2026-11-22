@@ -9,22 +9,26 @@ const path = require("node:path");
 
 const src = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "assistants.ts"), "utf8");
 
-/** hostOf, lifted out of the TypeScript so the real matching is exercised. */
+const HANDLES = [...src.matchAll(/handle: "@([a-z]+)"/g)].map((x) => x[1]);
+const AT_START = /^\s*@([a-z][a-z0-9_-]*)[\s,:]*/i;
+
+/** The same rule the module applies: the latest address wins. */
 function hostOf(messages) {
-  const first = messages.find((m) => m.role === "user");
-  if (!first) return undefined;
-  const m = /^\s*@([a-z][a-z0-9_-]*)\b/i.exec(first.content);
-  if (!m) return undefined;
-  const handles = [...src.matchAll(/handle: "@([a-z]+)"/g)].map((x) => x[1]);
-  return handles.includes(m[1].toLowerCase()) ? m[1].toLowerCase() : undefined;
+  const users = messages.filter((m) => m.role === "user");
+  for (let i = users.length - 1; i >= 0; i--) {
+    const m = AT_START.exec(users[i].content);
+    const h = m && m[1].toLowerCase();
+    if (h && HANDLES.includes(h)) return h;
+  }
+  return undefined;
 }
 
-test("the handle is taken from the first thing said", () => {
+test("the handle is read from the message that carries it", () => {
   assert.equal(hostOf([{ role: "user", content: "@theo what is a bond yield?" }]), "theo");
   assert.equal(hostOf([{ role: "user", content: "  @Nora rewrite this" }]), "nora");
 });
 
-test("it holds for the whole conversation, not just that message", () => {
+test("it holds until somebody else is addressed", () => {
   const convo = [
     { role: "user", content: "@theo what is a bond yield?" },
     { role: "assistant", content: "..." },
@@ -33,13 +37,17 @@ test("it holds for the whole conversation, not just that message", () => {
   assert.equal(hostOf(convo), "theo", "the third message is still Theo's conversation");
 });
 
-test("naming someone later does not hand the conversation over", () => {
+test("addressing somebody new mid-conversation hands it to them", () => {
+  // This used to assert the opposite: the handle was read only from the
+  // first message, so writing "@theo" later did nothing at all and the
+  // original assistant kept answering. Being able to bring somebody else
+  // into a chat is the point of having names.
   const convo = [
     { role: "user", content: "summarise this" },
     { role: "assistant", content: "..." },
     { role: "user", content: "@felix could do this better" },
   ];
-  assert.equal(hostOf(convo), undefined, "the conversation was not addressed to anybody");
+  assert.equal(hostOf(convo), "felix");
 });
 
 test("an unknown handle is not treated as an assistant", () => {
@@ -53,6 +61,7 @@ test("an address in the middle of a sentence is not a greeting", () => {
 test("the chat view adds the assistant to the prompt for the whole conversation", () => {
   const chat = fs.readFileSync(path.join(__dirname, "..", "src", "views", "Chat.tsx"), "utf8");
   assert.match(chat, /const host = hostOf\(/, "the host is worked out on every send");
-  assert.match(chat, /Answer as \$\{host\.name\} for the whole of this conversation/);
+  assert.match(chat, /Answer as \$\{host\.name\}\./);
+  assert.match(chat, /never greet them by your own name/i, "and knows it is not the person writing");
   assert.match(chat, /withAssistant &&/, "and the person can see whose conversation it is");
 });
