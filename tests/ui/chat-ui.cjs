@@ -36,6 +36,9 @@ async function scenario(name, server, fn) {
   await page.addInitScript((l) => localStorage.setItem("forge.conversations.v1", JSON.stringify(l)), SEED);
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForSelector(".app");
+  // The starting screen is held for about a second and covers the window, so
+  // waiting for the app element alone is not waiting for the app to be usable.
+  await page.locator(".boot").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
   try {
     await fn(page);
     assert.deepEqual(pageErrors, [], "no uncaught page errors");

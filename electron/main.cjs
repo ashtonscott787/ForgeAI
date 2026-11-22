@@ -29,6 +29,7 @@ const openWeb = require("./open-web.cjs");
 // app dies before it opens a window.
 const search = require("./search.cjs");
 const environment = require("./environment.cjs");
+const mcpClient = require("./mcp-client.cjs");
 // Keyless lookups leave through Electron's network stack, so they follow the system proxy.
 openWeb.useTransport((url, { timeoutMs, maxBytes, userAgent }) => new Promise((resolve, reject) => {
   const req = electronNet.request({ method: "GET", url, redirect: "error" });
@@ -102,6 +103,13 @@ const translocated = () => process.platform === "darwin" && process.execPath.inc
 
 const DEFAULTS = {
   theme: "system",
+  /**
+   * Other tools Forge AI may connect to over the Model Context Protocol.
+   * Each is { id, name, command, args, enabled }. A server is a program on
+   * this computer; nothing is contacted until it is switched on, and adding
+   * one never runs it.
+   */
+  mcp_servers: [],
   context_size: 8192,
   gpu_layers: 999,
   threads: null,
@@ -546,6 +554,28 @@ function register(win) {
   h("preview_forget", ({ id }) => { preview.forget(id); return null; });
   // What is true right now, for the prompt. The weather is only fetched when
   // the person has set a location themselves; see electron/environment.cjs.
+  // ── other tools, over MCP ──────────────────────────────
+  // Connecting is an inspection: the server is started, asked what it offers,
+  // and stopped again. Nothing it offers is called.
+  h("mcp_list", () => (loadSettings().mcp_servers || []));
+  h("mcp_inspect", async ({ command, args }) => mcpClient.inspect({
+    name: command || "server",
+    command: String(command || ""),
+    args: Array.isArray(args) ? args.map(String) : [],
+  }));
+  h("mcp_save", ({ servers }) => {
+    const clean = (Array.isArray(servers) ? servers : []).slice(0, 50).map((x) => ({
+      id: String(x.id || Math.random().toString(36).slice(2)),
+      name: String(x.name || "").slice(0, 120),
+      command: String(x.command || "").slice(0, 600),
+      args: (Array.isArray(x.args) ? x.args : []).slice(0, 40).map((a) => String(a).slice(0, 400)),
+      enabled: x.enabled === true,
+    }));
+    const next = { ...loadSettings(), mcp_servers: clean };
+    saveSettings(next);
+    return clean;
+  });
+
   h("environment-facts", async () => {
     const st = loadSettings();
     const place = st && st.location && typeof st.location.lat === "number" ? st.location : null;

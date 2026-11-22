@@ -218,6 +218,25 @@ const BRIDGE = `(() => {
       ],
     }),
     agent_activity_clear: () => ({ cleared: true }),
+    mcp_list: () => cfg.mcpServers || [],
+    mcp_save: ({ servers }) => servers,
+    mcp_inspect: ({ command }) =>
+      String(command).includes("broken")
+        ? { ok: false, name: command, tools: [], description: "", error: "spawn ENOENT" }
+        : {
+            ok: true,
+            name: "Notes",
+            tools: [{ name: "search_notes" }, { name: "delete_note" }],
+            // Built with fromCharCode because this whole bridge is injected as
+            // a template literal: a backslash escape written here is eaten
+            // before the browser ever sees it, and the script fails to parse.
+            description: [
+              "Notes 1.0 - 2 tools.",
+              "- search_notes - Find a note.",
+              "- delete_note - Remove a note.",
+              "Of these, one appears to change something: delete_note. Treat that as a guess from the wording, not a guarantee.",
+            ].join(String.fromCharCode(10)),
+          },
     agent_event: () => ({ ok: true }),
     agent_icons: () => ["\u{1F916}", "\u{1F4E7}", "\u{1F50D}", "\u{1F4C1}"],
     agent_duplicate: ({ id }) => {

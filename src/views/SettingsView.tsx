@@ -1,5 +1,6 @@
 import { CloudPanel } from "../components/CloudPanel";
 import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
+import { McpPanel } from "../components/McpPanel";
 import { SharePanel } from "../components/SharePanel";
 import { KnowledgePanel } from "../components/KnowledgePanel";
 import { SearchSettings } from "../components/SearchSettings";
@@ -155,6 +156,7 @@ export function SettingsView({
 
           <Group active={category} title="Agents and tools" note="Skills you write, and connectors to other tools. Agents themselves live on the Agents page.">
             <SkillsPanel />
+            <McpPanel />
             <ConnectorsPanel />
           </Group>
           <Group active={category} title="Inference, appearance and updates" note="How models run on this machine, how Forge AI looks, and how it updates.">

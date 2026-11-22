@@ -474,6 +474,11 @@ export interface ContactRow {
 
 export const api = {
   health: () => invoke<Health>("health"),
+  /** Other tools Forge AI may connect to over MCP. */
+  mcpList: () => invoke<{ id: string; name: string; command: string; args: string[]; enabled: boolean }[]>("mcp_list"),
+  mcpSave: (servers: unknown[]) => invoke<unknown[]>("mcp_save", { servers }),
+  mcpInspect: (a: { command: string; args: string[] }) =>
+    invoke<{ ok: boolean; name: string; description: string; error?: string }>("mcp_inspect", a),
   /** The date, this machine and (if a location is set) the weather. */
   environmentFacts: () => invoke<{ brief: string }>("environment-facts"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
