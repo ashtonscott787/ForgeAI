@@ -6,6 +6,7 @@ import { Browser } from "./views/Browser";
 import { GhostMark } from "./components/GhostMark";
 import { Boot, type BootStage } from "./components/Boot";
 import { ASSISTANTS } from "./lib/assistants";
+import { EMPTY, add as addUsage, describe as describeUsage, money, wouldHaveCost, type Usage } from "./lib/saved";
 import type { BrowserActivity } from "./lib/chat";
 
 // Long enough to be seen and read, short enough that nobody waits on it.
@@ -197,6 +198,21 @@ export default function App() {
   // What is true right now, handed to the model with every question so it
   // does not have to guess at the date or what it is running on.
   const [envBrief, setEnvBrief] = useState("");
+  // What has actually been run here, and what it would have cost elsewhere.
+  const [usage, setUsage] = useState<Usage>(() => {
+    try { return JSON.parse(localStorage.getItem("forge.usage.v1") || "") as Usage; } catch { return EMPTY; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("forge.usage.v1", JSON.stringify(usage)); } catch { /* private window */ }
+  }, [usage]);
+  // How wide the browser pane is, kept between sessions because a size you
+  // chose once should not be chosen again every time.
+  const [paneW, setPaneW] = useState(() => localStorage.getItem("forge.pane.width") || "clamp(320px, 38%, 560px)");
+  const [paneFull, setPaneFull] = useState(false);
+  const [gripping, setGripping] = useState(false);
+  useEffect(() => {
+    try { localStorage.setItem("forge.pane.width", paneW); } catch { /* private window */ }
+  }, [paneW]);
 
   // The starting screen is held for a moment and then faded out. Every stage
   // it reports is real, and on a warm machine all of them finish inside about
@@ -460,6 +476,11 @@ export default function App() {
                 </div>
               ))}
           </div>
+          {usage.replies > 0 && (
+            <div className="sidefoot saved" title={describeUsage(usage)}>
+              <b>{money(wouldHaveCost(usage))}</b> not spent · {usage.replies} {usage.replies === 1 ? "reply" : "replies"} here
+            </div>
+          )}
           {self && (
             <div className="sidefoot">
               {self.backend.toUpperCase()} · {fmtBytes(self.usable_model_bytes)} usable
@@ -505,7 +526,10 @@ export default function App() {
                 <GhostMark /> Temporary chat — not saved, and it ends when you leave it or close Forge AI.
               </div>
             )}
-            <div className={`chat-split${panes[activeId] ? " withpane" : ""}`}>
+            <div
+              className={`chat-split${panes[activeId] ? " withpane" : ""}${paneFull ? " panefull" : ""}${gripping ? " dragging" : ""}`}
+              style={{ ["--pane-w" as string]: paneW }}
+            >
             <button
               type="button"
               className={`ghost-toggle${active.temporary ? " on" : ""}`}
@@ -550,6 +574,7 @@ export default function App() {
               onHandoffUsed={() => setHandoff(null)}
               providers={providers}
               onMessagesFor={setMessagesFor}
+              onUsage={(prompt, completion) => setUsage((u) => addUsage(u, prompt, completion))}
               onReplyFinished={(cid) => {
                 // Only a chat you are not looking at can be unseen.
                 if (cid === activeId && view === "chat") return;
@@ -558,12 +583,43 @@ export default function App() {
               environment={envBrief}
             />
             {panes[activeId] && (
+              <div
+                className={`pane-grip${gripping ? " dragging" : ""}`}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize the browser"
+                tabIndex={0}
+                onPointerDown={(e) => {
+                  // Dragging is pointer events on the handle rather than a
+                  // library: the pane is a flex item, so all that changes is
+                  // one custom property.
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  setGripping(true);
+                }}
+                onPointerMove={(e) => {
+                  if (!gripping) return;
+                  const w = Math.min(Math.max(window.innerWidth - e.clientX, 280), window.innerWidth - 360);
+                  setPaneW(`${Math.round(w)}px`);
+                }}
+                onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); setGripping(false); }}
+                onKeyDown={(e) => {
+                  // It has to be movable without a pointer.
+                  const cur = parseInt(paneW, 10) || 480;
+                  if (e.key === "ArrowLeft") setPaneW(`${Math.min(cur + 40, window.innerWidth - 360)}px`);
+                  if (e.key === "ArrowRight") setPaneW(`${Math.max(cur - 40, 280)}px`);
+                }}
+                onDoubleClick={() => setPaneFull((f) => !f)}
+                title="Drag to resize. Double-click for full width."
+              />
+            )}
+            {panes[activeId] && (
               <aside className="chat-pane" aria-label="Browser">
                 <Browser
                   compact
                   openUrl={paneUrl}
                   onClose={() => setPanes((p) => ({ ...p, [activeId]: false }))}
                   onSendToChat={(text, images = [], browser) => setHandoff({ text, images, browser })}
+                  onToggleFull={() => setPaneFull((f) => !f)}
                 />
               </aside>
             )}

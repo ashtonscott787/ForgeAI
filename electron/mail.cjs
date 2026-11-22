@@ -286,4 +286,63 @@ const PROVIDERS = {
   },
 };
 
-module.exports = { PROVIDERS, buildMessage, sendMail, quotedPrintable, address, addressOnly, encodeHeaderText, allowsPlainPassword, MailError, LIMITS };
+
+// ── working out who hosts an address ────────────────────────
+/**
+ * Known domains, for the common case where the address says it outright.
+ */
+const BY_DOMAIN = {
+  "gmail.com": "gmail", "googlemail.com": "gmail",
+  "icloud.com": "icloud", "me.com": "icloud", "mac.com": "icloud",
+  "fastmail.com": "fastmail", "fastmail.fm": "fastmail",
+  "yahoo.com": "yahoo", "yahoo.co.uk": "yahoo", "ymail.com": "yahoo",
+  "outlook.com": "microsoft", "hotmail.com": "microsoft", "hotmail.co.uk": "microsoft",
+  "live.com": "microsoft", "live.co.uk": "microsoft", "msn.com": "microsoft",
+};
+
+/**
+ * Who actually handles a domain's mail, read from where it says to deliver it.
+ *
+ * This is what makes a school or work address work. somebody@someuniversity.edu
+ * says nothing on its face, but its MX records point at Google or at Microsoft,
+ * and that is the thing worth knowing. Only the domain is looked up — never the
+ * address, and never anything about the person.
+ */
+function providerFromMx(hosts = []) {
+  const all = hosts.map((h) => String(h).toLowerCase()).join(" ");
+  if (/\b(aspmx|googlemail|google)\.com\b/.test(all)) return "gmail";
+  if (/(outlook|office365|microsoft)\.com\b/.test(all) || /\.protection\.outlook\.com\b/.test(all)) return "microsoft";
+  if (/icloud\.com\b|\bme\.com\b|apple\.com\b/.test(all)) return "icloud";
+  if (/fastmail/.test(all) || /messagingengine\.com\b/.test(all)) return "fastmail";
+  if (/yahoodns|yahoo\.com\b/.test(all)) return "yahoo";
+  return "";
+}
+
+/**
+ * Which provider an address belongs to.
+ *
+ * The domain table first, because it needs nothing. Then the MX records, which
+ * is the only way to tell a Google Workspace school address from a Microsoft
+ * one. If neither settles it, that is said plainly rather than guessed at.
+ */
+async function detectProvider(addressLine, resolveMx) {
+  const at = String(addressLine || "").trim().toLowerCase();
+  const m = /^[^@\s]+@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(at);
+  if (!m) return { ok: false, why: "That does not look like an email address." };
+  const domain = m[1];
+  const known = BY_DOMAIN[domain];
+  if (known) return { ok: true, provider: known, domain, how: "the address itself" };
+  if (typeof resolveMx !== "function") return { ok: true, provider: "", domain, how: "" };
+  try {
+    const records = await resolveMx(domain);
+    const hosts = (records || []).map((r) => (typeof r === "string" ? r : r.exchange));
+    const found = providerFromMx(hosts);
+    return found
+      ? { ok: true, provider: found, domain, how: "where this domain delivers its mail" }
+      : { ok: true, provider: "", domain, how: "" };
+  } catch {
+    return { ok: true, provider: "", domain, how: "" };
+  }
+}
+
+module.exports = { PROVIDERS, detectProvider, providerFromMx, BY_DOMAIN, buildMessage, sendMail, quotedPrintable, address, addressOnly, encodeHeaderText, allowsPlainPassword, MailError, LIMITS };

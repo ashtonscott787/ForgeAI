@@ -19,6 +19,8 @@ interface Props {
   environment?: string;
   /** Called when a reply finishes, so a chat nobody was watching can be marked. */
   onReplyFinished?: (conversationId: string) => void;
+  /** Tokens this reply used, for the running total of what was not spent. */
+  onUsage?: (prompt: number, completion: number) => void;
   models: LocalModel[];
   installed: InstalledEntry[];
   value: string;
@@ -498,14 +500,32 @@ export function Chat(props: Props) {
           return copy;
         });
       },
-      onDone: ({ tokens }) => {
+      onDone: ({ tokens, answered }) => {
         if (run.stopped) return;
-        // A reply with no text is a failure the person should see, not an empty bubble.
+        // A reply with no text is a failure the person should see, not an
+        // empty bubble — but there are two different failures here and they
+        // need different advice.
         if (tokens === 0) {
-          failRun(run, `${picked.label} returned no text. Try again, or choose another model.`);
+          failRun(run,
+            `${picked.label} returned no text at all. The engine log below shows what it did. `
+            + "Try again, or choose another model.");
+          return;
+        }
+        if (answered === 0) {
+          // It generated, but every token was working rather than answer.
+          // This is what a reasoning model does when it runs out of room
+          // mid-thought; saying "returned no text" of it was simply wrong.
+          failRun(run,
+            `${picked.label} thought it through but never reached an answer — all ${tokens} tokens were `
+            + "its working. That usually means the context is too small for it to finish. "
+            + "Try a shorter question, a larger context size, or another model.");
           return;
         }
         endRun(run);
+        // The prompt is not counted by the stream, so it is estimated from
+        // its length — roughly four characters a token for English. It is an
+        // estimate and the figure it feeds says so.
+        props.onUsage?.(Math.round(sendContent.length / 4), tokens);
         const ended = performance.now();
         const first = firstTokenAt || ended;
         const generateMs = ended - first;

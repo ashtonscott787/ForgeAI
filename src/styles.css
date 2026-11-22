@@ -169,8 +169,11 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   border-radius:26px;padding:10px 10px 8px 16px;
   box-shadow:0 1px 2px rgba(0,0,0,.14),0 8px 24px -16px rgba(0,0,0,.5);
   transition:border-color var(--t),box-shadow var(--t),transform var(--t)}
+/* No ring when you click into it. The border lifts a little and that is all:
+   a glowing halo around the thing you are typing in is noise, every time. */
 .composer:focus-within{border-color:var(--line-strong);
-  box-shadow:0 1px 2px rgba(0,0,0,.16),0 14px 34px -18px rgba(0,0,0,.6)}
+  box-shadow:0 1px 2px rgba(0,0,0,.16),0 10px 28px -18px rgba(0,0,0,.5)}
+.composer textarea:focus-visible,.composer textarea:focus{outline:none;box-shadow:none}
 .composer textarea{width:100%;resize:none;min-height:28px;max-height:180px;font-size:15px;line-height:1.55;padding-top:5px}
 .composer textarea::placeholder{color:var(--fg-3)}
 .crow{display:flex;align-items:center;gap:6px;margin-top:4px}
@@ -777,13 +780,28 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
    selector also caught the pane's own <aside> and, at narrow widths, hid it. */
 .chat-split > div:first-of-type { flex: 1; min-width: 0; }
 .chat-pane {
-  flex: 0 0 clamp(320px, 38%, 560px);
+  /* Width is a variable so it can be dragged, and remembered. The old fixed
+     clamp meant the browser was always the size somebody else chose. */
+  flex: 0 0 var(--pane-w, clamp(320px, 38%, 560px));
   min-width: 0;
   border-left: 1px solid var(--line, #2a2a2a);
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
+/* The handle between the conversation and the browser. */
+.pane-grip{
+  flex:0 0 7px;cursor:col-resize;position:relative;background:transparent;
+  transition:background var(--t-fast);
+}
+.pane-grip::after{content:"";position:absolute;inset:0 3px;border-radius:2px;background:transparent;
+  transition:background var(--t-fast)}
+.pane-grip:hover::after,.pane-grip.dragging::after{background:var(--ember)}
+.chat-split.dragging{cursor:col-resize;user-select:none}
+/* Full width: the browser takes the window and the conversation steps aside. */
+.chat-split.panefull > div:first-of-type,.chat-split.panefull .pane-grip{display:none}
+.chat-split.panefull .chat-pane{flex:1;border-left:0}
+
 /* Narrow windows cannot show both, so the pane takes the width it needs. */
 @media (max-width: 900px) {
   .chat-split.withpane > div:first-of-type { display: none; }
@@ -1238,6 +1256,19 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   font-family:var(--serif);font-weight:600;letter-spacing:-.008em;
 }
 
+/* The model details sit to the right of the picker. In a window narrower than
+   a desk there is nothing to the right, and the panel was clipped at the
+   window edge — exactly the numbers it exists to show. It goes above the list
+   instead, and never grows past the viewport. */
+.preview{max-width:calc(100vw - 32px);max-height:min(66vh,560px);overflow-y:auto}
+@media (max-width:1240px){
+  .preview{
+    left:0;right:auto;bottom:calc(100% + 9px);
+    width:414px;transform-origin:left bottom;
+  }
+  .preview:not(.show){transform:translateY(6px) scale(.98)}
+}
+
 /* ───────── settings: a list, and one category at a time ─────────
    Eight groups stacked on one page meant finding a single switch by
    scrolling past every other one. The categories are a list on the left and
@@ -1355,3 +1386,85 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   font-size:12.5px;color:var(--fg-2)}
 .withwho b{color:var(--fg)}
 .face.sm{width:28px;height:28px;font-size:11px}
+
+/* ───────── a sheet over the page ───────── */
+.sheet-back{
+  position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;
+  background:rgba(0,0,0,.45);backdrop-filter:blur(3px);
+  animation:sheetBack 180ms var(--ease) both;
+}
+@keyframes sheetBack{from{opacity:0}to{opacity:1}}
+.sheet{
+  width:min(520px,100%);max-height:min(640px,86vh);display:flex;flex-direction:column;
+  background:var(--raised);border:1px solid var(--line);border-radius:var(--r-xl);
+  box-shadow:var(--shadow);overflow:hidden;
+  animation:sheetIn 260ms var(--ease-out) both;
+}
+@keyframes sheetIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:15px 16px;border-bottom:1px solid var(--line)}
+.sheet-h b{font-family:var(--serif);font-size:17px;font-weight:600}
+.sheet-b{padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.sheet-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.sheet-acts.left{justify-content:flex-start}
+.sheet-bad{color:var(--warn-fg);font-size:12.5px;margin:0}
+.sheet-found{font-size:13.5px;margin:0}
+.pickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pickgrid.tight{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.pick{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;
+  padding:12px 13px;border:1px solid var(--line);border-radius:var(--r);background:var(--raised-2);
+  transition:border-color var(--t-fast),transform 140ms var(--ease-spring)}
+.pick:hover{border-color:var(--line-strong)}
+.pick:active{transform:scale(.985)}
+.pick.on{border-color:var(--ember);background:var(--ember-soft)}
+.pick b{font-size:13.5px}
+.pick span{font-size:11.5px;color:var(--fg-3)}
+
+/* ───────── the browser's one button ───────── */
+.browser-more{position:relative;flex:none}
+.browser-action.icon{width:30px;padding:0;font-size:15px;line-height:1}
+.browser-menu{
+  position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:208px;
+  display:flex;flex-direction:column;padding:5px;
+  background:var(--raised);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow-pop);
+  animation:sheetIn 160ms var(--ease-out) both;
+}
+.browser-menu button{
+  text-align:left;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--fg-2);
+  transition:background var(--t-fast),color var(--t-fast);
+}
+.browser-menu button:hover:not(:disabled){background:var(--hover);color:var(--fg)}
+.browser-menu button:disabled{opacity:.45;cursor:default}
+
+/* ───────── sending ─────────
+   The composer answers the press, but it does not MOVE. Scaling it meant the
+   Stop button inside it was travelling for the best part of half a second
+   after you pressed send — exactly when somebody tries to hit Stop, and long
+   enough that an automated click waited for it to settle and missed the reply
+   entirely. The acknowledgement is a light that passes along the border
+   instead: nothing shifts, nothing becomes harder to press. */
+.composer.sent{animation:composerSent 420ms var(--ease-out)}
+@keyframes composerSent{
+  0%{border-color:var(--ember);box-shadow:0 0 0 1px var(--ember-soft)}
+  100%{border-color:var(--line);box-shadow:0 1px 2px rgba(0,0,0,.14),0 8px 24px -16px rgba(0,0,0,.5)}
+}
+.msg.user:last-of-type .bubble{animation:bubbleIn 340ms var(--ease-spring) both}
+@keyframes bubbleIn{
+  from{opacity:0;transform:translateY(10px) scale(.97)}
+  to{opacity:1;transform:none}
+}
+/* While it is thinking: three dots that are doing nothing but saying "yes,
+   this is running". They stop under prefers-reduced-motion with everything
+   else. */
+.thinkdots{display:inline-flex;gap:4px;align-items:center;height:18px}
+.thinkdots i{width:5px;height:5px;border-radius:50%;background:var(--fg-3);
+  animation:thinkdot 1.1s var(--ease) infinite}
+.thinkdots i:nth-child(2){animation-delay:.15s}
+.thinkdots i:nth-child(3){animation-delay:.3s}
+@keyframes thinkdot{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+/* What running it here instead of paying for it came to. */
+.sidefoot.saved{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;
+  font-size:11px;color:var(--fg-3);border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+.sidefoot.saved b{font-size:12.5px;color:var(--ember-fg);font-weight:600}

@@ -305,7 +305,8 @@ async function sendInChat(page, text) {
     await page.getByLabel("Address or search").fill("example.com");
     await page.getByRole("button", { name: "Go", exact: true }).click();
     // The pane shortens the label to "Send page"; the title is the same in both.
-    await page.getByTitle("Send page to chat").click();
+    await page.getByRole("button", { name: "More page actions" }).click();
+    await page.getByRole("menuitem", { name: "Send page to chat" }).click();
     // Wait for the hand-off to land in the composer, rather than reading it too early.
     await page.waitForFunction(() => Array.from(document.querySelectorAll("textarea")).some((t) => t.value.includes("Forge AI is a private assistant")), null, { timeout: 5000 });
     assert.equal(await page.locator('textarea[placeholder^="Ask anything"]').inputValue().then((v) => v.includes("Forge AI is a private assistant")), true, "the page text is in the composer");

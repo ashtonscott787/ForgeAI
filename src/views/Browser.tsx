@@ -27,11 +27,14 @@ const ORIGIN_NOTE = "Pages open in a separate, sandboxed browser. Forge AI reads
 
 export function Browser({
   onSendToChat,
+  onToggleFull,
   compact = false,
   onClose,
   openUrl,
 }: {
   onSendToChat: (text: string, images?: string[], activity?: BrowserActivity) => void;
+  /** Hands the whole window to the browser, and back again. */
+  onToggleFull?: () => void;
   /** Pane mode: narrower controls, no full-width start screen. */
   compact?: boolean;
   onClose?: () => void;
@@ -49,6 +52,7 @@ export function Browser({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [find, setFind] = useState("");
   const [findOpen, setFindOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [matches, setMatches] = useState<{ active: number; total: number } | null>(null);
   const webviews = useRef<Map<string, HTMLElement & { getURL?: () => string }>>(new Map());
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0]!;
@@ -304,6 +308,9 @@ export function Browser({
           </div>
         ))}
         <button className="browser-tab-new" aria-label="New tab" onClick={() => openNew(HOME)}>+</button>
+        {onToggleFull && (
+          <button className="browser-tab-x" aria-label="Full width" title="Full width" onClick={onToggleFull}>⤢</button>
+        )}
         {onClose && (
           <button className="browser-tab-x browser-close" aria-label="Close browser" onClick={onClose}>×</button>
         )}
@@ -322,11 +329,30 @@ export function Browser({
           spellCheck={false}
         />
         <button className="browser-go" type="submit">Go</button>
-        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void readPage()} title="Send page to chat">{compact ? "Send page" : "Send page to chat"}</button>
-        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void askAboutScreenshot()} title="Ask about screenshot">{compact ? "Ask" : "Ask about screenshot"}</button>
-        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void saveScreenshot()} title="Save screenshot">{compact ? "Save" : "Save screenshot"}</button>
-        <button type="button" className="browser-action" disabled={!active.url} onClick={() => void summarise()} title="Summarise this page">{compact ? "Sum" : "Summarise"}</button>
-        <button type="button" className="browser-action" aria-pressed={findOpen} onClick={() => (findOpen ? closeFind() : setFindOpen(true))} title="Find in page">Find</button>
+        {/* One button instead of five. The address bar had Send page, Ask,
+            Save, Sum and Find strung across it in text, which is the part of
+            this that looked unfinished. They all still exist, behind this. */}
+        <div className="browser-more">
+          <button
+            type="button"
+            className="browser-action icon"
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            aria-label="More page actions"
+            onClick={() => setMoreOpen((o) => !o)}
+          >
+            ⋯
+          </button>
+          {moreOpen && (
+            <div className="browser-menu" role="menu" onMouseLeave={() => setMoreOpen(false)}>
+              <button role="menuitem" disabled={!active.url} onClick={() => { setMoreOpen(false); void readPage(); }}>Send page to chat</button>
+              <button role="menuitem" disabled={!active.url} onClick={() => { setMoreOpen(false); void askAboutScreenshot(); }}>Ask about a screenshot</button>
+              <button role="menuitem" disabled={!active.url} onClick={() => { setMoreOpen(false); void saveScreenshot(); }}>Save a screenshot</button>
+              <button role="menuitem" disabled={!active.url} onClick={() => { setMoreOpen(false); void summarise(); }}>Summarise this page</button>
+              <button role="menuitem" onClick={() => { setMoreOpen(false); setFindOpen(true); }}>Find in page</button>
+            </div>
+          )}
+        </div>
       </form>
 
       {findOpen && (

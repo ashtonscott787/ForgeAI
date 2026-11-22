@@ -474,6 +474,9 @@ export interface ContactRow {
 
 export const api = {
   health: () => invoke<Health>("health"),
+  /** Works out who hosts an email address, from its domain and that domain's MX records. */
+  mailDetect: (address: string) =>
+    invoke<{ ok: boolean; provider?: string; domain?: string; how?: string; why?: string }>("mail_detect", { address }),
   /** Records an app-side failure in the engine log, so one paste shows both sides. */
   noteFailure: (text: string) => invoke<boolean>("note_failure", { text }),
   /** Other tools Forge AI may connect to over MCP. */

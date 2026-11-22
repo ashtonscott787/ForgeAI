@@ -55,7 +55,16 @@ function serve() {
 }
 
 /** Runs in the page before the app starts. */
-const BRIDGE = `(() => {
+// String.raw, not a plain template literal.
+//
+// This string is injected into the page as JavaScript source. Written as an
+// ordinary template literal, every backslash in it was consumed once by this
+// file before the browser ever saw it: \s in a regular expression became a
+// bare s, \n inside a string became a real newline and broke the parse, and
+// the symptom was always the same — every scenario in a suite failing at once
+// with "Invalid or unexpected token". It cost four separate debugging
+// sessions. String.raw hands the browser exactly what is written here.
+const BRIDGE = String.raw`(() => {
   const listeners = {};
   const calls = [];
   const pending = {};
@@ -189,6 +198,14 @@ const BRIDGE = `(() => {
       microsoft: { label: "Outlook / Microsoft 365", imap: { host: "outlook.office365.com", port: 993 }, smtp: { host: "smtp-mail.outlook.com", port: 587, secure: false }, note: "Microsoft has switched off password sign-in for mail apps.", works: false },
       other: { label: "Something else", imap: { host: "", port: 993 }, smtp: { host: "", port: 587, secure: false }, note: "Your provider's help pages will give the servers.", works: true },
     }),
+    mail_detect: ({ address }) => {
+      const at = String(address || "");
+      if (!/^[^@\s]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(at)) return { ok: false, why: "That does not look like an email address." };
+      if (/@gmail\.com$/i.test(at)) return { ok: true, provider: "gmail", domain: "gmail.com", how: "the address itself" };
+      if (/@school\.example$/i.test(at)) return { ok: true, provider: "gmail", domain: "school.example", how: "where this domain delivers its mail" };
+      if (/@corp\.example$/i.test(at)) return { ok: true, provider: "microsoft", domain: "corp.example", how: "where this domain delivers its mail" };
+      return { ok: true, provider: "", domain: at.split("@")[1], how: "" };
+    },
     mail_check: () => ({ ok: true, mailboxes: ["INBOX", "Sent"] }),
     mail_inbox: () => (cfg.mailReady ? { ok: true, total: 2, messages: [
       { uid: 102, seq: 2, unread: true, from: "Dana Patel <dana@supplier.example>", to: "you@example.com", subject: "Order 1042 delayed", date: "Thu, 20 Nov 2026 09:14:00" },

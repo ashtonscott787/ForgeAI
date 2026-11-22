@@ -74,7 +74,7 @@ export interface StreamHandle {
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
-  onDone: (stats: { tokens: number; seconds: number }) => void;
+  onDone: (stats: { tokens: number; answered: number; seconds: number }) => void;
   onError: (message: string) => void;
 }
 
@@ -86,6 +86,10 @@ export function streamChat(
   const controller = new AbortController();
   const started = performance.now();
   let tokens = 0;
+  /** True while the model's working is arriving, so the tag can be closed. */
+  let inReasoning = false;
+  /** Counted apart, so "thought but did not answer" can be told from "said nothing".  */
+  let answered = 0;
 
   (async () => {
     try {
@@ -180,11 +184,27 @@ export function streamChat(
             if (payload === "[DONE]") continue;
             try {
               const json = JSON.parse(payload) as {
-                choices?: { delta?: { content?: string } }[];
+                choices?: { delta?: { content?: string; reasoning_content?: string } }[];
               };
-              const piece = json.choices?.[0]?.delta?.content;
-              if (piece) {
+              const delta = json.choices?.[0]?.delta;
+              // A reasoning model's working does not arrive in `content`.
+              // llama.cpp splits it into `reasoning_content`, and reading only
+              // `content` meant a model that thought its way to an answer
+              // looked like a model that said nothing at all: the engine log
+              // showed hundreds of tokens generated while the app reported
+              // "returned no text". It is wrapped in <think> so it is shown as
+              // working rather than as the answer.
+              const reasoning = delta?.reasoning_content;
+              if (reasoning) {
+                if (!inReasoning) { inReasoning = true; cb.onToken("<think>"); }
                 tokens += 1;
+                cb.onToken(reasoning);
+              }
+              const piece = delta?.content;
+              if (piece) {
+                if (inReasoning) { inReasoning = false; cb.onToken("</think>"); }
+                tokens += 1;
+                answered += 1;
                 cb.onToken(piece);
               }
             } catch {
@@ -193,10 +213,12 @@ export function streamChat(
           }
         }
       }
-      cb.onDone({ tokens, seconds: (performance.now() - started) / 1000 });
+      // A reply that was all working and no answer still has a tag to close.
+      if (inReasoning) { inReasoning = false; cb.onToken("</think>"); }
+      cb.onDone({ tokens, answered, seconds: (performance.now() - started) / 1000 });
     } catch (e) {
       if ((e as Error).name === "AbortError") {
-        cb.onDone({ tokens, seconds: (performance.now() - started) / 1000 });
+        cb.onDone({ tokens, answered, seconds: (performance.now() - started) / 1000 });
         return;
       }
       // A bare browser error ("Failed to fetch", "network error") names

@@ -116,7 +116,9 @@ async function scenario(name, server, fn, { seed = false } = {}) {
     await page.getByRole("button", { name: "Open the browser" }).click();
     await page.waitForSelector(".chat-pane");
     assert.equal(await page.locator(".browser-find").count(), 0, "it stays out of the way until asked for");
-    await page.getByRole("button", { name: "Find", exact: true }).click();
+    // These actions live behind one button now; the address bar had five.
+    await page.getByRole("button", { name: "More page actions" }).click();
+    await page.getByRole("menuitem", { name: "Find in page" }).click();
     await page.waitForSelector(".browser-find", { timeout: 4000 });
     await page.getByLabel("Find in page").fill("forge");
     assert.equal(await page.getByLabel("Find in page").inputValue(), "forge");
@@ -134,7 +136,8 @@ async function scenario(name, server, fn, { seed = false } = {}) {
     await page.getByRole("button", { name: "Chat", exact: true }).click();
     await page.getByRole("button", { name: "Open the browser" }).click();
     await page.waitForSelector(".chat-pane");
-    await page.locator(".chat-pane").getByTitle("Summarise this page").click();
+    await page.locator(".chat-pane").getByRole("button", { name: "More page actions" }).click();
+    await page.locator(".chat-pane").getByRole("menuitem", { name: "Summarise this page" }).click();
     await page.waitForFunction(
       () => Array.from(document.querySelectorAll("textarea")).some((t) => t.value.includes("Summarise this page")),
       null,

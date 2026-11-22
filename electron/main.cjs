@@ -1049,6 +1049,12 @@ function register(win) {
   });
 
   h("mail_providers", () => mail.PROVIDERS);
+  /**
+   * Who hosts an address. Only the domain is looked up, and only in DNS —
+   * the address itself never leaves this computer.
+   */
+  h("mail_detect", async ({ address }) =>
+    mail.detectProvider(address, (domain) => require("node:dns").promises.resolveMx(domain)));
 
   /** What is actually connected, measured each time it is asked. */
   h("system_status", () => sysStatus.snapshot({

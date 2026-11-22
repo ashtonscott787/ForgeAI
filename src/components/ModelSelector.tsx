@@ -62,6 +62,7 @@ const PLACES: Place[] = ["Local", "Cluster"];
 export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
   const { models, value, configurations, prompt, usableBytes } = props;
   const [open, setOpen] = useState(false);
+  const [sent, setSent] = useState(false);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const popRef = useRef<HTMLDivElement>(null);
@@ -140,6 +141,9 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
   };
 
   const submit = () => {
+    // A press that produces nothing visible for two seconds feels broken.
+    setSent(true);
+    window.setTimeout(() => setSent(false), 420);
     if (!selected || !prompt.trim() || props.busy) return;
     props.onSubmit({ model: selected, configuration: cfgOf(selected.value), prompt });
   };
@@ -166,7 +170,7 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
   let lastGroup = "";
 
   return (
-    <div className="composer">
+    <div className={`composer${sent ? " sent" : ""}`}>
       <textarea
         ref={taRef}
         rows={1}

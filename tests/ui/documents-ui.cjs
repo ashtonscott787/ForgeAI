@@ -102,6 +102,11 @@ async function scenario(name, server, seed, fn) {
     [convo("s5", "Report", LONG_REPLY)], async (page) => {
       await page.locator(".conv", { hasText: "Report" }).first().click();
       await page.waitForSelector(".saveas", { timeout: 5000 });
+      // The five format buttons are behind one control now: a row of
+      // furniture under every answer was the complaint.
+      assert.equal(await page.getByRole("button", { name: "PDF", exact: true }).count(), 0,
+        "the formats are not shown until they are asked for");
+      await page.getByRole("button", { name: "Save as…" }).click();
       for (const label of ["PDF", "Word", "Markdown", "Text", "Web page"]) {
         assert.equal(await page.getByRole("button", { name: label, exact: true }).count(), 1, `${label} is offered`);
       }

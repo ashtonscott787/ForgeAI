@@ -16,6 +16,7 @@ const KINDS = [
  */
 export function SaveAs({ text, title }: { text: string; title: string }) {
   const [busy, setBusy] = useState("");
+  const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
 
   async function save(kind: (typeof KINDS)[number][0]) {
@@ -32,14 +33,23 @@ export function SaveAs({ text, title }: { text: string; title: string }) {
     }
   }
 
+  // Five buttons and a label under every answer was a row of furniture on a
+  // page that is mostly read. It is one quiet control now, and the formats
+  // appear when it is asked for.
   return (
     <div className="saveas">
-      <span className="hint">Save as</span>
-      {KINDS.map(([k, label]) => (
-        <button key={k} type="button" className="ghostbtn" disabled={Boolean(busy)} onClick={() => void save(k)}>
-          {busy === k ? "Saving…" : label}
-        </button>
-      ))}
+      {!open ? (
+        <button type="button" className="linkbtn" onClick={() => setOpen(true)}>Save as…</button>
+      ) : (
+        <>
+          {KINDS.map(([k, label]) => (
+            <button key={k} type="button" className="ghostbtn small" disabled={Boolean(busy)} onClick={() => void save(k)}>
+              {busy === k ? "Saving…" : label}
+            </button>
+          ))}
+          <button type="button" className="linkbtn" onClick={() => setOpen(false)}>Cancel</button>
+        </>
+      )}
       {note && <div className="hint saveas-note">{note}</div>}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MailSetup } from "../components/MailSetup";
 import { api, type MailHeader } from "../lib/ipc";
 
 /**
@@ -15,6 +16,36 @@ export function Mail({ onAsk }: { onAsk: (text: string) => void }) {
   const [open, setOpen] = useState<{ uid: number; subject: string; from: string; date: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [setup, setSetup] = useState(false);
+  const [providers, setProviders] = useState<Record<string, { label: string; note?: string; works?: boolean }>>({});
+
+  useEffect(() => { void api.mailProviders().then(setProviders).catch(() => undefined); }, []);
+
+  /**
+   * Saves what the wizard gathered. The servers come from the preset for the
+   * provider that was worked out, so nobody types a host name.
+   */
+  async function saveSetup(d: { kind: string; address: string; provider: string; password: string }) {
+    const preset = (await api.mailProviders())[d.provider];
+    if (!preset || !preset.smtp || !preset.imap) return "That provider has no server settings.";
+    const r = await api.mailSave({
+      host: preset.smtp.host,
+      port: preset.smtp.port,
+      secure: preset.smtp.secure,
+      imap_host: preset.imap.host,
+      imap_port: preset.imap.port,
+      user: d.address,
+      from: d.address,
+      password: d.password,
+      provider: d.provider,
+    });
+    if (!r.ok) return "Those details were refused. Check the password and try again.";
+    const st = await api.mailStatus();
+    setReady(st.can_read);
+    setSetup(false);
+    if (st.can_read) void load();
+    return null;
+  }
 
   useEffect(() => {
     void api.mailStatus().then((s) => {
@@ -53,13 +84,19 @@ export function Mail({ onAsk }: { onAsk: (text: string) => void }) {
         <div className="phead"><h2>Mail</h2><p>Your inbox, read on this computer.</p></div>
         <div className="scroll"><div className="pbody">
           <div className="panel"><div className="panel-b">
-            <p>No incoming mail account is set up yet.</p>
+            <p>No mail account is set up yet.</p>
             <p className="hint">
-              Settings → Email. Choose your provider and Forge AI fills in the servers;
-              you supply an app-specific password. Nothing is read until you do.
+              Three answers and it is done: what the address is for, the address, and a password.
+              Forge AI works out who hosts it. Nothing is read until you have finished.
             </p>
+            <div className="sheet-acts left">
+              <button className="btn primary" onClick={() => setSetup(true)}>Set up a mail account</button>
+            </div>
           </div></div>
         </div></div>
+        {setup && (
+          <MailSetup providers={providers} onCancel={() => setSetup(false)} onDone={saveSetup} />
+        )}
       </>
     );
   }

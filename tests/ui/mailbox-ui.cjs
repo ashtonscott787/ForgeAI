@@ -35,9 +35,11 @@ async function scenario(name, server, cfg, fn) {
 (async () => {
   const server = await serve();
 
-  await scenario("With no account, it says so and points at Settings", server, {}, async (page) => {
-    await page.waitForFunction(() => document.body.innerText.includes("No incoming mail account"), null, { timeout: 5000 });
-    assert.match(await page.locator(".view.active .pbody").innerText(), /Settings/);
+  await scenario("With no account, it offers to set one up here", server, {}, async (page) => {
+    // It used to send people to Settings to find the form themselves. The
+    // set-up now happens where the absence is noticed.
+    await page.waitForFunction(() => document.body.innerText.includes("No mail account"), null, { timeout: 5000 });
+    assert.equal(await page.getByRole("button", { name: "Set up a mail account" }).count(), 1);
     assert.equal(await page.locator(".view.active .maillist").count(), 0, "no empty list is shown");
   });
 
