@@ -57,6 +57,7 @@
   /* Icons as masks, so they take currentColor and never need a second asset
      for the light theme. */
   --ic-plus:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="black" stroke-width="1.6" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>');
+  --ic-stop:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect x="4.5" y="4.5" width="7" height="7" rx="1.6" fill="black"/></svg>');
   --ic-arrow-up:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.8 7.7 8 3.4l4.2 4.3"/></svg>');
   /* Headings are set in a serif against a sans body. It is the one typographic
      move that makes an interface look drawn rather than assembled, and it
@@ -184,6 +185,10 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 .send::after{content:"";width:16px;height:16px;background:currentColor;
   -webkit-mask:var(--ic-arrow-up) center/contain no-repeat;mask:var(--ic-arrow-up) center/contain no-repeat}
 .send.live{background:var(--ember);color:var(--on-ember)}
+/* Stop has to look like stop. The label is hidden because the control is an
+   icon, so the square is the only thing distinguishing it from Send — without
+   this rule both buttons drew the same arrow. */
+.send.stop::after{-webkit-mask-image:var(--ic-stop);mask-image:var(--ic-stop)}
 .send.live:hover{transform:scale(1.06)}
 .send:active{transform:scale(.94)}
 .send svg{display:none}
@@ -1307,3 +1312,32 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 .mcp-cmd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-family:var(--mono);font-size:11.5px;color:var(--fg-3)}
 .ghostbtn.small{height:26px;padding:0 10px;font-size:12px}
+
+/* A chat that answered while you were somewhere else. */
+.conv-new{
+  width:7px;height:7px;flex:none;border-radius:50%;background:var(--ember);
+  box-shadow:0 0 0 3px var(--ember-soft);
+  animation:convNew 300ms var(--ease-spring) both;
+}
+@keyframes convNew{from{transform:scale(0)}to{transform:scale(1)}}
+
+/* ───────── the assistants ───────── */
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px}
+.person{
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;background:var(--raised);
+  display:flex;flex-direction:column;gap:10px;
+  transition:border-color var(--t),transform var(--t);
+}
+.person:hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.person-top{display:flex;align-items:center;gap:12px}
+.face{width:52px;height:52px;flex:none;border-radius:50%;object-fit:cover;
+  box-shadow:0 0 0 1px var(--line)}
+.face.initials{display:grid;place-items:center;color:#fff;font-weight:650;font-size:16px;letter-spacing:.02em}
+.person-id{display:flex;flex-direction:column;gap:1px;min-width:0}
+.person-id b{font-size:14.5px;letter-spacing:-.01em}
+.person-handle{font-size:12px;color:var(--ember-fg)}
+.person-role{font-size:12px;color:var(--fg-3)}
+.person-addr{font-family:var(--mono);font-size:11px;color:var(--fg-3);margin:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.person-acts{margin-top:auto;display:flex;gap:8px}
+.roster-note{margin-top:12px}

@@ -78,8 +78,8 @@ async function scenario(name, server, fn) {
 
   await scenario("The last answer can be asked for again, without repeating the question", server, async (page) => {
     await page.locator(".conv", { hasText: "Bike repair" }).first().click();
-    await page.getByRole("button", { name: "Regenerate" }).waitFor({ timeout: 4000 });
-    await page.getByRole("button", { name: "Regenerate" }).click();
+    await page.getByRole("button", { name: "Ask again" }).waitFor({ timeout: 4000 });
+    await page.getByRole("button", { name: "Ask again" }).click();
     // The question is asked again from before it, so it must not appear twice.
     await page.waitForFunction(
       () => Array.from(document.querySelectorAll(".msg.user")).filter((m) => m.textContent.includes("derailleur")).length === 1,
@@ -114,6 +114,17 @@ async function scenario(name, server, fn) {
     await page.waitForSelector(".tempnote");
     const text = await page.locator('textarea[placeholder^="Ask anything"]').inputValue();
     assert.equal(text, "", "the previous temporary chat is gone, not restored");
+  });
+
+  await scenario("The last question can be taken back and changed", server, async (page) => {
+    // Stopping a reply usually means the question was wrong. Editing puts it
+    // back in the composer and removes the exchange it produced.
+    await page.getByRole("button", { name: "Ask again" }).waitFor({ timeout: 4000 });
+    const before = await page.locator(".msg").count();
+    await page.getByRole("button", { name: "Edit question" }).click();
+    const box = page.locator('textarea[placeholder^="Ask anything"]');
+    assert.ok((await box.inputValue()).length > 0, "the question is back in the composer");
+    assert.ok(await page.locator(".msg").count() < before, "and the exchange it produced is gone");
   });
 
   server.close();

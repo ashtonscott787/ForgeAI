@@ -10,6 +10,12 @@ export interface Conversation {
    * being the open one, so closing the app or moving away ends it.
    */
   temporary?: boolean;
+  /**
+   * When a reply finished in a chat that was not on screen. Cleared the moment
+   * the chat is opened. A model answering while you are on another page is
+   * worth a mark: there is nothing else to tell you it happened.
+   */
+  unseen?: number;
 }
 
 const KEY = "forge.conversations.v1";

@@ -296,14 +296,14 @@ export function ModelSelectorPrompt(props: ModelSelectorPromptProps) {
         </div>
 
         {props.busy ? (
-          <button className="send live stop" onClick={() => props.onStop?.()}>
+          <button className="send live stop" aria-label="Stop" title="Stop" onClick={() => props.onStop?.()}>
             Stop
             <svg viewBox="0 0 24 24" fill="currentColor">
               <rect x="7" y="7" width="10" height="10" rx="2" />
             </svg>
           </button>
         ) : (
-          <button className={`send${prompt.trim() ? " live" : ""}`} onClick={submit}>
+          <button className={`send${prompt.trim() ? " live" : ""}`} aria-label="Send" title="Send" onClick={submit}>
             Send
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 19V5M5 12l7-7 7 7" />

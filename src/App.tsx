@@ -5,6 +5,7 @@ import { People } from "./views/People";
 import { Browser } from "./views/Browser";
 import { GhostMark } from "./components/GhostMark";
 import { Boot, type BootStage } from "./components/Boot";
+import { ASSISTANTS } from "./lib/assistants";
 import type { BrowserActivity } from "./lib/chat";
 
 // Long enough to be seen and read, short enough that nobody waits on it.
@@ -441,9 +442,11 @@ export default function App() {
                   onClick={() => {
                     setActiveId(c.id);
                     setView("chat");
+                    if (c.unseen) setConvos((l) => l.map((x) => (x.id === c.id ? { ...x, unseen: 0 } : x)));
                   }}
                 >
                   <span className="conv-t">{c.title}</span>
+                  {c.unseen ? <span className="conv-new" title="Answered since you last looked" aria-label="Unread reply" /> : null}
                   <button
                     className="conv-x"
                     title="Delete conversation"
@@ -547,6 +550,11 @@ export default function App() {
               onHandoffUsed={() => setHandoff(null)}
               providers={providers}
               onMessagesFor={setMessagesFor}
+              onReplyFinished={(cid) => {
+                // Only a chat you are not looking at can be unseen.
+                if (cid === activeId && view === "chat") return;
+                setConvos((l) => l.map((c) => (c.id === cid ? { ...c, unseen: Date.now() } : c)));
+              }}
               environment={envBrief}
             />
             {panes[activeId] && (
@@ -575,7 +583,22 @@ export default function App() {
           </section>
 
           <section className={`view${view === "agents" ? " active" : ""}`}>
-            <Agents installed={installed} self={self} />
+            <Agents
+              installed={installed}
+              self={self}
+              onMessageAssistant={(aid) => {
+                const who = ASSISTANTS.find((x) => x.id === aid);
+                if (!who) return;
+                // A chat of their own, opened with their handle already typed:
+                // the chat is with that assistant, not with "the model".
+                const c = newConversation();
+                c.title = who.name;
+                setConvos((l) => [c, ...l]);
+                setActiveId(c.id);
+                setHandoff({ text: `${who.handle} `, images: [] });
+                setView("chat");
+              }}
+            />
           </section>
 
           <section className={`view${view === "models" ? " active" : ""}`}>

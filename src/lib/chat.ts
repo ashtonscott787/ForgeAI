@@ -89,38 +89,71 @@ export function streamChat(
 
   (async () => {
     try {
-      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Only the two fields the server expects; anything else is local bookkeeping.
-        body: JSON.stringify({
-          messages: messages.map((m) =>
-            m.images && m.images.length
-              ? {
-                  role: m.role,
-                  content: [
-                    { type: "text", text: m.content },
-                    ...m.images.map((url) => ({ type: "image_url", image_url: { url } })),
-                  ],
-                }
-              : { role: m.role, content: m.content },
-          ),
-          stream: true,
-          cache_prompt: true,
-          // Describing an image should give the same answer each time, so that
-          // path is pinned. Ordinary chat is sampled, with a fresh seed on
-          // every request: asking the same question twice should not return
-          // the same sentences word for word, because a person asking again
-          // is usually asking for another go at it, not a replay.
-          ...(messages.some((m) => m.images && m.images.length)
-            ? { temperature: 0, seed: 0 }
-            : { temperature: 0.8, top_p: 0.95, seed: freshSeed() }),
-        }),
-        signal: controller.signal,
-      });
+      const hasImages = messages.some((m) => m.images && m.images.length);
+      const content = messages.map((m) =>
+        m.images && m.images.length
+          ? {
+              role: m.role,
+              content: [
+                { type: "text", text: m.content },
+                ...m.images.map((url) => ({ type: "image_url", image_url: { url } })),
+              ],
+            }
+          : { role: m.role, content: m.content },
+      );
+      // The parts every engine understands, and the sampling, kept apart so
+      // the second can be dropped if an engine refuses it.
+      const core = { messages: content, stream: true, cache_prompt: true };
+      // Describing an image should give the same answer each time, so that
+      // path is pinned. Ordinary chat is sampled, with a fresh seed on every
+      // request: asking the same question twice should not return the same
+      // sentences word for word, because a person asking again is usually
+      // asking for another go at it, not a replay.
+      const sampling = hasImages
+        ? { temperature: 0, seed: 0 }
+        : { temperature: 0.8, top_p: 0.95, seed: freshSeed() };
+
+      const send = (body: unknown) =>
+        fetch(`${baseUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+      let res = await send({ ...core, ...sampling });
+      if (res.status >= 400 && res.status < 500) {
+        // Some builds of the engine refuse a sampling field they do not know,
+        // and refuse the whole request with it. An answer without the extra
+        // sampling is worth far more than a red message, so it is tried once
+        // more with the fields every build accepts.
+        const plain = await send(core);
+        if (plain.ok) res = plain;
+      }
 
       if (!res.ok) {
-        cb.onError(`The inference runtime returned ${res.status}.`);
+        // The engine explains itself in the body — "invalid sampling
+        // parameter", "context size exceeded", the name of the field it did
+        // not like. Reporting only the number threw that away and left
+        // "returned 400" on screen, which tells nobody anything.
+        let why = "";
+        try {
+          const text = await res.text();
+          try {
+            const j = JSON.parse(text);
+            why = j?.error?.message || j?.message || j?.error || "";
+          } catch {
+            why = text;
+          }
+        } catch {
+          why = "";
+        }
+        why = String(why).trim().slice(0, 400);
+        cb.onError(
+          why
+            ? `The model could not answer: ${why} (HTTP ${res.status})`
+            : `The model could not answer, and the engine gave no reason. (HTTP ${res.status})`,
+        );
         return;
       }
       if (!res.body) {

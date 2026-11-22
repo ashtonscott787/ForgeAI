@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Agent, type AgentTool, type KnowledgePack, type MachineCapability } from "../lib/ipc";
 import { streamChat, type ChatMessage } from "../lib/chat";
 import { AgentMap } from "../components/AgentMap";
+import { AssistantRoster } from "../components/AssistantRoster";
 
 /**
  * Agents: a saved worker, run one task at a time.
@@ -31,10 +32,13 @@ const TEST_GOAL =
 export function Agents({
   installed,
   self,
+  onMessageAssistant,
 }: {
   /** Model files actually on disk, so an agent runs on one that exists. */
   installed: { file_name: string; label: string }[];
   self: MachineCapability | null;
+  /** Opens a chat with one of the built-in assistants. */
+  onMessageAssistant?: (assistantId: string) => void;
 }) {
   const [list, setList] = useState<Agent[]>([]);
   const [tools, setTools] = useState<AgentTool[]>([]);
@@ -149,6 +153,8 @@ export function Agents({
       </div>
       <div className="scroll">
         <div className="pbody">
+          <AssistantRoster onMessage={(a) => onMessageAssistant?.(a.id)} />
+
           <AgentMap />
 
           {advice && !advice.ok && <div className="banner warn" role="status">{advice.text}</div>}

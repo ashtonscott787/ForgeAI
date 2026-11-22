@@ -16,6 +16,8 @@ import { choose } from "../lib/router";
 interface Props {
   /** The date, this machine and the weather, for the system prompt. */
   environment?: string;
+  /** Called when a reply finishes, so a chat nobody was watching can be marked. */
+  onReplyFinished?: (conversationId: string) => void;
   models: LocalModel[];
   installed: InstalledEntry[];
   value: string;
@@ -131,6 +133,24 @@ export function Chat(props: Props) {
     void send(asked.content, messages.slice(0, at));
   }
 
+  /**
+   * Puts the last question back in the composer to be changed and asked again.
+   *
+   * Stopping a reply usually means the question was wrong, not that the answer
+   * was unwanted, so the question comes back rather than being left on screen
+   * above a half-finished answer nobody will read.
+   */
+  function editLastQuestion() {
+    if (streaming) return;
+    let at = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]!.role === "user") { at = i; break; }
+    }
+    if (at < 0) return;
+    setPrompt(messages[at]!.content);
+    props.onMessagesFor(props.conversationId, messages.slice(0, at));
+  }
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming, status]);
@@ -210,6 +230,9 @@ export function Chat(props: Props) {
     const endRun = (run: Run) => {
       if (runs.current.get(convId) === run) runs.current.delete(convId);
       setBusy((b) => ({ ...b, [convId]: false }));
+      // However it ended, the chat now holds something that was not there
+      // when it was last looked at.
+      props.onReplyFinished?.(convId);
     };
     const failRun = (run: Run, msg: string) => {
       endRun(run);
@@ -576,7 +599,8 @@ export function Chat(props: Props) {
               {m.perf && <PerfLine perf={m.perf} />}
               {m.role === "assistant" && i === messages.length - 1 && !streaming && m.content && (
                 <div className="turnacts">
-                  <button type="button" className="linkbtn" onClick={regenerate}>Regenerate</button>
+                  <button type="button" className="linkbtn" onClick={regenerate}>Ask again</button>
+                  <button type="button" className="linkbtn" onClick={editLastQuestion}>Edit question</button>
                 </div>
               )}
             </div>
