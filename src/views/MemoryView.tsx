@@ -28,13 +28,46 @@ export function MemoryView() {
     }
   }
 
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  async function saveEdit(m: Memory) {
+    const text = draft.trim();
+    if (!text || text === m.text) { setEditing(null); return; }
+    await run(() => api.memoryUpdate({ id: m.id, text }), "Changed.");
+    setEditing(null);
+  }
+
   const personal = items.filter((m) => m.scope === "personal");
   const byProject = items.filter((m) => m.scope === "project");
 
   const card = (m: Memory) => (
     <div key={m.id} className={`memrow${m.pinned ? " pinned" : ""}`}>
       <div className="memmain">
-        <div className="memtext">{m.text}</div>
+        {editing === m.id ? (
+          // What Forge AI believes about you should be correctable, not only
+          // deletable: a line that is nearly right was being thrown away and
+          // retyped because there was no way to change one word of it.
+          <div className="memedit">
+            <textarea
+              className="memtextarea"
+              aria-label="What this remembers"
+              value={draft}
+              autoFocus
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditing(null);
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void saveEdit(m);
+              }}
+            />
+            <div className="memedit-acts">
+              <button className="btn primary small" disabled={!draft.trim()} onClick={() => void saveEdit(m)}>Save</button>
+              <button className="ghostbtn small" onClick={() => setEditing(null)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="memtext">{m.text}</div>
+        )}
         <div className="mcard-sub num">
           {m.scope === "project" ? `${m.project || "unnamed project"} · ` : ""}
           added {new Date(m.created).toLocaleDateString()}
@@ -42,6 +75,15 @@ export function MemoryView() {
           {m.expires ? ` · expires ${new Date(m.expires).toLocaleDateString()}` : ""}
         </div>
       </div>
+      {editing !== m.id && (
+        <button
+          className="ghostbtn"
+          title="Change what this says"
+          onClick={() => { setEditing(m.id); setDraft(m.text); }}
+        >
+          Edit
+        </button>
+      )}
       <button
         className="ghostbtn"
         title={m.pinned ? "Unpin" : "Pin so it is always included"}

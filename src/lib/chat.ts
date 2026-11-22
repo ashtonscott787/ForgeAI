@@ -199,7 +199,16 @@ export function streamChat(
         cb.onDone({ tokens, seconds: (performance.now() - started) / 1000 });
         return;
       }
-      cb.onError(e instanceof Error ? e.message : String(e));
+      // A bare browser error ("Failed to fetch", "network error") names
+      // neither the stage nor the cause, and that is what was being shown.
+      // The engine log, meanwhile, showed a clean run — two sides of one
+      // moment, neither of which said what had gone wrong.
+      const raw = e instanceof Error ? e.message : String(e);
+      const where = tokens > 0 ? `after ${tokens} tokens had arrived` : "before the first token arrived";
+      const guess = /fetch|network|ECONNREFUSED|load failed/i.test(raw)
+        ? ` The engine at ${baseUrl} could not be reached — it may have stopped or restarted.`
+        : "";
+      cb.onError(`The answer stopped ${where}: ${raw}.${guess}`);
     }
   })();
 

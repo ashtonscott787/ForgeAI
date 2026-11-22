@@ -474,6 +474,8 @@ export interface ContactRow {
 
 export const api = {
   health: () => invoke<Health>("health"),
+  /** Records an app-side failure in the engine log, so one paste shows both sides. */
+  noteFailure: (text: string) => invoke<boolean>("note_failure", { text }),
   /** Other tools Forge AI may connect to over MCP. */
   mcpList: () => invoke<{ id: string; name: string; command: string; args: string[]; enabled: boolean }[]>("mcp_list"),
   mcpSave: (servers: unknown[]) => invoke<unknown[]>("mcp_save", { servers }),

@@ -1341,3 +1341,17 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .person-acts{margin-top:auto;display:flex;gap:8px}
 .roster-note{margin-top:12px}
+
+/* Correcting what Forge AI believes about you. */
+.memedit{display:flex;flex-direction:column;gap:8px}
+.memtextarea{width:100%;min-height:62px;resize:vertical;font-size:13.5px;line-height:1.5;
+  padding:9px 11px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--raised-2)}
+.memtextarea:focus{border-color:var(--ember-line)}
+.memedit-acts{display:flex;gap:8px}
+
+/* Whose conversation this is. */
+.withwho{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;
+  border:1px solid var(--line);border-radius:var(--r-lg);background:var(--raised);
+  font-size:12.5px;color:var(--fg-2)}
+.withwho b{color:var(--fg)}
+.face.sm{width:28px;height:28px;font-size:11px}

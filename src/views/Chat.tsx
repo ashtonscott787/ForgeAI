@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hostOf } from "../lib/assistants";
 import { Attachments } from "../components/Attachments";
 import { AssistantMessage } from "../components/Message";
 import { PerfLine } from "../components/Perf";
@@ -376,7 +377,14 @@ export function Chat(props: Props) {
     const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);
     if (run.stopped) return;
     // With an image, the short instruction is used: see VISION_SYSTEM.
-    const system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills, props.environment ?? "");
+    // A conversation addressed to an assistant is that assistant's for its
+    // whole length, not only for the message that named them.
+    const host = hostOf([...(base ?? messages), { role: "user", content: body }]);
+    let system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills, props.environment ?? "");
+    if (host) {
+      system += `\n\nYou are ${host.name} (${host.handle}), ${host.role.toLowerCase()}. ${host.instructions}`
+        + ` Answer as ${host.name} for the whole of this conversation.`;
+    }
 
     const outbound: ChatMessage[] = next.map((m, i) =>
       i === next.length - 1
@@ -525,12 +533,17 @@ export function Chat(props: Props) {
       },
       onError: (message) => {
         if (run.stopped) return;
+        // Into the engine's own log as well, so the two accounts of the same
+        // moment can be copied together.
+        void api.noteFailure(`chat failed: ${message}`).catch(() => undefined);
         failRun(run, message);
       },
     });
     run.stop = () => handle.cancel();
   }
 
+  // Who this conversation belongs to, if it was addressed to somebody.
+  const withAssistant = hostOf(messages);
   const empty = messages.length === 0;
 
 
@@ -557,6 +570,16 @@ export function Chat(props: Props) {
       {dragging && <div className="dropnote">Drop files to attach them</div>}
       {!empty && (
         <div className="scroll chatlog">
+          {withAssistant && (
+            <div className="withwho">
+              {withAssistant.portrait
+                ? <img className="face sm" src={withAssistant.portrait} alt="" width={28} height={28} />
+                : <span className="face sm initials" style={{ background: withAssistant.accent }} aria-hidden="true">{withAssistant.initials}</span>}
+              <span>
+                This conversation is with <b>{withAssistant.name}</b> — {withAssistant.role.toLowerCase()}.
+              </span>
+            </div>
+          )}
           {messages.map((m, i) => (
             <div key={i} className={`msg ${m.role}`}>
               <div className="who">{m.role === "user" ? "You" : (m.model ?? "Forge")}</div>

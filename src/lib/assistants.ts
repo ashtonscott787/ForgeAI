@@ -116,4 +116,19 @@ export const ASSISTANTS: Assistant[] = [
 ];
 
 export const byHandle = (h: string): Assistant | undefined =>
-  ASSISTANTS.find((a) => a.handle.toLowerCase() === h.toLowerCase().replace(/^(?!@)/, "@"));
+  ASSISTANTS.find((a) => a.handle.toLowerCase() === (h.startsWith("@") ? h : `@${h}`).toLowerCase());
+
+/**
+ * Which assistant a conversation is with.
+ *
+ * Addressing one by handle is not a single-message thing: writing "@theo" is
+ * starting a conversation with Theo, and it stays Theo's for as long as it
+ * goes on. The handle is looked for in the first thing said, so later use of
+ * someone's name in passing does not quietly hand the conversation over.
+ */
+export function hostOf(messages: { role: string; content: string }[]): Assistant | undefined {
+  const first = messages.find((m) => m.role === "user");
+  if (!first) return undefined;
+  const m = /^\s*@([a-z][a-z0-9_-]*)\b/i.exec(first.content);
+  return m ? byHandle(m[1]!) : undefined;
+}

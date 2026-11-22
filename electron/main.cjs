@@ -959,6 +959,21 @@ function register(win) {
   });
   h("stop_engine", stopEngine);
   h("engine_status", status);
+  /**
+   * The renderer writing into the same log as the engine.
+   *
+   * A failure in the app and the engine's own account of the same moment used
+   * to live in two places, and only one of them could be copied. A request
+   * that fails now leaves its line in engine.log beside the engine's, so one
+   * paste shows both sides.
+   */
+  h("note_failure", ({ text }) => {
+    try {
+      const line = `${new Date().toISOString()} APP  ${String(text || "").slice(0, 600)}\n`;
+      fs.appendFileSync(logFile(), line);
+    } catch { /* the log is a convenience, never a dependency */ }
+    return true;
+  });
   h("engine_log", () => logTail(200));
   h("open_engine_log", () => shell.showItemInFolder(logFile()));
   h("environment", () => ({
