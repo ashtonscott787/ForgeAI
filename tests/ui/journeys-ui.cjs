@@ -73,6 +73,30 @@ async function scenario(name, server, cfg, fn) {
       assert.equal(await page.locator(".ajsvg").count(), 0, "no picture at all");
     });
 
+  await scenario("the stage replays what was recorded, as bubbles that travel", server, {}, async (page) => {
+    const stage = page.locator(".stage");
+    await stage.waitFor();
+    // Nothing flies on arrival: a page that opens with a burst of old traffic
+    // would be claiming it is happening now.
+    assert.equal(await page.locator(".stage-bubble").count(), 0, "nothing is in flight on arrival");
+    await page.getByRole("button", { name: "Replay the last run" }).click();
+    await page.locator(".stage-bubble").first().waitFor({ timeout: 4000 });
+    const text = await page.locator(".stage-bubble").first().innerText();
+    assert.match(text, /Bea/, "the bubble says who is moving");
+    assert.match(text, /web search|read email/, "and what it was doing");
+  });
+
+  await scenario("a failed step is marked as failed, not drawn as success", server, {}, async (page) => {
+    await page.getByRole("button", { name: "Replay the last run" }).click();
+    await page.waitForTimeout(1200);
+    // Bea's read_email failed in the recorded history.
+    assert.ok(await page.locator(".stage-bubble.failed").count() >= 1, "the failure is visibly a failure");
+  });
+
+  await scenario("it says agents never travel to each other", server, {}, async (page) => {
+    assert.match(await page.locator(".stage-note").innerText(), /never contact each other/i);
+  });
+
   server.close();
   const passed = results.filter(Boolean).length;
   console.log(`\n${passed}/${results.length} passed`);

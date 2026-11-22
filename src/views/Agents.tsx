@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Agent, type AgentTool, type KnowledgePack, type MachineCapability } from "../lib/ipc";
 import { streamChat, type ChatMessage } from "../lib/chat";
 import { AgentMap } from "../components/AgentMap";
+import { shrinkToAvatar } from "../lib/avatar";
 import { AssistantRoster } from "../components/AssistantRoster";
 
 /**
@@ -161,7 +162,7 @@ export function Agents({
           {advice?.warn && <div className="banner" role="status">{advice.text}</div>}
 
           <div className="sharerow">
-            <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", icon: icons[0] ?? "", description: "", role: "", instructions: "", model: null, tools: [], preapproved: [], packs: [], updated: 0 } as Agent)}>New agent</button>
+            <button className="ghostbtn" onClick={() => setEditing({ id: "", name: "New agent", icon: icons[0] ?? "", portrait: "", description: "", role: "", instructions: "", model: null, tools: [], preapproved: [], packs: [], updated: 0 } as Agent)}>New agent</button>
             <button className="ghostbtn" onClick={() => void api.agentImport().then(load)}>Import</button>
             {!list.some((x) => x.name.startsWith("Forge AI")) && installed.length > 0 && (
               <button
@@ -303,6 +304,7 @@ function AgentEditor({
   onCancel: () => void;
 }) {
   const [a, setA] = useState<Agent>(agent);
+  const [portraitError, setPortraitError] = useState("");
   const toggle = (id: string) => setA((p) => {
     const on = p.tools.includes(id);
     const next = on ? p.tools.filter((t) => t !== id) : [...p.tools, id];
@@ -337,6 +339,38 @@ function AgentEditor({
           </button>
         ))}
       </div>
+
+      <span className="fl">Picture</span>
+      <div className="facepick">
+        {a.portrait
+          ? <img className="face" src={a.portrait} alt="" width={52} height={52} />
+          : <span className="face initials" aria-hidden="true">{a.icon}</span>}
+        <div className="facepick-acts">
+          <label className="ghostbtn small facepick-btn">
+            {a.portrait ? "Change" : "Upload a photo"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                // Drawn down to an avatar here rather than stored at whatever
+                // size the camera produced: a megabyte of photograph in every
+                // exported agent file helps nobody.
+                void shrinkToAvatar(f).then(
+                  (url) => { setPortraitError(""); setA((prev) => ({ ...prev, portrait: url })); },
+                  (err) => setPortraitError(err instanceof Error ? err.message : String(err)),
+                );
+              }}
+            />
+          </label>
+          {a.portrait && (
+            <button type="button" className="ghostbtn small" onClick={() => setA({ ...a, portrait: "" })}>Remove</button>
+          )}
+        </div>
+      </div>
+      {portraitError && <p className="hint warnhint">{portraitError}</p>}
 
       <label className="fl" htmlFor="ag-desc">Description</label>
       <input id="ag-desc" value={a.description} onChange={(e) => setA({ ...a, description: e.target.value })}

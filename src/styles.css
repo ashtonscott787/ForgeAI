@@ -1468,3 +1468,58 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 .sidefoot.saved{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;
   font-size:11px;color:var(--fg-3);border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
 .sidefoot.saved b{font-size:12.5px;color:var(--ember-fg);font-weight:600}
+
+/* ───────── agents at work ───────── */
+.stage{margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:var(--r-lg);
+  background:var(--raised)}
+.stage-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.stage-floor{
+  position:relative;min-height:calc(var(--lanes) * 42px + 16px);
+  display:grid;grid-template-rows:repeat(var(--lanes),42px);align-items:center;
+  padding-left:96px;overflow:hidden;
+}
+.stage-from{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  font-size:12px;font-weight:550;color:var(--fg-2);
+  padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--raised-2);
+}
+.stage-lane{display:flex;align-items:center;gap:8px;justify-content:flex-end;
+  border-top:1px dashed var(--line);height:42px}
+.stage-lane:first-of-type{border-top:none}
+.stage-dot{width:7px;height:7px;border-radius:50%;background:var(--ember);flex:none}
+.stage-place{font-size:12px;color:var(--fg-3)}
+/* Named stage-bubble, not bubble: .bubble is already every chat message, and
+   giving it position:absolute and a travelling animation took the whole
+   conversation apart. */
+.stage-bubble{
+  position:absolute;left:96px;white-space:nowrap;
+  top:calc(var(--lane) * 42px + 21px);transform:translateY(-50%);
+  font-size:11.5px;color:var(--fg);
+  padding:5px 10px;border-radius:var(--r-pill);
+  background:var(--ember-soft);border:1px solid var(--ember-line);
+  animation:bubbleTravel 2600ms var(--ease) forwards;
+}
+.stage-bubble b{font-weight:600}
+.stage-bubble.failed{background:var(--warn-soft);border-color:var(--warn)}
+@keyframes bubbleTravel{
+  0%{left:96px;opacity:0;transform:translateY(-50%) scale(.9)}
+  12%{opacity:1;transform:translateY(-50%) scale(1)}
+  82%{left:calc(100% - 150px);opacity:1}
+  100%{left:calc(100% - 150px);opacity:0}
+}
+.stage-note{margin-top:10px}
+@media (prefers-reduced-motion: reduce){
+  /* The bubbles are the whole point of this view, so they are listed rather
+     than removed: still readable, simply not moving. */
+  .stage-bubble{animation:none;position:static;display:inline-block;margin:3px 4px 0 0}
+  .stage-floor{display:block;padding-left:0}
+  .stage-from{position:static;transform:none;display:inline-block;margin-bottom:8px}
+}
+
+/* Giving an agent a face. */
+.facepick{display:flex;align-items:center;gap:12px;margin:2px 0 4px}
+.facepick .face.initials{background:var(--raised-2);color:var(--fg-2);font-size:20px}
+.facepick-acts{display:flex;gap:8px}
+.facepick-btn{position:relative;overflow:hidden;cursor:pointer;display:inline-flex;align-items:center}
+.facepick-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.warnhint{color:var(--warn-fg)}

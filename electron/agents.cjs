@@ -46,7 +46,16 @@ const TOOLS = [
 const TOOL_IDS = TOOLS.map((t) => t.id);
 const byId = (id) => TOOLS.find((t) => t.id === id) || null;
 
-const LIMITS = { name: 80, role: 200, description: 400, instructions: 8000, goal: 2000, steps: 20 };
+const LIMITS = {
+  name: 80, role: 200, description: 400, instructions: 8000, goal: 2000, steps: 20,
+  /**
+   * The largest a stored portrait may be, as a data URL: about 256 KB, which
+   * is a generous avatar and a very small photograph. Anything bigger is
+   * refused rather than quietly shrunk, because a silently altered picture is
+   * worse than a rejected one.
+   */
+  portrait: 256 * 1024,
+};
 
 /**
  * The icons an agent may carry. A fixed set rather than free text: an arbitrary
@@ -54,6 +63,22 @@ const LIMITS = { name: 80, role: 200, description: 400, instructions: 8000, goal
  * also means every agent looks like it belongs to the same application.
  */
 const ICONS = ["\u{1F916}", "\u{1F4E7}", "\u{1F50D}", "\u{1F4C1}", "\u{1F4CA}", "\u{1F9FE}", "\u{1F4DD}", "\u{1F6E0}", "\u{1F4C8}", "\u{1F9ED}", "\u{2699}", "\u{1F4AC}"];
+
+
+
+/**
+ * Keeps a picture only if it is one this app will actually draw.
+ *
+ * SVG is excluded on purpose: it is a document that can carry script, and an
+ * agent's portrait is rendered in the same window as everything else. Too
+ * large is refused rather than quietly shrunk, because a silently altered
+ * picture is worse than a rejected one.
+ */
+function portraitOf(v) {
+  if (typeof v !== "string" || !v) return "";
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v)) return "";
+  return v.length > LIMITS.portrait ? "" : v;
+}
 
 const newId = () => crypto.randomBytes(8).toString("hex");
 const clip = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
@@ -104,6 +129,15 @@ function validateAgent(raw) {
     name,
     // An icon outside the set is dropped rather than rendered.
     icon: typeof raw.icon === "string" && ICONS.includes(raw.icon) ? raw.icon : ICONS[0],
+    /**
+     * A picture for this agent, as a data URL, or "" for none.
+     *
+     * Held in the agent's own record rather than as a file beside it, so
+     * exporting an agent takes its face with it. Only the three formats a
+     * browser will draw are kept, and only up to a size that is a portrait
+     * rather than a photograph — see LIMITS.portrait.
+     */
+    portrait: portraitOf(raw.portrait),
     role: clip(raw.role, LIMITS.role),
     description: clip(raw.description, LIMITS.description),
     instructions: clip(raw.instructions, LIMITS.instructions),

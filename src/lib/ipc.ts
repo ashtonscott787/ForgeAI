@@ -365,6 +365,8 @@ export interface Agent {
   id: string;
   name: string;
   icon: string;
+  /** A picture for this agent, as a small data URL, or "" for none. */
+  portrait: string;
   description: string;
   role: string;
   instructions: string;

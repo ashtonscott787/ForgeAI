@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type AgentActivity } from "../lib/ipc";
 import { AgentJourneys } from "./AgentJourneys";
+import { AgentStage } from "./AgentStage";
 
 /**
  * What the agents have been doing, drawn.
@@ -56,6 +57,8 @@ export function AgentMap() {
         <>
           {/* Where they went, before how often they ran: the journey is the
               part worth looking at. */}
+          <AgentStage data={data} />
+
           <AgentJourneys agents={data.agents} />
 
           <div className="amap-grid">
