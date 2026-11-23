@@ -389,6 +389,7 @@ export function Chat(props: Props) {
     let system = images.length ? VISION_SYSTEM : systemPrompt(memories, enabledSkills, props.environment ?? "");
     if (host) {
       system += `\n\nYou are ${host.name} (${host.handle}), ${host.role.toLowerCase()}. ${host.instructions}`
+        + ` How you talk: ${host.manner}`
         + ` Answer as ${host.name}. The person writing to you is not ${host.name} — ${host.handle} is how they`
         + " address you, so never greet them by your own name.";
       if (others.length) {

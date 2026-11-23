@@ -235,6 +235,18 @@ const BRIDGE = String.raw`(() => {
       ],
     }),
     agent_activity_clear: () => ({ cleared: true }),
+    connect_plan: ({ app }) => ({
+      ok: true,
+      file: app === "chatgpt" ? "/Users/you/Library/Application Support/ChatGPT/mcp_config.json"
+                              : "/Users/you/Library/Application Support/Claude/claude_desktop_config.json",
+      existed: true,
+      others: ["filesystem"],
+      already: Boolean(cfg.connected),
+      same: Boolean(cfg.connected),
+      command: "claude mcp add forge-ai --env ELECTRON_RUN_AS_NODE=1 -- /Applications/Forge AI.app/Contents/MacOS/Forge AI /x/mcp-server.cjs",
+    }),
+    connect_apply: () => ({ ok: true, changed: true, note: "Added." }),
+    connect_remove: () => ({ ok: true, changed: true, note: "Removed." }),
     mcp_list: () => cfg.mcpServers || [],
     mcp_save: ({ servers }) => servers,
     mcp_inspect: ({ command }) =>

@@ -30,6 +30,7 @@ const openWeb = require("./open-web.cjs");
 const search = require("./search.cjs");
 const environment = require("./environment.cjs");
 const mcpClient = require("./mcp-client.cjs");
+const connectClaude = require("./connect-claude.cjs");
 // Keyless lookups leave through Electron's network stack, so they follow the system proxy.
 openWeb.useTransport((url, { timeoutMs, maxBytes, userAgent }) => new Promise((resolve, reject) => {
   const req = electronNet.request({ method: "GET", url, redirect: "error" });
@@ -557,6 +558,22 @@ function register(win) {
   // ── other tools, over MCP ──────────────────────────────
   // Connecting is an inspection: the server is started, asked what it offers,
   // and stopped again. Nothing it offers is called.
+  // ── letting Claude or ChatGPT use this machine ─────────
+  // The server lives beside the app; the command is this app's own Electron,
+  // so there is nothing for anybody to install.
+  const whoWeAre = () => ({
+    execPath: process.execPath,
+    serverPath: app.isPackaged
+      ? path.join(process.resourcesPath, "app.asar", "electron", "mcp-server.cjs")
+      : path.join(__dirname, "mcp-server.cjs"),
+  });
+  h("connect_plan", ({ app: which }) => ({
+    ...connectClaude.plan(which || "claude", whoWeAre()),
+    command: connectClaude.command(whoWeAre()),
+  }));
+  h("connect_apply", ({ app: which }) => connectClaude.connect(which || "claude", whoWeAre()));
+  h("connect_remove", ({ app: which }) => connectClaude.disconnect(which || "claude"));
+
   h("mcp_list", () => (loadSettings().mcp_servers || []));
   h("mcp_inspect", async ({ command, args }) => mcpClient.inspect({
     name: command || "server",

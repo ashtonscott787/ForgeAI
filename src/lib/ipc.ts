@@ -481,6 +481,15 @@ export const api = {
     invoke<{ ok: boolean; provider?: string; domain?: string; how?: string; why?: string }>("mail_detect", { address }),
   /** Records an app-side failure in the engine log, so one paste shows both sides. */
   noteFailure: (text: string) => invoke<boolean>("note_failure", { text }),
+  /** What connecting Forge AI to Claude or ChatGPT would change. Writes nothing. */
+  connectPlan: (which: string) => invoke<{
+    ok: boolean; file?: string; existed?: boolean; others?: string[];
+    already?: boolean; same?: boolean; command?: string; why?: string;
+  }>("connect_plan", { app: which }),
+  connectApply: (which: string) =>
+    invoke<{ ok: boolean; file?: string; changed?: boolean; note?: string; why?: string }>("connect_apply", { app: which }),
+  connectRemove: (which: string) =>
+    invoke<{ ok: boolean; changed?: boolean; note?: string; why?: string }>("connect_remove", { app: which }),
   /** Other tools Forge AI may connect to over MCP. */
   mcpList: () => invoke<{ id: string; name: string; command: string; args: string[]; enabled: boolean }[]>("mcp_list"),
   mcpSave: (servers: unknown[]) => invoke<unknown[]>("mcp_save", { servers }),

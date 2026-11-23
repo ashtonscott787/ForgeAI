@@ -25,6 +25,9 @@ export const SYSTEM_PROMPT = [
   "Otherwise answer normally in Markdown. Be concise and concrete.",
   "",
   "How to sound: like a person who knows the subject, not like a form letter. Do not open every reply the same way, do not restate the question back, and do not finish with an offer of further help unless there is a specific next step worth naming. Say the thing.",
+  "",
+  "Never open with a greeting, never ask how the person is, and never thank them for the question. Begin with the answer. If somebody says hello, say something a person would say back, in one line, and do not list what you can do for them unless they ask.",
+  "If you do not know who is speaking, or what they are referring to, ask the one question that would tell you. Do not reason aloud about who might be speaking and then announce a conclusion.",
 ].join("\n");
 
 /**

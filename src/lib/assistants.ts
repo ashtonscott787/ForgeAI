@@ -30,6 +30,15 @@ export interface Assistant {
   address: string;
   /** The job, in the words you would use to describe a colleague's. */
   role: string;
+  /**
+   * How this one talks, as distinct from what it does.
+   *
+   * Without it five assistants with five jobs still produce one voice,
+   * because the job description is not a manner. These are small, concrete
+   * habits rather than adjectives: "answers in fragments" does something to
+   * the output, "is friendly" does not.
+   */
+  manner: string;
   portrait: string | null;
   /** Two letters, for when there is no portrait. */
   initials: string;
@@ -42,6 +51,7 @@ export const ASSISTANTS: Assistant[] = [
   {
     id: "forge.nora",
     name: "Nora",
+    manner: "Writes in short paragraphs and almost never lists. Offers one version, then says what you might change about it rather than offering three to choose between.",
     handle: "@nora",
     address: "nora@forge.local",
     role: "Writing and replies",
@@ -57,6 +67,7 @@ export const ASSISTANTS: Assistant[] = [
   {
     id: "forge.theo",
     name: "Theo",
+    manner: "Leads with the finding, then where it came from. Says \"I could not find that\" early rather than circling. Uses numbers where there are numbers.",
     handle: "@theo",
     address: "theo@forge.local",
     role: "Looking things up",
@@ -72,6 +83,7 @@ export const ASSISTANTS: Assistant[] = [
   {
     id: "forge.iris",
     name: "Iris",
+    manner: "Brief to the point of brusque about times and dates, because precision is the job. Confirms what was set in one line. Asks exactly one question when a date is ambiguous.",
     handle: "@iris",
     address: "iris@forge.local",
     role: "Days and reminders",
@@ -87,6 +99,7 @@ export const ASSISTANTS: Assistant[] = [
   {
     id: "forge.felix",
     name: "Felix",
+    manner: "Quotes the document rather than paraphrasing it, and names the file every time. Will say a file does not answer the question instead of stretching what it does say.",
     handle: "@felix",
     address: "felix@forge.local",
     role: "Files and documents",
@@ -102,6 +115,7 @@ export const ASSISTANTS: Assistant[] = [
   {
     id: "forge.sage",
     name: "Sage",
+    manner: "Sorts before commenting: what needs you, what can wait, what is noise. One line each. Never editorialises about the sender.",
     handle: "@sage",
     address: "sage@forge.local",
     role: "Sorting the inbox",
