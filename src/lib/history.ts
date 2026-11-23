@@ -16,6 +16,18 @@ export interface Conversation {
    * worth a mark: there is nothing else to tell you it happened.
    */
   unseen?: number;
+  /**
+   * Which workspace this chat belongs to. Absent means Personal: every chat
+   * made before workspaces existed has no mark on it, and they belong
+   * somewhere rather than nowhere.
+   */
+  space?: string;
+  /**
+   * The messages as they were before this chat was compacted, so compacting
+   * can be undone. Cleared once another message is sent, because an undo that
+   * silently discards what was said since would be worse than no undo.
+   */
+  before?: ChatMessage[];
 }
 
 const KEY = "forge.conversations.v1";
@@ -32,19 +44,29 @@ export function loadConversations(): Conversation[] {
 
 export function saveConversations(list: Conversation[]) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.filter((c) => c.messages.length > 0 && !c.temporary)));
+    // `before` is a whole second copy of the conversation and only exists to
+    // undo a compaction in this sitting, so it is not written to storage.
+    const keep = list
+      .filter((c) => c.messages.length > 0 && !c.temporary)
+      .map(({ before: _before, ...c }) => c);
+    localStorage.setItem(KEY, JSON.stringify(keep));
   } catch {
     /* storage full or unavailable: history is a convenience, never fatal */
   }
 }
 
-export const newTempConversation = (): Conversation => ({ ...newConversation(), title: "Temporary chat", temporary: true });
+export const newTempConversation = (space?: string): Conversation => ({
+  ...newConversation(space),
+  title: "Temporary chat",
+  temporary: true,
+});
 
-export const newConversation = (): Conversation => ({
+export const newConversation = (space?: string): Conversation => ({
   id: Math.random().toString(36).slice(2) + Date.now().toString(36),
   title: "New chat",
   messages: [],
   updated: Date.now(),
+  ...(space ? { space } : {}),
 });
 
 export const titleFrom = (text: string) => {

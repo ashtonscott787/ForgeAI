@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type AgentActivity } from "../lib/ipc";
 import { AgentJourneys } from "./AgentJourneys";
 import { AgentStage } from "./AgentStage";
+import { WorkGraph } from "./WorkGraph";
 
 /**
  * What the agents have been doing, drawn.
@@ -58,6 +59,11 @@ export function AgentMap() {
           {/* Where they went, before how often they ran: the journey is the
               part worth looking at. */}
           <AgentStage data={data} />
+
+          {/* The same steps again, in the shape work actually takes: a line
+              carrying on, with each piece of work branching off it and
+              rejoining. */}
+          <WorkGraph events={data.recent || []} />
 
           <AgentJourneys agents={data.agents} />
 

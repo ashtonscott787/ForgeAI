@@ -313,8 +313,8 @@ const BRIDGE = String.raw`(() => {
     // Settings persist here as they do in the app, so a control that reads back
     // what it wrote behaves the same way in a test as it does for a person.
     set_settings: (a) => { state.settings = Object.assign({}, state.settings, a && a.settings ? a.settings : a); return state.settings; },
-    memory_for_prompt: () => [],
-    skills_for_prompt: () => [],
+    memory_for_prompt: () => cfg.memories || [],
+    skills_for_prompt: () => cfg.skills || [],
     engine_status: () => ({ running: false, port: 0, model_file: null, base_url: "" }),
     read_files: () => [],
     // Keyless search is tested in the main process (tests/open-web.test.cjs). The stand-in returns a

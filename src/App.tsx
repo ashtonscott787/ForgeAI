@@ -18,6 +18,8 @@ const BOOT_FADE_MS = 420;
 import { cloudRows } from "./lib/cloud";
 import { publisherFor } from "./lib/publisher";
 import { loadConversations, newConversation, newTempConversation, saveConversations, titleFrom, type Conversation } from "./lib/history";
+import { SpaceSwitcher } from "./components/SpaceSwitcher";
+import { PERSONAL, loadCurrent, loadSpaces, saveCurrent, saveSpaces, spaceOf, type Space } from "./lib/spaces";
 import type { ChatMessage } from "./lib/chat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat } from "./views/Chat";
@@ -137,12 +139,30 @@ export default function App() {
     return () => mq.removeEventListener("change", on);
   }, [settings.theme, applyTheme]);
 
+  // workspaces. Loaded before the conversations, because which chats are
+  // listed depends on which one is current.
+  const [spaces, setSpaces] = useState<Space[]>(() => loadSpaces());
+  const [space, setSpace] = useState<string>(() => loadCurrent(loadSpaces()));
+  useEffect(() => saveSpaces(spaces), [spaces]);
+  useEffect(() => saveCurrent(space), [space]);
+
   // conversations
   const [convos, setConvos] = useState<Conversation[]>(() => {
     const l = loadConversations();
     return l.length ? l : [newConversation()];
   });
   const [activeId, setActiveId] = useState<string>(() => convos[0]?.id ?? "");
+  /** Chats of the workspace in view. Everything in the sidebar comes from here. */
+  const here = useMemo(() => convos.filter((c) => spaceOf(c) === space), [convos, space]);
+  const spaceCounts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const c of convos) {
+      if (!c.messages.length || c.temporary) continue;
+      const id = spaceOf(c);
+      out[id] = (out[id] ?? 0) + 1;
+    }
+    return out;
+  }, [convos]);
   const active: Conversation = convos.find((c) => c.id === activeId) ?? convos[0] ?? newConversation();
   useEffect(() => saveConversations(convos), [convos]);
   // Writes name their conversation, so a reply that finishes after a switch lands where it started.
@@ -156,6 +176,10 @@ export default function App() {
           return {
             ...c,
             messages,
+            // Anything added after a compaction makes the undo wrong: putting
+            // the old messages back would silently drop what was said since.
+            // Compaction itself only ever shortens, so it keeps its undo.
+            before: messages.length > c.messages.length ? undefined : c.before,
             updated: Date.now(),
             title: c.title === "New chat" && firstUser ? titleFrom(firstUser.content) : c.title,
           };
@@ -167,7 +191,7 @@ export default function App() {
   const startTempChat = () => {
     setView("chat");
     if (active.temporary) return;
-    const c = newTempConversation();
+    const c = newTempConversation(space);
     setConvos((l) => [c, ...l]);
     setActiveId(c.id);
   };
@@ -179,15 +203,56 @@ export default function App() {
 
   const startNewChat = () => {
     setView("chat");
-    if (active.messages.length === 0) return;
-    const c = newConversation();
+    // An empty chat is reused — but only if it is in the workspace being
+    // worked in. Otherwise "New chat" after a switch would carry on in the
+    // workspace just left.
+    if (active.messages.length === 0 && spaceOf(active) === space) return;
+    const c = newConversation(space);
     setConvos((l) => [c, ...l]);
     setActiveId(c.id);
   };
+  /**
+   * Moving between workspaces. The open chat follows, so the view is never
+   * showing one workspace in the sidebar and another in the pane.
+   */
+  const switchSpace = (id: string) => {
+    setSpace(id);
+    setView("chat");
+    const mine = convos.filter((c) => spaceOf(c) === id && !c.temporary);
+    const next = mine.sort((a, b) => b.updated - a.updated)[0];
+    if (next) {
+      setActiveId(next.id);
+      if (next.unseen) setConvos((l) => l.map((x) => (x.id === next.id ? { ...x, unseen: 0 } : x)));
+    } else {
+      const c = newConversation(id);
+      setConvos((l) => [c, ...l]);
+      setActiveId(c.id);
+    }
+  };
+
+  /**
+   * Deleting a workspace never deletes what was said in it. Its chats move to
+   * Personal, where they can be found again. Throwing away somebody's
+   * conversations as a side effect of tidying a label is not a tidy-up.
+   */
+  const deleteSpace = (id: string) => {
+    if (id === PERSONAL.id) return;
+    const count = convos.filter((c) => spaceOf(c) === id && c.messages.length).length;
+    const ok = window.confirm(
+      count
+        ? `Delete this workspace? Its ${count} chat${count === 1 ? "" : "s"} will move to Personal, not be deleted.`
+        : "Delete this workspace?",
+    );
+    if (!ok) return;
+    setConvos((l) => l.map((c) => (spaceOf(c) === id ? { ...c, space: PERSONAL.id } : c)));
+    setSpaces((l) => l.filter((s) => s.id !== id));
+    if (space === id) switchSpace(PERSONAL.id);
+  };
+
   const deleteChat = (id: string) => {
     setConvos((l) => {
       const rest = l.filter((c) => c.id !== id);
-      const next = rest.length ? rest : [newConversation()];
+      const next = rest.length ? rest : [newConversation(space)];
       if (id === activeId && next[0]) setActiveId(next[0].id);
       return next;
     });
@@ -403,6 +468,15 @@ export default function App() {
 
       <div className="body">
         <aside className="side">
+          <SpaceSwitcher
+            spaces={spaces}
+            current={space}
+            counts={spaceCounts}
+            onPick={switchSpace}
+            onCreate={(s) => setSpaces((l) => [...l, s])}
+            onRename={(id, name) => setSpaces((l) => l.map((x) => (x.id === id ? { ...x, name } : x)))}
+            onDelete={deleteSpace}
+          />
           <button className="newchat" onClick={startNewChat}>
             New chat
           </button>
@@ -430,7 +504,7 @@ export default function App() {
               </button>
             ))}
           </nav>
-          {convos.filter((c) => c.messages.length > 0).length > 3 && (
+          {here.filter((c) => c.messages.length > 0).length > 3 && (
             <input
               className="convsearch"
               type="search"
@@ -442,7 +516,7 @@ export default function App() {
           )}
           <div className="side-label">Chats</div>
           <div className="convlist">
-            {convos
+            {here
               .filter((c) => c.messages.length > 0 && !c.temporary)
               .filter((c) => {
                 // Titles alone miss the chat you remember by something said in it.
@@ -572,6 +646,17 @@ export default function App() {
                 setPaneUrl({ url, at: Date.now() });
               }}
               messages={active.messages}
+              canUndoCompact={Boolean(active.before?.length)}
+              onBeforeCompact={(m) => setConvos((l) => l.map((c) => (c.id === activeId ? { ...c, before: m } : c)))}
+              onUndoCompact={() =>
+                setConvos((l) =>
+                  l.map((c) =>
+                    c.id === activeId && c.before?.length
+                      ? { ...c, messages: c.before, before: undefined, updated: Date.now() }
+                      : c,
+                  ),
+                )
+              }
               conversationId={activeId}
               handoff={handoff}
               onHandoffUsed={() => setHandoff(null)}

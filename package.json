@@ -1,7 +1,7 @@
 {
   "name": "forge-ai",
   "private": true,
-  "version": "0.6.5",
+  "version": "0.6.6",
   "packageManager": "pnpm@10.28.0",
   "type": "module",
   "scripts": {
@@ -28,7 +28,8 @@
     "test:ui:boot": "node tests/ui/boot-ui.cjs",
     "test:ui:mailbox": "node tests/ui/mailbox-ui.cjs",
     "test:ui:systems": "node tests/ui/systems-ui.cjs",
-    "test:ui:people": "node tests/ui/people-ui.cjs"
+    "test:ui:people": "node tests/ui/people-ui.cjs",
+    "test:ui:context": "node tests/ui/context-ui.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",

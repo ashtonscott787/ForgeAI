@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { castOf, hostOf, withoutHandle } from "../lib/assistants";
 import { Attachments } from "../components/Attachments";
 import { AssistantMessage } from "../components/Message";
@@ -11,7 +11,10 @@ import type { Attachment, EngineStatus, Health, MachineCapability, ProviderStatu
 import { api, pathForFile } from "../lib/ipc";
 import type { InstalledEntry } from "../lib/library";
 import type { LocalModel, ModelConfiguration } from "../lib/models";
-import { systemPrompt, VISION_SYSTEM } from "../lib/prompt";
+import { SYSTEM_PROMPT, systemPrompt, VISION_SYSTEM } from "../lib/prompt";
+import { ContextMeter } from "../components/ContextMeter";
+import { COMPACT_INSTRUCTION, applyCompaction, canCompact, splitFor, transcriptOf } from "../lib/compact";
+import type { Piece } from "../lib/context";
 import { choose } from "../lib/router";
 
 interface Props {
@@ -44,6 +47,11 @@ interface Props {
   onOpenPane?: (url: string) => void;
   onHandoffUsed?: () => void;
   messages: ChatMessage[];
+  /** True while the last compaction of this chat can still be put back. */
+  canUndoCompact?: boolean;
+  onUndoCompact?: () => void;
+  /** Keeps the messages as they were, so compacting can be undone. */
+  onBeforeCompact?: (messages: ChatMessage[]) => void;
   onMessagesFor: (conversationId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 }
 
@@ -82,6 +90,12 @@ function imageDataUrl(f: Attachment): string {
 
 export function Chat(props: Props) {
   const [prompt, setPrompt] = useState("");
+  /** Compacting: see compactNow below. */
+  const [compacting, setCompacting] = useState(false);
+  const [extras, setExtras] = useState<{ memories: string[]; skills: { name: string; instructions: string }[] }>({
+    memories: [],
+    skills: [],
+  });
   const messages = props.messages;
   const id = props.conversationId;
   const writeTo = (convId: string, m: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
@@ -123,6 +137,80 @@ export function Chat(props: Props) {
     if (browser) pendingBrowser.current = browser;
     props.onHandoffUsed?.();
   }, [props.handoff]);
+
+  // What the meter shows. Memory and skills are fetched for display the same
+  // way the send path fetches them, so the figure is of what would actually
+  // be sent rather than of the messages alone.
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      api.memoryForPrompt().catch(() => [] as string[]),
+      api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]),
+    ]).then(([memories, skills]) => {
+      if (alive) setExtras({ memories, skills });
+    });
+    return () => { alive = false; };
+  }, [messages.length]);
+
+  const pieces: Piece[] = useMemo(() => {
+    const env = props.environment ?? "";
+    return [
+      { id: "messages", label: "Messages", text: messages.map((m) => m.content).join("\n") },
+      { id: "system", label: "House rules", text: SYSTEM_PROMPT + (env ? `\n\n${env}` : "") },
+      { id: "memory", label: "Memory", text: extras.memories.join("\n") },
+      { id: "skills", label: "Skills", text: extras.skills.map((s) => `${s.name}\n${s.instructions}`).join("\n") },
+      { id: "attachments", label: "Attachments", text: files.map((f) => f.text || "").join("\n") },
+    ];
+  }, [messages, extras, files, props.environment]);
+
+  /**
+   * Replaces the older half of the conversation with a summary of it.
+   *
+   * Only ever on request, and the original is handed up first so Undo can put
+   * it back. The summary is written by the model that is loaded, which is the
+   * point: it is reading the same words it will later be given.
+   */
+  async function compactNow() {
+    if (compacting || streaming) return;
+    if (!props.engine.running) {
+      setError("Compacting asks the model to write the summary, so the engine has to be running. Send a message first, or start a model.");
+      return;
+    }
+    const { older } = splitFor(messages);
+    if (!canCompact(messages)) return;
+    setCompacting(true);
+    setError(null);
+    try {
+      const res = await fetch(`${props.engine.base_url}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: COMPACT_INSTRUCTION },
+            { role: "user", content: transcriptOf(older) },
+          ],
+          temperature: 0.2,
+          stream: false,
+        }),
+      });
+      if (!res.ok) {
+        setError(`The summary could not be written: the engine answered ${res.status}. Nothing was changed.`);
+        return;
+      }
+      const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const summary = body.choices?.[0]?.message?.content?.trim() ?? "";
+      if (!summary) {
+        setError("The model returned an empty summary, so the conversation was left exactly as it was.");
+        return;
+      }
+      props.onBeforeCompact?.(messages);
+      writeTo(id, applyCompaction(messages, summary));
+    } catch (e) {
+      setError(`The summary could not be written: ${e instanceof Error ? e.message : String(e)}. Nothing was changed.`);
+    } finally {
+      setCompacting(false);
+    }
+  }
 
   /** Asks the last question again, from the point just before it was asked. */
   function regenerate() {
@@ -716,6 +804,23 @@ export function Chat(props: Props) {
           )}
 
           <Attachments files={files} reading={reading} onRemove={(n) => setFiles((p) => p.filter((f) => f.name !== n))} />
+
+          {messages.length > 0 && (
+            <ContextMeter
+              pieces={pieces}
+              limit={props.contextSize}
+              baseUrl={props.engine.running ? props.engine.base_url : null}
+              canCompact={canCompact(messages)}
+              compacting={compacting}
+              onCompact={() => void compactNow()}
+            />
+          )}
+          {props.canUndoCompact && (
+            <p className="hint ctx-undo">
+              Earlier messages were replaced by a summary.{" "}
+              <button className="linkbtn" onClick={() => props.onUndoCompact?.()}>Undo that</button>
+            </p>
+          )}
 
           <div className="composerow">
             <div className="composergrow">
