@@ -1961,6 +1961,15 @@ function register(win) {
     formats: workshop.FORMATS,
     can_shrink: fs.existsSync(exe("llama-quantize")),
     can_combine: fs.existsSync(exe("llama-export-lora")),
+    // Why not, when not. A disabled button with no explanation is the same
+    // as a broken one: llama.cpp does not publish llama-export-lora for
+    // Windows, so on Windows this will never be there however many times
+    // somebody re-downloads the app.
+    why_no_combine: fs.existsSync(exe("llama-export-lora"))
+      ? null
+      : process.platform === "win32"
+        ? "The tool that does this is not published for Windows by the engine's authors, so Forge AI cannot ship it. It works on macOS."
+        : "This copy of Forge AI was built without that tool. Re-download the app.",
     job: shopJob
       ? { kind: shopJob.kind, out: shopJob.out, started: shopJob.started, log: shopJob.log.slice(-14) }
       : null,

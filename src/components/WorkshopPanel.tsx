@@ -100,6 +100,8 @@ export function WorkshopPanel({ installed }: { installed: InstalledModel[] }) {
                 </label>
                 <p className="hint">{s.formats.find((f) => f.id === format)?.note}</p>
               </>
+            ) : !s.can_combine ? (
+              <p className="sheet-bad">{s.why_no_combine ?? "Combining is not available in this build."}</p>
             ) : (
               <label className="row">
                 <span>Adapter file</span>

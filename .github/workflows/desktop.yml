@@ -182,6 +182,12 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
+          # The guard, before the packager. `pnpm dist` runs it; this step
+          # called electron-builder directly and so never did, which is why
+          # a Windows build packaged happily with an engine tool missing and
+          # said nothing. A guard that only runs on a developer's machine is
+          # not a guard.
+          node scripts/check-engine.cjs
           for attempt in 1 2 3 4; do
             if pnpm exec electron-builder ${{ matrix.builder }} --publish never; then exit 0; fi
             echo "packaging attempt $attempt failed; waiting before retry"

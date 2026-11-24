@@ -57,6 +57,45 @@ test("packaging refuses when a tool that gates a feature is missing", () => {
   assert.match(check, /Refusing to package/, "and stops the build rather than warning");
 });
 
+// `pnpm dist` runs the guard; the workflow called electron-builder directly
+// and so never did. A Windows build packaged happily with an engine tool
+// missing and said nothing about it.
+test("the release build runs the guard, not only a developer's machine", () => {
+  const pack = workflow.slice(workflow.indexOf("- name: Package"));
+  const step = pack.slice(0, pack.indexOf("- name:", 10));
+  // Commands, not any mention: the comment above the guard names
+  // electron-builder, and comparing raw positions found that instead.
+  const commands = step
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"));
+  const guardAt = commands.findIndex((l) => l.includes("scripts/check-engine.cjs"));
+  const packAt = commands.findIndex((l) => l.includes("electron-builder"));
+  assert.ok(guardAt >= 0, "the guard runs in the release build");
+  assert.ok(packAt >= 0, "and so does the packager");
+  assert.ok(guardAt < packAt, "the guard runs before it, not after");
+});
+
+test("a tool upstream does not publish is known about rather than treated as a defect", () => {
+  const { BINARIES, expectedOn } = require(path.join(root, "scripts", "engine-manifest.cjs"));
+  const lora = BINARIES.find((b) => b.name === "llama-export-lora");
+  // Verified against the published archive: llama.cpp's Windows CPU zip
+  // contains llama-server, ggml-rpc-server and llama-quantize, and not this.
+  assert.equal(expectedOn(lora, "win32"), false, "not expected on Windows");
+  assert.equal(expectedOn(lora, "darwin"), true, "expected on macOS");
+  for (const b of BINARIES.filter((x) => x.name !== "llama-export-lora")) {
+    assert.equal(expectedOn(b, "win32"), true, `${b.name} is expected on every platform`);
+  }
+});
+
+test("a feature with no binary says why rather than showing a dead button", () => {
+  const main = fs.readFileSync(path.join(root, "electron", "main.cjs"), "utf8");
+  assert.match(main, /why_no_combine/, "the reason is reported");
+  assert.match(main, /not published for Windows/, "and it names the real cause");
+  const panel = fs.readFileSync(path.join(root, "src", "components", "WorkshopPanel.tsx"), "utf8");
+  assert.match(panel, /why_no_combine/, "and the panel shows it");
+});
+
 test("the source-build fallback produces the same set of tools", () => {
   // A fallback build that made only llama-server would ship an app whose
   // clustering and model workshop are missing, and nothing would say so.

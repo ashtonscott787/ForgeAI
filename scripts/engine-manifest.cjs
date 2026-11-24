@@ -25,8 +25,20 @@ const BINARIES = [
   { name: "llama-server", required: true, gives: "running a model at all" },
   { name: "ggml-rpc-server", required: false, gives: "splitting a model across computers" },
   { name: "llama-quantize", required: false, gives: "making a smaller copy of a model" },
-  { name: "llama-export-lora", required: false, gives: "baking an adapter into a model" },
+  {
+    name: "llama-export-lora",
+    required: false,
+    gives: "baking an adapter into a model",
+    // llama.cpp does not publish this one in its Windows CPU archive. That
+    // is a fact about the upstream release, not something a build here can
+    // fix, so the guard does not fail over it — and the app says the
+    // feature is unavailable rather than offering a button that cannot work.
+    absent_on: ["win32"],
+  },
 ];
+
+/** Is this binary published for the platform being built? */
+const expectedOn = (binary, platform = process.platform) => !(binary.absent_on || []).includes(platform);
 
 /** Names of every binary, with the Windows suffix where it applies. */
 const binaryNames = (platform = process.platform) =>
@@ -50,4 +62,4 @@ const keep = (fileName) => BINARY_RE.test(fileName) || KEEP_RE.test(fileName);
  */
 const signature = () => BINARIES.map((b) => b.name).sort().join("+");
 
-module.exports = { BINARIES, BINARY_RE, KEEP_RE, binaryNames, keep, signature };
+module.exports = { BINARIES, BINARY_RE, KEEP_RE, binaryNames, keep, signature, expectedOn };

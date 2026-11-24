@@ -9,7 +9,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { BINARIES } = require("./engine-manifest.cjs");
+const { BINARIES, expectedOn } = require("./engine-manifest.cjs");
 
 const engineDir = path.join(__dirname, "..", "engine");
 const bin = path.join(engineDir, process.platform === "win32" ? "llama-server.exe" : "llama-server");
@@ -49,7 +49,16 @@ This is the defect that shipped in 0.5.2. Fix it with:
 // is reported here rather than discovered by somebody pressing its button
 // in a release — which is what happened with 0.7.0.
 const suffix = process.platform === "win32" ? ".exe" : "";
-const missing = BINARIES.filter((b) => !b.required && !fs.existsSync(path.join(engineDir, b.name + suffix)));
+const present = (b) => fs.existsSync(path.join(engineDir, b.name + suffix));
+const optional = BINARIES.filter((b) => !b.required);
+// Published for this platform and absent: a build defect, and the guard stops.
+const missing = optional.filter((b) => expectedOn(b) && !present(b));
+// Not published for this platform at all: upstream's doing, said once and
+// not treated as a failure.
+const unavailable = optional.filter((b) => !expectedOn(b));
+for (const b of unavailable) {
+  console.log(`note: ${b.name} is not published for ${process.platform}, so "${b.gives}" will be unavailable in this build.`);
+}
 if (missing.length) {
   console.error(`
 Refusing to package: ${missing.length} engine tool(s) are missing, so the
@@ -66,4 +75,5 @@ Set FORGE_ALLOW_PARTIAL_ENGINE=1 to package without them on purpose.
   if (process.env.FORGE_ALLOW_PARTIAL_ENGINE !== "1") process.exit(1);
 }
 
-console.log(`Engine present and loadable, with ${BINARIES.length - missing.length}/${BINARIES.length} tools.`);
+const have = BINARIES.filter(present).length;
+console.log(`Engine present and loadable, with ${have}/${BINARIES.length} tools.`);

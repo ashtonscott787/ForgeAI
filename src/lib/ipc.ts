@@ -288,6 +288,8 @@ export interface WorkshopStatus {
   formats: WorkshopFormat[];
   can_shrink: boolean;
   can_combine: boolean;
+  /** Why combining is unavailable, when it is. Null when it works. */
+  why_no_combine?: string | null;
   job: { kind: "shrink" | "combine"; out: string; started: number; log: string[] } | null;
 }
 
