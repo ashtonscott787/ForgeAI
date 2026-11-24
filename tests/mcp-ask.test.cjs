@@ -24,7 +24,8 @@ function engine({ ignoreBudget = false } = {}) {
       seen.push(asked);
       // Spends everything it is given, which is the behaviour that turned a
       // 20-token request into six hundred tokens.
-      const room = ignoreBudget ? asked.max_tokens : asked.max_tokens - (asked.reasoning_budget || 0);
+      const budget = asked[reasoning.BUDGET_FIELD] || 0;
+      const room = ignoreBudget ? asked.max_tokens : asked.max_tokens - budget;
       const words = Array.from({ length: Math.max(1, room) }, (_, i) => `word${i}`).join(" ");
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({
@@ -41,7 +42,8 @@ test("the request carries the asked length plus room to think, not four times it
   const fields = reasoning.requestFields("DeepSeek-R1-Distill-Qwen-1.5B.gguf", 20);
   const budget = reasoning.budgetFor("DeepSeek-R1-Distill-Qwen-1.5B.gguf", 20);
   assert.equal(budget.answer_tokens, 20);
-  assert.equal(fields.max_tokens, 20 + fields.reasoning_budget);
+  assert.equal(fields.max_tokens, 20 + budget.reasoning_budget);
+  assert.ok(fields[reasoning.BUDGET_FIELD] > 0, "sent under the name the engine reads");
   assert.ok(fields.max_tokens < 3072, "the floor that caused this is gone");
 });
 
@@ -83,7 +85,7 @@ test("an engine that honours the budget leaves the answer the asked length", asy
       body: JSON.stringify({ ...fields, messages: [] }),
     });
     const body = await res.json();
-    assert.equal(seen[0].reasoning_budget, fields.reasoning_budget, "the budget was sent");
+    assert.equal(seen[0][reasoning.BUDGET_FIELD], fields[reasoning.BUDGET_FIELD], "the budget was sent");
     const words = body.choices[0].message.content.split(" ").length;
     assert.equal(words, 20, "and the answer came back the length that was asked for");
   } finally {
@@ -107,7 +109,8 @@ test("forge_ask declares what its limit means and offers strict", () => {
   const impl = src.slice(src.indexOf('case "forge_ask"'), src.indexOf('default:'));
   assert.match(impl, /capAnswer/, "the answer is held to the limit here, not only at the engine");
   assert.match(impl, /explainTruncated|cut off at the/, "and a cut answer says so");
-  assert.match(impl, /budgetAccepted/, "whether the engine took the budget is tracked");
+  assert.match(impl, /budgetHonoured/, "whether the engine took the budget is judged from the reply");
+  assert.match(impl, /stripStrayThink/, "and a closing tag for a block that never opened is removed");
 });
 
 test("a tool may answer with more than one piece of content", () => {

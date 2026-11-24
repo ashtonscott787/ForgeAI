@@ -77,18 +77,72 @@ function budgetFor(modelName, asked) {
 }
 
 /**
+ * The name of the field that caps thinking.
+ *
+ * `thinking_budget_tokens`, verified against the shipped engine's own
+ * strings rather than recalled. 0.7.2 sent `reasoning_budget`, which this
+ * build accepts without complaint and silently ignores — so nothing capped
+ * the thinking, a twenty-token answer took twenty-five seconds, and the
+ * code that was supposed to notice saw no error and reported success.
+ *
+ * A field name is the kind of thing that feels like knowledge and is
+ * actually memory. There is a test that reads it out of the binary.
+ */
+const BUDGET_FIELD = "thinking_budget_tokens";
+
+/**
+ * The smallest budget worth sending.
+ *
+ * At 0 the engine ends the thinking immediately and the answer begins with
+ * a stray `</think>`, because the closing tag is emitted for a block that
+ * never opened. 32 tokens is enough for the model to close the block
+ * properly and costs a fraction of a second.
+ */
+const MIN_BUDGET = 32;
+
+/**
  * The body fields to add to an OpenAI-shaped request.
  *
- * `reasoning_budget` is llama.cpp's own field and older builds reject
- * unknown fields outright, so a caller that gets a 4xx should retry without
- * them — the same shape the chat window already uses for sampling fields.
+ * An engine that does not know the field ignores it rather than refusing,
+ * so there is nothing to retry — and nothing to conclude from the absence
+ * of an error either. Whether it was honoured is judged from the reply.
  */
 function requestFields(modelName, asked) {
   const b = budgetFor(modelName, asked);
   const out = { max_tokens: b.max_tokens };
-  if (b.reasoning) out.reasoning_budget = b.reasoning_budget;
+  if (b.reasoning) out[BUDGET_FIELD] = Math.max(MIN_BUDGET, b.reasoning_budget);
   return out;
 }
+
+/**
+ * Did the engine honour the budget?
+ *
+ * Judged from how much thinking came back, not from whether the request
+ * succeeded. The first version set this true whenever no error was
+ * returned, which is true of an engine that ignored the field entirely —
+ * so the note that was meant to report exactly this case could never fire.
+ *
+ * The margin is generous: a model stops at a sentence end rather than
+ * exactly on the token, and calling a near miss a failure would cry wolf.
+ */
+function budgetHonoured({ reasoning, budget, margin = 1.5 }) {
+  if (!budget) return null;
+  const text = String(reasoning || "");
+  if (!text) return true; // no thinking at all is within any budget
+  // Four characters to the token, the same estimate used elsewhere.
+  const spent = text.length / 4;
+  return spent <= budget * margin + MIN_BUDGET;
+}
+
+/**
+ * Removes a closing tag for a block that never opened.
+ *
+ * With the budget at 0 the engine ends the thinking before it starts and
+ * the answer arrives beginning "</think>". The budget has a floor now so
+ * this should not happen, but an answer that starts with a stray tag is
+ * worth stripping wherever it comes from.
+ */
+const stripStrayThink = (text) => String(text || "").replace(/^\s*<\/think>\s*/, "");
 
 /**
  * What to say about a reply, given what came back.
@@ -163,6 +217,7 @@ const wasTruncated = ({ content, finishReason }) =>
   finishReason === "length" && Boolean(String(content || "").trim());
 
 module.exports = {
-  FAMILIES, PLAIN_TOKENS, THINKING_ROOM, isReasoning, budgetFor, requestFields, explainEmpty,
-  explainTruncated, wasTruncated, capAnswer,
+  FAMILIES, PLAIN_TOKENS, THINKING_ROOM, BUDGET_FIELD, MIN_BUDGET,
+  isReasoning, budgetFor, requestFields, explainEmpty,
+  explainTruncated, wasTruncated, capAnswer, budgetHonoured, stripStrayThink,
 };

@@ -263,20 +263,22 @@ async function call(name, args = {}) {
         temperature: Number.isFinite(args.temperature) ? args.temperature : 0.7,
         stream: false,
       };
-      let r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, body, 600_000, e.key);
-      // Whether the engine accepted the thinking budget at all, which
-      // decides whether anything but this code is capping the output.
-      let budgetAccepted = Boolean(fields.reasoning_budget);
-      if (r && r.error && fields.reasoning_budget) {
-        // An older build refuses the field outright rather than ignoring it.
-        const { reasoning_budget: _drop, ...plain } = body;
-        budgetAccepted = false;
-        r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, plain, 600_000, e.key);
-      }
+      const r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, body, 600_000, e.key);
+
       const choice = r && r.choices && r.choices[0];
       if (!choice) throw new Error(`The engine answered in an unexpected shape: ${JSON.stringify(r).slice(0, 300)}`);
       const message = choice.message || {};
-      const raw = typeof message.content === "string" ? message.content : "";
+      // A closing tag for a block that never opened, which the engine emits
+      // when the thinking is ended before it starts.
+      const raw = reasoning.stripStrayThink(typeof message.content === "string" ? message.content : "");
+      // Whether the budget was honoured is read from the reply, not from
+      // the absence of an error. An engine that does not know the field
+      // ignores it and returns 200, so "no error" said nothing at all —
+      // which is why the note it was meant to trigger never appeared.
+      const honoured = reasoning.budgetHonoured({
+        reasoning: message.reasoning_content,
+        budget: fields[reasoning.BUDGET_FIELD],
+      });
       // Never hand back an empty string as though it were an answer.
       const why = reasoning.explainEmpty({
         content: raw,
@@ -307,8 +309,8 @@ async function call(name, args = {}) {
         {
           type: "text",
           text: note
-            + (budget.reasoning && !budgetAccepted
-              ? " (This engine did not accept a separate thinking budget, so the limit was applied to the reply itself.)"
+            + (budget.reasoning && honoured === false
+              ? " (This engine ignored the thinking budget, so it thought for longer than asked and the limit was applied to the reply here instead.)"
               : ""),
         },
       ];
