@@ -27,6 +27,7 @@ export function ContextMeter({
   pieces,
   limit,
   baseUrl,
+  apiKey,
   onCompact,
   canCompact,
   compacting,
@@ -35,6 +36,8 @@ export function ContextMeter({
   limit: number;
   /** The running engine, if there is one. Exact counts come from it. */
   baseUrl?: string | null;
+  /** Its key for this launch; the engine refuses a request without one. */
+  apiKey?: string;
   onCompact?: () => void;
   canCompact?: boolean;
   compacting?: boolean;
@@ -50,12 +53,12 @@ export function ContextMeter({
     if (!open || !baseUrl) return;
     const mine = (token.current += 1);
     const ac = new AbortController();
-    void countAll(baseUrl, pieces, ac.signal).then((c) => {
+    void countAll(baseUrl, pieces, ac.signal, apiKey).then((c) => {
       if (token.current === mine) setCounts(c);
     });
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, baseUrl, key]);
+  }, [open, baseUrl, apiKey, key]);
 
   const reading = useMemo(() => measure(pieces, limit, counts ?? undefined), [pieces, limit, counts]);
   const state = pressure(reading);

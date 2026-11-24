@@ -30,6 +30,8 @@ const https = require("node:https");
 const { spawn } = require("node:child_process");
 const env = require("./environment.cjs");
 
+const reasoning = require("./reasoning.cjs");
+
 const PROTOCOL = "2025-06-18";
 const NAME = "forge-ai";
 
@@ -83,7 +85,11 @@ async function engineFor(file) {
   if (!fs.existsSync(model)) throw new Error(`No such model: ${file}. Ask for forge_models to see what is here.`);
 
   const port = await freePort();
-  const proc = spawn(bin, ["--model", model, "--host", "127.0.0.1", "--port", String(port), "--ctx-size", "4096", "--no-webui"], {
+  // Its own key, made fresh here, for the same reason the app's engine has
+  // one: 127.0.0.1 keeps other machines out and other programs on this one
+  // in, and the engine answers any origin that asks.
+  const key = require("node:crypto").randomBytes(24).toString("hex");
+  const proc = spawn(bin, ["--model", model, "--host", "127.0.0.1", "--port", String(port), "--ctx-size", "4096", "--no-webui", "--api-key", key], {
     cwd: engineDir(),
     windowsHide: true,
     stdio: ["ignore", "ignore", "pipe"],
@@ -98,6 +104,7 @@ async function engineFor(file) {
     if (proc.exitCode !== null) throw new Error(`The engine stopped while starting.\n${stderr.trim().split("\n").slice(-6).join("\n")}`);
     if (Date.now() > deadline) { proc.kill("SIGKILL"); throw new Error("The engine did not become ready within two minutes."); }
     const ok = await new Promise((r) => {
+      // /health needs no key; everything else does.
       const req = http.get(`http://127.0.0.1:${port}/health`, (res) => { res.resume(); r(res.statusCode === 200); });
       req.on("error", () => r(false));
       req.setTimeout(1500, () => { req.destroy(); r(false); });
@@ -105,7 +112,7 @@ async function engineFor(file) {
     if (ok) break;
     await new Promise((r) => setTimeout(r, 400));
   }
-  engine = { proc, port, file: path.basename(file) };
+  engine = { proc, port, file: path.basename(file), key };
   return engine;
 }
 
@@ -115,13 +122,17 @@ function stopEngine() {
   engine = null;
 }
 
-function postJson(url, body, timeoutMs = 600_000) {
+function postJson(url, body, timeoutMs = 600_000, key = "") {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const data = JSON.stringify(body);
     const req = http.request({
       hostname: u.hostname, port: u.port, path: u.pathname, method: "POST",
-      headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) },
+      headers: {
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(data),
+        ...(key ? { authorization: `Bearer ${key}` } : {}),
+      },
     }, (res) => {
       let out = "";
       res.on("data", (c) => { out += c; });
@@ -235,15 +246,36 @@ async function call(name, args = {}) {
       const messages = [];
       if (args.system) messages.push({ role: "system", content: String(args.system) });
       messages.push({ role: "user", content: String(args.prompt ?? "") });
+      // A reasoning model needs room to think and then answer. Asked for
+      // 1024 tokens flat, the shipped R1 distill spent all of them thinking
+      // and returned an empty string, which this tool passed on as the
+      // answer.
+      const fields = reasoning.requestFields(file, args.max_tokens);
       const body = {
         messages,
-        max_tokens: Number.isFinite(args.max_tokens) ? args.max_tokens : 1024,
+        ...fields,
         temperature: Number.isFinite(args.temperature) ? args.temperature : 0.7,
         stream: false,
       };
-      const r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, body);
-      const text = r && r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content;
-      if (typeof text !== "string") throw new Error(`The engine answered in an unexpected shape: ${JSON.stringify(r).slice(0, 300)}`);
+      let r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, body, 600_000, e.key);
+      if (r && r.error && fields.reasoning_budget) {
+        // An older build refuses the field outright rather than ignoring it.
+        const { reasoning_budget: _drop, ...plain } = body;
+        r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, plain, 600_000, e.key);
+      }
+      const choice = r && r.choices && r.choices[0];
+      const message = (choice && choice.message) || {};
+      const text = typeof message.content === "string" ? message.content : "";
+      if (!choice) throw new Error(`The engine answered in an unexpected shape: ${JSON.stringify(r).slice(0, 300)}`);
+      // Never hand back an empty string as though it were an answer.
+      const why = reasoning.explainEmpty({
+        content: text,
+        reasoning: message.reasoning_content,
+        finishReason: choice.finish_reason,
+        modelLabel: file,
+        maxTokens: fields.max_tokens,
+      });
+      if (why) throw new Error(why);
       return text.trim();
     }
     default:

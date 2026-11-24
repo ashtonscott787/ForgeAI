@@ -21,6 +21,16 @@
   --shadow-pop:0 24px 56px -12px rgba(0,0,0,.75),0 0 0 1px rgba(0,0,0,.35);
   --sheen:linear-gradient(180deg,rgba(242,240,232,.03),transparent);
   --glow:rgba(213,122,88,.075);
+  /* Aliases, defined because they were being used.
+     Several components reached for --accent, --bad, --muted and --card, which
+     were never tokens here: each one fell through to a hard-coded literal
+     that ignored the theme, and the workspace menu, whose fallback chain
+     ended in another undefined name, rendered with no background at all and
+     the sidebar showed straight through it. A test now fails on any var()
+     whose name is not defined. */
+  --accent:var(--ember); --accent-2:#8d92d6; --bad:#d9705f; --bad-fg:#e8907f;
+  --bad-soft:rgba(217,112,95,.14);
+  --muted:var(--fg-2); --card:var(--raised-2); --bg:var(--surface); --bg-raised:var(--raised);
 }
 [data-theme="light"]{
   --page:#f4f2ea; --surface:#faf9f5; --raised:#ffffff; --raised-2:#efece2; --sunken:#f4f2ea;
@@ -37,6 +47,9 @@
   --shadow-pop:0 20px 48px -14px rgba(43,40,33,.24),0 0 0 1px rgba(31,30,28,.07);
   --sheen:linear-gradient(180deg,rgba(31,30,28,.016),transparent);
   --glow:rgba(201,106,74,.08);
+  --accent:var(--ember); --accent-2:#5a60b8; --bad:#b3402f; --bad-fg:#9a3627;
+  --bad-soft:rgba(179,64,47,.1);
+  --muted:var(--fg-2); --card:var(--raised-2); --bg:var(--surface); --bg-raised:var(--raised);
 }
 :root{
   --r:10px; --r-lg:14px; --r-xl:20px; --r-pill:999px;
@@ -1643,8 +1656,8 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: var(--bg-raised, var(--bg));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  background: var(--raised);
+  box-shadow: var(--shadow-pop);
 }
 .space-row { display: flex; align-items: center; gap: 4px; border-radius: 8px; }
 .space-row.on { background: var(--hover, rgba(127, 127, 127, 0.12)); }
@@ -1771,3 +1784,116 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   color: var(--muted);
   font-size: 0.9em;
 }
+
+/* ------------------------------------------------------------------ *
+ * The rail down the right: what is in the window, and a shell.
+ * ------------------------------------------------------------------ */
+.rail {
+  position: absolute;
+  /* Below the globe and the temporary-chat button, which both sit at the top
+     right of the same box. At top:10px this covered them: the buttons were
+     still there and still focusable, and every click landed on the rail. */
+  top: 54px;
+  right: 14px;
+  z-index: 29;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(420px, 42vw);
+  /* The column is only a position. Its empty space must not swallow clicks
+     meant for the conversation underneath it. */
+  pointer-events: none;
+}
+.rail > * { pointer-events: auto; }
+/* Out of the way of the browser pane, the way the globe moves. */
+.chat-split.withpane .rail { right: calc(clamp(320px, 38%, 560px) + 14px); }
+@media (max-width: 900px) { .chat-split.withpane .rail { right: 14px; } }
+.rail-tabs { display: flex; gap: 6px; }
+.rail-tab {
+  font: inherit;
+  font-size: 0.82em;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.rail-tab:hover { color: var(--fg); border-color: var(--line-strong); }
+.rail-tab.on { background: var(--ember-soft); border-color: var(--ember-line); color: var(--ember-fg); }
+.rail-body {
+  width: min(420px, 42vw);
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--raised);
+  box-shadow: var(--shadow-pop);
+}
+@media (max-width: 900px) {
+  .rail { position: static; align-items: stretch; max-width: none; margin: 0 0 10px; }
+  .rail-body { width: auto; max-height: 50vh; }
+}
+
+/* ------------------------------------------------------------------ *
+ * The shell.
+ * ------------------------------------------------------------------ */
+.term { display: flex; flex-direction: column; gap: 8px; }
+.term-h { display: flex; align-items: center; gap: 8px; }
+.term-cwd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; max-width: 190px; }
+.term-acts { margin-left: auto; display: flex; gap: 4px; }
+.term-start { display: flex; flex-direction: column; gap: 6px; }
+.term-out {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  line-height: 1.55;
+  max-height: 300px;
+  overflow: auto;
+  padding: 9px 10px;
+  border-radius: var(--r);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+}
+.term-line { white-space: pre-wrap; word-break: break-word; }
+.term-line.in { color: var(--ember-fg); margin-top: 6px; }
+.term-line.bad { color: var(--bad-fg); }
+.term-prompt { opacity: 0.6; }
+.term-in { display: flex; gap: 8px; align-items: flex-end; }
+.term-in textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  font-family: var(--mono);
+  font-size: 0.82em;
+}
+.term-refusal { margin: 0; }
+
+.shellcard {
+  border: 1px solid var(--ember-line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin: 10px 0;
+  background: var(--ember-soft);
+}
+.shellcard.refused { border-color: var(--line); background: var(--bad-soft); }
+.shellcard-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.shellcard-tag { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ember-fg); }
+.shellcard-cmd {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: var(--r);
+  background: var(--sunken);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.shellcard-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* A download that stopped partway and was never picked up. */
+.partials { display: flex; flex-direction: column; gap: 8px; }
+.partial { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.partial-acts { margin-left: auto; display: flex; gap: 6px; }

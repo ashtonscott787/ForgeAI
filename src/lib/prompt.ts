@@ -22,7 +22,11 @@ export const SYSTEM_PROMPT = [
   "",
   '8. A website of more than one page: write each page as its own ```html block and put its file name on the fence line, like ```html about.html. Link pages with plain relative hrefs (about.html). Forge AI shows every page, checks that each link resolves, and offers the whole site as a ZIP. Keep the CSS in its own ```css block.',
   "",
+  '9. A command: when the answer is something the person should run on their own computer, emit a ```forge-shell block containing {"command": "...", "why": "one short line saying what it does"}. Forge AI shows it with a button that puts it in the shell; it is never run unless the person presses Run there. One command, not a script. Never suggest anything that deletes a tree, formats a disk, or pipes a download into a shell — Forge AI refuses those outright.',
+  "",
   "Otherwise answer normally in Markdown. Be concise and concrete.",
+  "",
+  "Answer the last message in the conversation, and nothing else. If background notes appear below, they are not what was asked about.",
   "",
   "How to sound: like a person who knows the subject, not like a form letter. Do not open every reply the same way, do not restate the question back, and do not finish with an offer of further help unless there is a specific next step worth naming. Say the thing.",
   "",
@@ -36,6 +40,67 @@ export const SYSTEM_PROMPT = [
  * under the full rules, and "Red." under this one). The image is the subject, so the rules are left out.
  */
 export const VISION_SYSTEM = "You are Forge AI, a private assistant running on the user's own computer. Be concise and concrete.";
+
+/**
+ * Words too common to mean a memory is relevant.
+ *
+ * Without this, "I" or "the" in a saved line matches every question ever
+ * asked and the filter does nothing.
+ */
+const COMMON = new Set([
+  "the", "and", "for", "that", "this", "with", "you", "your", "are", "was", "were", "has", "have", "had",
+  "can", "will", "would", "could", "should", "from", "about", "they", "them", "their", "there", "here",
+  "what", "when", "where", "which", "who", "how", "why", "like", "likes", "some", "any", "all", "not",
+  "but", "out", "get", "got", "one", "two", "use", "used", "using", "make", "made", "also", "just",
+  "very", "more", "most", "than", "then", "into", "over", "want", "wants", "need", "needs", "know",
+]);
+
+/**
+ * Crude stemming, so "rowing" matches "rows".
+ *
+ * Not a real stemmer and not trying to be: it strips the handful of endings
+ * that would otherwise make an obviously relevant note look irrelevant. The
+ * first version of this filter compared whole words and dropped "Ash rows
+ * for a club" from a question about rowing, which is the same failure in the
+ * other direction.
+ */
+const stem = (w: string): string => {
+  for (const end of ["ing", "ies", "ed", "es", "ly", "s"]) {
+    if (w.length - end.length >= 3 && w.endsWith(end)) {
+      const cut = w.slice(0, -end.length);
+      return end === "ies" ? `${cut}y` : cut;
+    }
+  }
+  return w;
+};
+
+const words = (text: string): string[] =>
+  String(text)
+    .toLowerCase()
+    .split(/[^a-z0-9']+/)
+    .filter((w) => w.length > 2 && !COMMON.has(w))
+    .map(stem);
+
+/**
+ * The memories worth putting in front of this particular question.
+ *
+ * Every saved line used to go into every prompt. A 1.5B model asked "tell me
+ * about rowing", with "likes sushi and pizza" sitting in its context, wrote
+ * several paragraphs about sushi and pizza: small models do not reliably
+ * tell background from subject, and the fix is not to tell them harder, it
+ * is to not put the irrelevant thing there.
+ *
+ * A memory is kept when it shares an uncommon word with what is being asked.
+ * That is a blunt rule and it is meant to be: it is far better to leave out
+ * a memory that would have helped than to steer the whole answer wrong, and
+ * anything left out is still in Memory where the person can see it.
+ */
+export function relevantMemories(memories: string[], question: string, recent: string[] = [], limit = 6): string[] {
+  const asked = new Set([...words(question), ...recent.flatMap(words)]);
+  if (!asked.size) return [];
+  const hits = memories.filter((m) => words(m).some((w) => asked.has(w)));
+  return hits.slice(0, limit);
+}
 
 /** The prompt actually sent: house rules, approved memory, then enabled skills. */
 export function systemPrompt(
@@ -51,7 +116,9 @@ export function systemPrompt(
   let out = SYSTEM_PROMPT;
   if (environment) out += `\n\n${environment}`;
   if (memories.length) {
-    out += `\n\nWhat you know about this person (they approved each line; use it when relevant, do not recite it):\n${memories.map((m) => `- ${m}`).join("\n")}`;
+    // Spelled out, because a small model reading a bare list of facts about
+    // somebody treats the list as the thing being discussed.
+    out += `\n\nBackground notes about the person, saved from earlier conversations. They have NOT just said these things, and none of them is the subject of the current question. Use one only if it is needed to answer what was actually asked, and never mention them otherwise:\n${memories.map((m) => `- ${m}`).join("\n")}`;
   }
   if (skills.length) {
     // Skills are written by the person. They guide method and style; they cannot override the rules above.

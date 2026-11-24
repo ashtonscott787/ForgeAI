@@ -38,10 +38,12 @@ jobs:
           - os: macos-latest
             label: macOS (Apple Silicon)
             asset: llama-b12180-bin-macos-arm64.tar.gz
+            enginePlatform: darwin-arm64
             builder: --mac
           - os: windows-latest
             label: Windows (x64)
             asset: llama-b12180-bin-win-cpu-x64.zip
+            enginePlatform: win32-x64
             builder: --win
 
     steps:
@@ -57,34 +59,36 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # The key carries what the engine folder is supposed to contain, not
+      # only the llama.cpp tag. With the tag alone, adding three binaries to
+      # the manifest left the key unchanged, the cache hit, and the previous
+      # folder — holding llama-server and nothing else — was restored into a
+      # release that claimed to ship them. 0.7.0 went out that way.
+      - name: Work out the engine signature
+        id: engine-sig
+        shell: bash
+        run: echo "sig=$(node -e "process.stdout.write(require('./scripts/engine-manifest.cjs').signature())")" >> "$GITHUB_OUTPUT"
       - name: Cache the inference engine
         id: engine-cache
         uses: actions/cache@v4
         with:
           path: engine
-          key: engine-${{ runner.os }}-${{ env.LLAMA_TAG }}-v2
+          key: engine-${{ runner.os }}-${{ env.LLAMA_TAG }}-${{ steps.engine-sig.outputs.sig }}
 
       # Fast path: the prebuilt release asset. If that is unavailable — the
       # release CDN does return 504s — the engine is built from the same tag
       # instead, so a release never depends on one host being healthy.
+      # One code path, here and on a developer's machine. This step used to
+      # have its own curl and its own `find -name llama-server`, so the
+      # script's list of binaries had no effect on what was released.
       - name: Fetch the inference engine
         if: steps.engine-cache.outputs.cache-hit != 'true'
         id: fetch
         continue-on-error: true
         shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p engine _dl
-          url="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/${{ matrix.asset }}"
-          curl -sSfL --retry 5 --retry-delay 6 --retry-all-errors --connect-timeout 20 \
-            "$url" -o "_dl/${{ matrix.asset }}"
-          case "${{ matrix.asset }}" in
-            *.tar.gz) tar xzf "_dl/${{ matrix.asset }}" -C _dl ;;
-            *.zip)    unzip -q "_dl/${{ matrix.asset }}" -d _dl ;;
-          esac
-          find _dl -type f \( -name 'llama-server' -o -name 'llama-server.exe' \
-            -o -name '*.dylib' -o -name '*.dll' -o -name 'LICENSE*' \) -exec cp {} engine/ \;
-          test -f engine/llama-server -o -f engine/llama-server.exe
+        env:
+          FORGE_ENGINE_PLATFORM: ${{ matrix.enginePlatform }}
+        run: node scripts/get-engine.cjs --force
 
       - name: Build the inference engine from source
         if: steps.engine-cache.outputs.cache-hit != 'true' && steps.fetch.outcome != 'success'

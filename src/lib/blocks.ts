@@ -44,7 +44,13 @@ export type Segment =
   /** The model's own working, which some models emit in <think> tags. */
   | { kind: "thinking"; text: string; open: boolean }
   /** The model asking to look at a page in the built-in browser. */
-  | { kind: "browse"; url: string };
+  | { kind: "browse"; url: string }
+  /**
+   * A command the model suggests running. A suggestion and nothing else:
+   * it is put in front of the person, who moves it to the shell and presses
+   * Run, or does not. Two deliberate actions, neither of them the model's.
+   */
+  | { kind: "shell"; command: string; why: string };
 
 // The text after the language is the info string, which is where a model puts
 // a file name (```html about.html). Ignoring it made every such block parse as
@@ -99,6 +105,9 @@ function parseBody(content: string): Segment[] {
     } else if (lang === "forge-browse") {
       const url = parseBrowse(code);
       out.push(url ? { kind: "browse", url } : { kind: "code", lang: "json", code: code.trimEnd() });
+    } else if (lang === "forge-shell") {
+      const ask = parseShell(code);
+      out.push(ask ? { kind: "shell", ...ask } : { kind: "code", lang: "json", code: code.trimEnd() });
     } else if (lang === "forge-ui") {
       const spec = parseUi(code);
       out.push(spec ? { kind: "ui", spec } : { kind: "code", lang: "json", code: code.trimEnd() });
@@ -110,6 +119,29 @@ function parseBody(content: string): Segment[] {
   }
   if (last < content.length) pushText(out, content.slice(last));
   return out;
+}
+
+/**
+ * A suggested command, as JSON with a command and a reason.
+ *
+ * The reason is required. A bare command with no explanation is the shape
+ * that gets run without being read, and a model that cannot say why it wants
+ * to run something should not be putting a Run button on the screen.
+ */
+function parseShell(code: string): { command: string; why: string } | null {
+  try {
+    const o = JSON.parse(code);
+    const command = typeof o?.command === "string" ? o.command.trim() : "";
+    const why = typeof o?.why === "string" ? o.why.trim() : "";
+    if (!command || command.length > 2000) return null;
+    if (!why) return null;
+    // One command, not a script: a block of twenty lines is not something
+    // anybody reads before pressing a button.
+    if (command.split(/\n/).length > 3) return null;
+    return { command, why: why.slice(0, 300) };
+  } catch {
+    return null;
+  }
 }
 
 /** Unterminated fences stream in token by token; show them as code as they grow. */

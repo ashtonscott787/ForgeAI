@@ -36,6 +36,10 @@ async function scenario(name, server, cfg, fn) {
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForSelector(".app");
   await page.locator(".boot").waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+  // The context meter moved off the composer and onto the rail down the
+  // right, where it no longer pushes the box you are writing in down the
+  // screen every time it grows. Opening that tab is now part of reaching it.
+  if (!cfg.noRail) await page.getByRole("button", { name: "Context", exact: true }).click();
   try {
     await fn(page);
     assert.deepEqual(errs, [], "no uncaught page errors");

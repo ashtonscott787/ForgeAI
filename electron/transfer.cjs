@@ -109,4 +109,47 @@ async function transfer(win, { dir, modelId, url, fileName, sha256 }, mayRestart
 }
 
 
-module.exports = { downloadModel };
+/**
+ * Downloads that were interrupted and never picked up again.
+ *
+ * Resuming works — the next attempt sends a Range header and carries on —
+ * but nothing ever said a partial file was there, so one sat in the models
+ * folder for twelve days taking 720 MB and nobody knew. A half-downloaded
+ * model is invisible: it is not in the model list, because it is not a
+ * model, and it is not in the download list, because nothing is downloading.
+ *
+ * This finds them so they can be finished or thrown away. It only reads.
+ */
+function partials(dir) {
+  let names;
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  return names
+    .filter((n) => n.endsWith(".gguf.part"))
+    .map((n) => {
+      const full = path.join(dir, n);
+      let st;
+      try { st = fs.statSync(full); } catch { return null; }
+      return {
+        part: n,
+        file_name: n.replace(/\.part$/, ""),
+        bytes: st.size,
+        at: st.mtimeMs,
+        /** True once the finished model is there too: the part is then just litter. */
+        superseded: fs.existsSync(path.join(dir, n.replace(/\.part$/, ""))),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.bytes - a.bytes);
+}
+
+/** Removes one partial file. Named exactly, and only ever a .part. */
+function discardPartial(dir, partName) {
+  const n = path.basename(String(partName || ""));
+  if (!n.endsWith(".gguf.part")) return { ok: false, why: "That is not a partial download." };
+  const full = path.join(dir, n);
+  if (!fs.existsSync(full)) return { ok: false, why: "It is not there any more." };
+  fs.rmSync(full, { force: true });
+  return { ok: true, freed: n };
+}
+
+module.exports = { downloadModel, partials, discardPartial };

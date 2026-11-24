@@ -23,6 +23,7 @@
  *   not installed is refused by name rather than quietly answered by another.
  */
 const http = require("node:http");
+const reasoning = require("./reasoning.cjs");
 const crypto = require("node:crypto");
 
 const MAX_BODY = 8 * 1024 * 1024;
@@ -130,12 +131,27 @@ function createServer(deps) {
         catch (e) { return fail(res, 503, `The model could not be started: ${e instanceof Error ? e.message : String(e)}`, "engine_error"); }
         if (!engine?.base_url) return fail(res, 503, "The model did not start.", "engine_error");
 
-        // Forwarded as sent, except that the engine is given the file name it knows.
-        const out = Buffer.from(JSON.stringify({ ...body, model: match.file_name }), "utf8");
+        // Forwarded as sent, except that the engine is given the file name
+        // it knows — and, when the caller named no limit, room sized for the
+        // kind of model this is. A reasoning model under someone else's
+        // default spends the whole allowance thinking and returns an empty
+        // string, which this endpoint would pass on as the answer.
+        const sized = body.max_tokens === undefined && body.max_completion_tokens === undefined
+          ? reasoning.requestFields(match.file_name)
+          : {};
+        const out = Buffer.from(JSON.stringify({ ...body, ...sized, model: match.file_name }), "utf8");
         const target = new URL("/v1/chat/completions", engine.base_url);
         const up = http.request(
           { hostname: target.hostname, port: target.port, path: target.pathname, method: "POST",
-            headers: { "content-type": "application/json", "content-length": out.length } },
+            headers: {
+              "content-type": "application/json",
+              "content-length": out.length,
+              // The engine now requires its own per-launch key. The caller's
+              // token got them through this endpoint; this one gets this
+              // endpoint through to the engine. They are different secrets
+              // and neither is ever shown to the other side.
+              ...(engine.api_key ? { authorization: `Bearer ${engine.api_key}` } : {}),
+            } },
           (ur) => {
             res.writeHead(ur.statusCode || 200, {
               "content-type": ur.headers["content-type"] || "application/json",

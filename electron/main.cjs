@@ -16,7 +16,8 @@ const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { readAttachment, selectRelevant } = require("./extract.cjs");
 const updater = require("./updater.cjs");
-const { downloadModel } = require("./transfer.cjs");
+const transfer = require("./transfer.cjs");
+const { downloadModel } = transfer;
 const reminders = require("./reminders.cjs");
 const memory = require("./memory.cjs");
 const skills = require("./skills.cjs");
@@ -93,6 +94,9 @@ const settingsFile = () => path.join(root(), "settings.json");
 const engineDir = () => app.isPackaged ? path.join(process.resourcesPath, "engine") : path.join(__dirname, "..", "engine-dev");
 const cluster = require("./cluster.cjs");
 const workshop = require("./workshop.cjs");
+const terminal = require("./terminal.cjs");
+/** The one shell, if it has been opened. Opening is always the person's doing. */
+let shellSession = null;
 /** The one job the workshop is running, if any. One at a time, on purpose:
  *  two quantisations at once on a laptop is two slow jobs, not two fast ones. */
 let shopJob = null;
@@ -329,7 +333,29 @@ async function listRepoFiles({ repo }) {
 
 // ── engine ──────────────────────────────────────────────────
 let engine = { proc: null, port: 0, model_file: null };
-const status = () => ({ running: !!engine.proc, port: engine.port, model_file: engine.model_file, base_url: engine.proc ? `http://127.0.0.1:${engine.port}` : "" });
+
+/**
+ * A key for the engine, made fresh every time this process starts.
+ *
+ * llama-server binds to 127.0.0.1, which keeps other machines out but not
+ * other programs on this one — and that includes any web page open in a
+ * browser, which can reach localhost and which the server answers with
+ * Access-Control-Allow-Origin: *. The engine's own log says so on every
+ * launch: "no API key is set and CORS allows all origins". A page could
+ * find the port and use the model.
+ *
+ * The key closes that. It is never written to disk, never leaves this
+ * process except to the window's own code, and a different one is generated
+ * on every launch, so nothing can remember it between runs.
+ */
+const engineKey = require("node:crypto").randomBytes(24).toString("hex");
+const status = () => ({
+  running: !!engine.proc,
+  port: engine.port,
+  model_file: engine.model_file,
+  base_url: engine.proc ? `http://127.0.0.1:${engine.port}` : "",
+  api_key: engine.proc ? engineKey : "",
+});
 /** A small JSON GET, used only for the weather lookup. */
 const getJsonOverHttps = (url) => new Promise((resolve, reject) => {
   const req = require("node:https").get(url, { headers: { accept: "application/json" } }, (res) => {
@@ -527,6 +553,19 @@ async function startEngine({ modelFile }) {
     "--port", String(port),
     "--host", "127.0.0.1",
     "--n-gpu-layers", String(layers),
+    // Without this the engine answers anybody who can reach the port,
+    // which on this machine includes any open web page.
+    "--api-key", engineKey,
+    // Credentials are never needed — the key is sent in a header — and
+    // refusing them stops a page using an ambient cookie against the engine.
+    //
+    // The origin list is deliberately left alone. llama.cpp defaults to "*",
+    // and the obvious tightening ("localhost") would break this app: its
+    // window is loaded with loadFile, so its requests carry Origin: null,
+    // which "localhost" does not match and the browser would then refuse
+    // the reply. The key is what actually closes the hole — a page cannot
+    // read it, so it gets 401 whatever the origin header says.
+    "--no-cors-credentials",
   ];
   if (settings.threads) args.push("--threads", String(settings.threads));
   // Other computers. They are checked first and only the ones that answered
@@ -653,6 +692,10 @@ function register(win) {
   h("catalogue", () => JSON.parse(fs.readFileSync(path.join(__dirname, "catalogue.json"), "utf8")));
   h("installed_models", installed);
   h("download_model", (a) => downloadModel(win, { dir: modelsDir(), ...a }));
+  // Downloads that stopped and were never picked up. Resuming already works;
+  // nothing ever said one was sitting there.
+  h("partial_downloads", () => transfer.partials(modelsDir()));
+  h("discard_partial", ({ part }) => transfer.discardPartial(modelsDir(), part));
   h("delete_model", ({ fileName }) => { const p = path.join(modelsDir(), safeName(fileName)); if (engine.model_file === fileName) stopEngine(); fs.rmSync(p, { force: true }); fs.rmSync(p + ".part", { force: true }); });
   h("start_engine", startEngine);
   h("ensure_engine", ensureEngine);
@@ -1741,6 +1784,64 @@ function register(win) {
     return { ok: true, ...(await clusterState(false)) };
   });
 
+  // ── the shell ─────────────────────────────────────────
+  //
+  // Nothing here runs a command that the person has not pressed Run on. The
+  // assistant can put a command on screen; it cannot execute one. See the
+  // rules at the top of electron/terminal.cjs.
+  const shellState = () => ({
+    open: Boolean(shellSession && !shellSession.closed),
+    cwd: shellSession ? shellSession.cwd : terminal.defaultCwd(),
+    platform: process.platform,
+  });
+
+  h("shell_status", () => shellState());
+
+  h("shell_open", ({ cwd } = {}) => {
+    if (shellSession && !shellSession.closed) return { ok: true, ...shellState() };
+    let where = cwd ? String(cwd) : terminal.defaultCwd();
+    if (!fs.existsSync(where) || !fs.statSync(where).isDirectory()) {
+      return { ok: false, why: `${where} is not a folder on this computer.` };
+    }
+    shellSession = new terminal.Session({
+      cwd: where,
+      env: process.env,
+      onData: (chunk) => { try { win?.webContents.send("shell://data", { chunk }); } catch { /* window gone */ } },
+    });
+    return { ok: true, ...shellState() };
+  });
+
+  h("shell_run", async ({ command }) => {
+    // Checked here and not only in the interface: this is the handler
+    // anything on the page could reach, so the refusal has to live at the
+    // door rather than in front of it.
+    const why = terminal.refuse(command);
+    if (why) return { ok: false, refused: true, why };
+    if (!shellSession || shellSession.closed) return { ok: false, why: "The shell is not open." };
+    const r = await shellSession.run(String(command));
+    return { ...r, ...shellState() };
+  });
+
+  h("shell_interrupt", () => ({ ok: Boolean(shellSession && shellSession.interrupt()) }));
+
+  h("shell_close", () => {
+    if (shellSession) shellSession.stop();
+    shellSession = null;
+    return { ok: true, ...shellState() };
+  });
+
+  /** Says whether a command would be refused, without running it. */
+  h("shell_check", ({ command }) => {
+    const why = terminal.refuse(command);
+    return { allowed: !why, why: why || null };
+  });
+
+  h("shell_pick_folder", async () => {
+    const r = await dialog.showOpenDialog(win, { properties: ["openDirectory"], title: "Where should the shell run?" });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    return { ok: true, cwd: r.filePaths[0] };
+  });
+
   // ── making a model from one you already have ──────────
   const shopEnv = () => ({ ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH });
   const shopState = () => ({
@@ -1960,5 +2061,10 @@ function stopWorker() {
     workerProc = null;
   }
 }
-app.on("window-all-closed", () => { stopEngine(); stopWorker(); reminders.stop(); app.quit(); });
-app.on("before-quit", () => { stopEngine(); stopWorker(); });
+/** Closing the app closes the shell with it, and whatever it was running. */
+function stopShell() {
+  if (shellSession) { try { shellSession.stop(); } catch { /* already gone */ } }
+  shellSession = null;
+}
+app.on("window-all-closed", () => { stopEngine(); stopWorker(); stopShell(); reminders.stop(); app.quit(); });
+app.on("before-quit", () => { stopEngine(); stopWorker(); stopShell(); });

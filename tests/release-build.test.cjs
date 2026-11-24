@@ -21,9 +21,40 @@ test("the Electron cache key names the Electron that is actually installed", () 
 });
 
 test("every tool the app runs is kept from the downloaded archive", () => {
-  for (const tool of ["llama-server", "ggml-rpc-server", "llama-quantize", "llama-export-lora"]) {
-    assert.match(getEngine, new RegExp(tool), `${tool} survives the filter`);
+  const { keep, BINARIES } = require(path.join(root, "scripts", "engine-manifest.cjs"));
+  for (const b of BINARIES) {
+    assert.equal(keep(b.name), true, `${b.name} survives the filter`);
+    assert.equal(keep(`${b.name}.exe`), true, `${b.name}.exe survives the filter`);
   }
+  assert.equal(keep("llama-perplexity"), false, "and the development tools do not");
+  assert.equal(keep("libggml-rpc.dylib"), true, "libraries travel with them");
+});
+
+// This is the test that should have existed. The previous version checked
+// scripts/get-engine.cjs and the source-build fallback — neither of which CI
+// ran — while the workflow quietly copied `llama-server` and nothing else
+// with its own inline find. 0.7.0 shipped clustering and the model workshop
+// with their binaries absent, and the suite was green.
+test("the path CI actually takes is the one that was tested", () => {
+  const fetchStep = workflow.slice(workflow.indexOf("- name: Fetch the inference engine"), workflow.indexOf("- name: Build the inference engine from source"));
+  assert.match(fetchStep, /node scripts\/get-engine\.cjs/, "CI fetches through the script, not a second copy of it");
+  assert.doesNotMatch(fetchStep, /-name 'llama-server'/, "no inline list of binaries beside the manifest");
+  assert.doesNotMatch(fetchStep, /\bcurl\b/, "and no second downloader");
+});
+
+test("the engine cache cannot outlive a change to what ships", () => {
+  // The key was the llama.cpp tag alone. Three binaries were added, the tag
+  // did not move, the cache hit, and the release went out with the old
+  // folder in it.
+  const key = /key: engine-\$\{\{ runner\.os \}\}-\$\{\{ env\.LLAMA_TAG \}\}-([^\n]+)/.exec(workflow);
+  assert.ok(key, "there is an engine cache key");
+  assert.match(key[1], /engine-sig\.outputs\.sig/, "and it carries the manifest signature");
+});
+
+test("packaging refuses when a tool that gates a feature is missing", () => {
+  const check = fs.readFileSync(path.join(root, "scripts", "check-engine.cjs"), "utf8");
+  assert.match(check, /engine-manifest/, "the check reads the same list");
+  assert.match(check, /Refusing to package/, "and stops the build rather than warning");
 });
 
 test("the source-build fallback produces the same set of tools", () => {

@@ -9,6 +9,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { BINARIES } = require("./engine-manifest.cjs");
+
 const engineDir = path.join(__dirname, "..", "engine");
 const bin = path.join(engineDir, process.platform === "win32" ? "llama-server.exe" : "llama-server");
 
@@ -43,4 +45,25 @@ This is the defect that shipped in 0.5.2. Fix it with:
   }
 }
 
-console.log("Engine present and loadable.");
+// Every optional tool, named either way. A feature whose binary is absent
+// is reported here rather than discovered by somebody pressing its button
+// in a release — which is what happened with 0.7.0.
+const suffix = process.platform === "win32" ? ".exe" : "";
+const missing = BINARIES.filter((b) => !b.required && !fs.existsSync(path.join(engineDir, b.name + suffix)));
+if (missing.length) {
+  console.error(`
+Refusing to package: ${missing.length} engine tool(s) are missing, so the
+features that need them would be in the app and unable to run.
+
+${missing.map((b) => `  ${b.name}${suffix} — ${b.gives}`).join("\n")}
+
+Get them with:
+
+    pnpm engine:get --force
+
+Set FORGE_ALLOW_PARTIAL_ENGINE=1 to package without them on purpose.
+`);
+  if (process.env.FORGE_ALLOW_PARTIAL_ENGINE !== "1") process.exit(1);
+}
+
+console.log(`Engine present and loadable, with ${BINARIES.length - missing.length}/${BINARIES.length} tools.`);

@@ -88,11 +88,14 @@ export function measure(pieces: Piece[], limit: number, counts?: Record<string, 
  * null rather than a number, and the caller keeps the estimate and keeps
  * saying it is one.
  */
-export async function countWithEngine(baseUrl: string, text: string, signal?: AbortSignal): Promise<number | null> {
+export async function countWithEngine(baseUrl: string, text: string, signal?: AbortSignal, apiKey?: string): Promise<number | null> {
   try {
     const res = await fetch(`${baseUrl}/tokenize`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       body: JSON.stringify({ content: text }),
       signal,
     });
@@ -109,6 +112,7 @@ export async function countAll(
   baseUrl: string,
   pieces: Piece[],
   signal?: AbortSignal,
+  apiKey?: string,
 ): Promise<Record<string, number> | null> {
   const out: Record<string, number> = {};
   for (const p of pieces) {
@@ -116,7 +120,7 @@ export async function countAll(
       out[p.id] = 0;
       continue;
     }
-    const n = await countWithEngine(baseUrl, p.text, signal);
+    const n = await countWithEngine(baseUrl, p.text, signal, apiKey);
     // One failure makes the whole reading a mixture of measured and guessed
     // numbers, which is exactly the thing this module exists to avoid.
     if (n === null) return null;

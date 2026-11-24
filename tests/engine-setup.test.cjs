@@ -43,23 +43,60 @@ test("packaging is refused when there is no engine", () => {
   assert.match(r.output, /pnpm engine:get/, "and says how to fix it");
 });
 
-test("the guard passes once an engine is present", () => {
-  // A stand-in binary: the guard checks presence, and on macOS loadability.
+/** An engine folder holding the named tools and nothing else. */
+function fakeEngine(names) {
   const tmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "forge-eng-"));
   const engine = path.join(tmp, "engine");
   fs.mkdirSync(engine);
-  fs.writeFileSync(path.join(engine, process.platform === "win32" ? "llama-server.exe" : "llama-server"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  const suffix = process.platform === "win32" ? ".exe" : "";
+  for (const n of names) {
+    fs.writeFileSync(path.join(engine, n + suffix), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  }
+  return { tmp, engine };
+}
+
+test("the guard passes once the whole engine is present", () => {
+  const { BINARIES } = require(path.join(__dirname, "..", "scripts", "engine-manifest.cjs"));
+  const { tmp, engine } = fakeEngine(BINARIES.map((b) => b.name));
   try {
     const r = runGuard(engine);
     assert.equal(r.status, 0, `the guard should pass; it said: ${r.output}`);
     assert.match(r.output, /Engine present/);
+    assert.match(r.output, /4\/4 tools/, "and says how complete it is");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-/** Runs the guard against a chosen engine folder. */
-function runGuard(engineDir) {
+// This is the case that shipped. 0.7.0 was packaged with llama-server alone,
+// so clustering and the model workshop were in the app and unable to run,
+// and nothing in the build said a word about it.
+test("a build missing a feature's binary is refused, and the feature is named", () => {
+  const { tmp, engine } = fakeEngine(["llama-server"]);
+  try {
+    const r = runGuard(engine);
+    assert.notEqual(r.status, 0, "it does not package");
+    assert.match(r.output, /ggml-rpc-server — splitting a model across computers/);
+    assert.match(r.output, /llama-quantize/);
+    assert.match(r.output, /llama-export-lora/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("a partial engine can still be packaged on purpose, and only on purpose", () => {
+  const { tmp, engine } = fakeEngine(["llama-server"]);
+  try {
+    const r = runGuard(engine, { FORGE_ALLOW_PARTIAL_ENGINE: "1" });
+    assert.equal(r.status, 0, "the override works");
+    assert.match(r.output, /Refusing to package/, "and it still says what is missing");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/** Runs the guard against a chosen engine folder, keeping both streams. */
+function runGuard(engineDir, env = {}) {
   const script = `
     const path = require("node:path");
     const real = path.join(${JSON.stringify(root)}, "engine");
@@ -70,12 +107,14 @@ function runGuard(engineDir) {
     process.argv[1] = ${JSON.stringify(path.join(root, "scripts/check-engine.cjs"))};
     require(${JSON.stringify(path.join(root, "scripts/check-engine.cjs"))});
   `;
-  try {
-    const out = execFileSync(process.execPath, ["-e", script], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    return { status: 0, output: out };
-  } catch (e) {
-    return { status: e.status ?? 1, output: `${e.stdout ?? ""}${e.stderr ?? ""}` };
-  }
+  // spawnSync rather than execFileSync: the guard writes what is missing to
+  // stderr even when it is told to carry on, and execFileSync hands back
+  // only stdout on success — so a warning would read as silence.
+  const r = require("node:child_process").spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
+  return { status: r.status ?? 1, output: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 
 // ── against the real release ──────────────────────────────────

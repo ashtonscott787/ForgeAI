@@ -10,6 +10,7 @@ import { GenUI } from "./GenUI";
 import { HtmlPreview } from "./HtmlPreview";
 import { Markdown } from "./Markdown";
 import { BrowseCard } from "./BrowseCard";
+import { ShellCard } from "./ShellCard";
 import { SaveAs } from "./SaveAs";
 import { SiteCard } from "./SiteCard";
 
@@ -39,6 +40,7 @@ export function AssistantMessage({
   onSend,
   onResearch,
   onOpenPane,
+  onShell,
   showThinking = false,
 }: {
   content: string;
@@ -48,6 +50,8 @@ export function AssistantMessage({
   onResearch?: (text: string) => void;
   /** Shows the page in the browser pane beside the conversation. */
   onOpenPane?: (url: string) => void;
+  /** Moves a suggested command into the shell's box. It is still not run there. */
+  onShell?: (command: string) => void;
   /** Off by default: most people want the answer, not the working. */
   showThinking?: boolean;
 }) {
@@ -93,6 +97,7 @@ export function AssistantMessage({
               onOpenPane={onOpenPane}
             />
           );
+        if (s.kind === "shell") return <ShellCard key={i} command={s.command} why={s.why} onSend={onShell} />;
         if (s.kind === "search")
           return (
             <SearchCard

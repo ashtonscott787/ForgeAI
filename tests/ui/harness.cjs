@@ -81,7 +81,7 @@ const BRIDGE = String.raw`(() => {
     // A stalled start: the engine never becomes ready until Stop stops it, as in the app.
     ensure_engine: ({ modelFile }) => (cfg.stallEngine
       ? new Promise((resolve, reject) => { window.__engineStop = () => reject(new Error("The AI engine was stopped while it was starting.")); })
-      : { running: true, port: cfg.enginePort || 0, model_file: modelFile, base_url: cfg.engineBase }),
+      : { running: true, port: cfg.enginePort || 0, model_file: modelFile, base_url: cfg.engineBase, api_key: "test-engine-key" }),
     default_browser_status: () => ({ is_default: false, platform: "darwin" }),
     share_status: () => ({ enabled: false, running: false, urls: [], port: 11435, token: null, mesh_enabled: false, mesh_address: null, error: null }),
     share_set: (a) => ({ enabled: Boolean(a.enabled), running: Boolean(a.enabled), urls: a.enabled ? ["http://127.0.0.1:11435"] : [], port: 11435, token: a.enabled ? "test-token" : null, mesh_enabled: Boolean(a.mesh), mesh_address: null, error: null }),
@@ -147,6 +147,40 @@ const BRIDGE = String.raw`(() => {
     agent_list: () => (state.agents || (state.agents = [])),
     mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady), provider: "other", imap_host: cfg.mailReady ? "imap.example.com" : "", imap_port: 993, can_read: Boolean(cfg.mailReady) }),
     mail_save: () => ({ ok: true }),
+    partial_downloads: () => state.partials || (state.partials = cfg.partials || []),
+    discard_partial: ({ part }) => {
+      state.partials = (state.partials || []).filter((p) => p.part !== part);
+      return { ok: true };
+    },
+    // The shell. Nothing is ever really spawned in a test; what is checked
+    // is that a command is only run by a press, and that the refusals hold.
+    shell_status: () => state.shell || (state.shell = { open: false, cwd: "/Users/you", platform: "darwin" }),
+    shell_open: ({ cwd }) => {
+      const st = handlers.shell_status();
+      st.open = true;
+      if (cwd) st.cwd = cwd;
+      return { ok: true, ...st };
+    },
+    shell_close: () => {
+      const st = handlers.shell_status();
+      st.open = false;
+      return { ok: true, ...st };
+    },
+    shell_check: ({ command }) => {
+      const bad = /rm\s+-[a-z]*r[a-z]*\s+(\/|~)|mkfs|\bsudo\b/i.test(String(command || ""));
+      return { allowed: !bad, why: bad ? "Forge AI will not run that: it deletes a whole tree from the top of the disk or your home folder. Use a real terminal if you mean it." : null };
+    },
+    shell_run: ({ command }) => {
+      const c = handlers.shell_check({ command });
+      if (!c.allowed) return { ok: false, refused: true, why: c.why };
+      const st = handlers.shell_status();
+      if (!st.open) return { ok: false, why: "The shell is not open." };
+      state.ran = (state.ran || []).concat(String(command));
+      return { ok: true, code: 0, output: "ran: " + command, ...st };
+    },
+    shell_ran: () => state.ran || [],
+    shell_interrupt: () => ({ ok: true }),
+    shell_pick_folder: () => ({ ok: true, cwd: "/Users/you/Projects" }),
     // More than one computer. The worker never runs in a test; what is
     // checked is that the interface refuses the dangerous choices and says
     // which machines are actually in use.
@@ -382,7 +416,7 @@ const BRIDGE = String.raw`(() => {
     set_settings: (a) => { state.settings = Object.assign({}, state.settings, a && a.settings ? a.settings : a); return state.settings; },
     memory_for_prompt: () => cfg.memories || [],
     skills_for_prompt: () => cfg.skills || [],
-    engine_status: () => ({ running: false, port: 0, model_file: null, base_url: "" }),
+    engine_status: () => ({ running: false, port: 0, model_file: null, base_url: "", api_key: "" }),
     read_files: () => [],
     // Keyless search is tested in the main process (tests/open-web.test.cjs). The stand-in returns a
     // fixed answer shaped like the real one, so the view can be exercised here.

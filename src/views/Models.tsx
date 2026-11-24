@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { WorkshopPanel } from "../components/WorkshopPanel";
+import { PartialDownloads } from "../components/PartialDownloads";
 import {
   api,
   CAP_LABEL,
@@ -106,6 +107,24 @@ export function Models(props: Props) {
       e.caps.some((c) => c.includes(q))
     );
   });
+
+  /**
+   * Picks up a stopped download by matching its file name to a catalogue
+   * entry. The transfer itself resumes from the bytes already on disk, so
+   * this is only a matter of finding which model it was.
+   */
+  async function resumeByName(fileName: string) {
+    const stem = fileName.replace(/\.gguf$/i, "").toLowerCase();
+    const entry = props.catalogue?.models?.find((m) =>
+      stem.startsWith(m.repo.split("/").pop()!.toLowerCase().replace(/-gguf$/, "")) ||
+      stem.includes(m.id.toLowerCase()),
+    );
+    if (!entry) {
+      setError(`${fileName} does not match anything in the library, so Forge AI cannot tell where it came from. Remove it and download the model again.`);
+      return;
+    }
+    await download(entry);
+  }
 
   async function download(entry: CatalogueEntry) {
     const q = quant[entry.id] ?? "Q4_K_M";
@@ -278,6 +297,7 @@ export function Models(props: Props) {
         <div className="banner warn">The AI engine is missing from this copy of Forge AI.</div>
       )}
       {error && <div className="banner err">{error}</div>}
+      <PartialDownloads onResume={(fileName) => void resumeByName(fileName)} />
       {notice && <div className="banner">{notice}</div>}
 
       {showCustom && (

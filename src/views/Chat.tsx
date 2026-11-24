@@ -11,10 +11,12 @@ import type { Attachment, EngineStatus, Health, MachineCapability, ProviderStatu
 import { api, pathForFile } from "../lib/ipc";
 import type { InstalledEntry } from "../lib/library";
 import type { LocalModel, ModelConfiguration } from "../lib/models";
-import { SYSTEM_PROMPT, systemPrompt, VISION_SYSTEM } from "../lib/prompt";
+import { SYSTEM_PROMPT, relevantMemories, systemPrompt, VISION_SYSTEM } from "../lib/prompt";
 import { ContextMeter } from "../components/ContextMeter";
+import { Terminal } from "../components/Terminal";
 import { COMPACT_INSTRUCTION, applyCompaction, canCompact, splitFor, transcriptOf } from "../lib/compact";
 import type { Piece } from "../lib/context";
+import { describePlan, mapPrompt, planFor, reducePrompt } from "../lib/chunking";
 import { choose } from "../lib/router";
 
 interface Props {
@@ -92,6 +94,14 @@ export function Chat(props: Props) {
   const [prompt, setPrompt] = useState("");
   /** Compacting: see compactNow below. */
   const [compacting, setCompacting] = useState(false);
+  /**
+   * The rail down the right: what is in the context window, and the shell.
+   * Both belong beside the conversation rather than above the composer,
+   * where the meter was pushing the thing you are writing down the screen.
+   */
+  const [rail, setRail] = useState<"context" | "shell" | null>(null);
+  /** A command the assistant suggested, on its way to the shell's box. */
+  const [toShell, setToShell] = useState<string | null>(null);
   const [extras, setExtras] = useState<{ memories: string[]; skills: { name: string; instructions: string }[] }>({
     memories: [],
     skills: [],
@@ -181,24 +191,13 @@ export function Chat(props: Props) {
     setCompacting(true);
     setError(null);
     try {
-      const res = await fetch(`${props.engine.base_url}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: COMPACT_INSTRUCTION },
-            { role: "user", content: transcriptOf(older) },
-          ],
-          temperature: 0.2,
-          stream: false,
-        }),
-      });
-      if (!res.ok) {
-        setError(`The summary could not be written: the engine answered ${res.status}. Nothing was changed.`);
-        return;
-      }
-      const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const summary = body.choices?.[0]?.message?.content?.trim() ?? "";
+      const summary = await once(
+        [
+          { role: "system", content: COMPACT_INSTRUCTION },
+          { role: "user", content: transcriptOf(older) },
+        ],
+        900,
+      );
       if (!summary) {
         setError("The model returned an empty summary, so the conversation was left exactly as it was.");
         return;
@@ -210,6 +209,25 @@ export function Chat(props: Props) {
     } finally {
       setCompacting(false);
     }
+  }
+
+  /**
+   * One completion, not streamed. Used by compaction and by reading a long
+   * document in parts — both are internal passes whose output is not the
+   * answer, so there is nothing to stream to anybody.
+   */
+  async function once(messages: { role: "system" | "user"; content: string }[], maxTokens = 900): Promise<string> {
+    const res = await fetch(`${props.engine.base_url}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(props.engine.api_key ? { Authorization: `Bearer ${props.engine.api_key}` } : {}),
+      },
+      body: JSON.stringify({ messages, temperature: 0.2, max_tokens: maxTokens, stream: false }),
+    });
+    if (!res.ok) throw new Error(`the engine answered ${res.status}`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    return body.choices?.[0]?.message?.content?.trim() ?? "";
   }
 
   /** Asks the last question again, from the point just before it was asked. */
@@ -431,20 +449,52 @@ export function Chat(props: Props) {
     let contextChars = 0;
     let sendContent = body;
     if (usable.length) {
-      setStatus(`Reading ${usable.length} file${usable.length > 1 ? "s" : ""}…`);
-      try {
-        const built = await api.buildContext(
-          usable.map((f) => ({ name: f.name, text: f.text })),
-          body,
-          Math.max(4000, Math.floor(props.contextSize * 2.6)),
-        );
-        if (run.stopped) return;
-        contextChars = built.context.length;
-        sendContent = `${built.context}\n\n${body}`;
-      } catch (e) {
-        if (run.stopped) return;
-        failRun(run, `Could not prepare the attached files: ${e instanceof Error ? e.message : String(e)}`);
-        return;
+      const whole = usable.map((f) => f.text).join("\n\n");
+      const plan = planFor(whole, props.contextSize);
+      // Far too long to extract from sensibly, and a local engine to do it
+      // with: read it in parts and answer from the notes. Selecting extracts
+      // from a 20,000-token document throws most of it away without saying
+      // so, and the answer then looks complete.
+      if (plan.needed && plan.parts.length > 1 && !cloud && props.engine.running) {
+        try {
+          const notes: string[] = [];
+          for (let i = 0; i < plan.parts.length; i++) {
+            if (run.stopped) return;
+            setStatus(`Reading part ${i + 1} of ${plan.parts.length}…`);
+            notes.push(await once([{ role: "user", content: mapPrompt(body, plan.parts[i]!, i, plan.parts.length) }]));
+          }
+          if (run.stopped) return;
+          contextChars = whole.length;
+          sendContent = reducePrompt(body, notes);
+          setStatus(describePlan(plan));
+        } catch (e) {
+          if (run.stopped) return;
+          failRun(run, `That document could not be read in parts: ${e instanceof Error ? e.message : String(e)}`);
+          return;
+        }
+      } else {
+        setStatus(`Reading ${usable.length} file${usable.length > 1 ? "s" : ""}…`);
+        try {
+          const built = await api.buildContext(
+            usable.map((f) => ({ name: f.name, text: f.text })),
+            body,
+            Math.max(4000, Math.floor(props.contextSize * 2.6)),
+          );
+          if (run.stopped) return;
+          contextChars = built.context.length;
+          sendContent = `${built.context}\n\n${body}`;
+          // Extracts were taken rather than the whole file. Saying so is the
+          // difference between an answer from part of a document and an
+          // answer that appears to be from all of it.
+          const cut = (built.report ?? []).filter((r) => r.trimmed).map((r) => r.name);
+          if (cut.length) {
+            setStatus(`${cut.join(", ")} ${cut.length === 1 ? "was" : "were"} too long to send whole — the most relevant extracts were used.`);
+          }
+        } catch (e) {
+          if (run.stopped) return;
+          failRun(run, `Could not prepare the attached files: ${e instanceof Error ? e.message : String(e)}`);
+          return;
+        }
       }
     }
 
@@ -462,7 +512,15 @@ export function Chat(props: Props) {
       // A pack that will not read must not stop the answer; the chat goes on without it.
     }
 
-    const memories = await api.memoryForPrompt().catch(() => [] as string[]);
+    const saved = await api.memoryForPrompt().catch(() => [] as string[]);
+    // Only the notes that bear on this question. Everything saved used to go
+    // into every prompt, and a small model asked about one subject with an
+    // unrelated fact in front of it answers about the fact.
+    const memories = relevantMemories(
+      saved,
+      body,
+      (base ?? messages).slice(-4).map((m) => m.content),
+    );
     if (run.stopped) return;
     const enabledSkills = await api.skillsForPrompt().catch(() => [] as { name: string; instructions: string }[]);
     if (run.stopped) return;
@@ -600,15 +658,21 @@ export function Chat(props: Props) {
           return copy;
         });
       },
-      onDone: ({ tokens, answered }) => {
+      onDone: ({ tokens, answered, finish }) => {
         if (run.stopped) return;
+        // "length" means the engine stopped at the token limit rather than
+        // because the model had finished. Without that fact, a reply cut off
+        // before it began reads as a model that said nothing.
+        const hitLimit = finish === "length";
         // A reply with no text is a failure the person should see, not an
         // empty bubble — but there are two different failures here and they
         // need different advice.
         if (tokens === 0) {
           failRun(run,
-            `${picked.label} returned no text at all. The engine log below shows what it did. `
-            + "Try again, or choose another model.");
+            hitLimit
+              ? `${picked.label} reached its token limit before writing anything. Raise the reply length in Settings.`
+              : `${picked.label} returned no text at all. The engine log below shows what it did. `
+                + "Try again, or choose another model.");
           return;
         }
         if (answered === 0) {
@@ -616,9 +680,13 @@ export function Chat(props: Props) {
           // This is what a reasoning model does when it runs out of room
           // mid-thought; saying "returned no text" of it was simply wrong.
           failRun(run,
-            `${picked.label} thought it through but never reached an answer — all ${tokens} tokens were `
-            + "its working. That usually means the context is too small for it to finish. "
-            + "Try a shorter question, a larger context size, or another model.");
+            hitLimit
+              ? `${picked.label} used its whole token limit thinking and never began the answer — all ${tokens} tokens `
+                + "were its working. It is a reasoning model, so it needs more room: raise the reply length, "
+                + "or choose a model that answers directly."
+              : `${picked.label} thought it through but never reached an answer — all ${tokens} tokens were `
+                + "its working. That usually means the context is too small for it to finish. "
+                + "Try a shorter question, a larger context size, or another model.");
           return;
         }
         endRun(run);
@@ -658,7 +726,7 @@ export function Chat(props: Props) {
         void api.noteFailure(`chat failed: ${message}`).catch(() => undefined);
         failRun(run, message);
       },
-    });
+    }, engine.api_key);
     run.stop = () => handle.cancel();
   }
 
@@ -689,6 +757,68 @@ export function Chat(props: Props) {
       onDrop={onDrop}
     >
       {dragging && <div className="dropnote">Drop files to attach them</div>}
+
+      {/* The rail down the right. Closed it is two buttons; open it is one
+          panel. It sits beside the conversation rather than above the
+          composer, where the context meter used to push the box you are
+          writing in further down the screen every time it grew. */}
+      <div className={`rail${rail ? " open" : ""}`}>
+        <div className="rail-tabs">
+          <button
+            className={`rail-tab${rail === "context" ? " on" : ""}`}
+            aria-pressed={rail === "context"}
+            title="What is in the context window"
+            onClick={() => setRail((r) => (r === "context" ? null : "context"))}
+          >
+            Context
+          </button>
+          <button
+            className={`rail-tab${rail === "shell" ? " on" : ""}`}
+            aria-pressed={rail === "shell"}
+            title="A shell on this computer"
+            onClick={() => setRail((r) => (r === "shell" ? null : "shell"))}
+          >
+            Shell
+          </button>
+        </div>
+
+        {rail === "context" && (
+          <div className="rail-body">
+            {messages.length === 0 ? (
+              <p className="hint">Nothing has been said yet, so the window is empty.</p>
+            ) : (
+              <>
+                <ContextMeter
+                  pieces={pieces}
+                  limit={props.contextSize}
+                  baseUrl={props.engine.running ? props.engine.base_url : null}
+                  apiKey={props.engine.api_key}
+                  canCompact={canCompact(messages)}
+                  compacting={compacting}
+                  onCompact={() => void compactNow()}
+                />
+                {props.canUndoCompact && (
+                  <p className="hint ctx-undo">
+                    Earlier messages were replaced by a summary.{" "}
+                    <button className="linkbtn" onClick={() => props.onUndoCompact?.()}>Undo that</button>
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {rail === "shell" && (
+          <div className="rail-body">
+            <Terminal
+              proposed={toShell}
+              onUsedProposal={() => setToShell(null)}
+              onClose={() => setRail(null)}
+            />
+          </div>
+        )}
+      </div>
+
       {!empty && (
         <div className="scroll chatlog">
           {cast.length > 0 && (
@@ -720,6 +850,7 @@ export function Chat(props: Props) {
                       content={m.content}
                       showThinking={props.showThinking === true}
                       onOpenPane={props.onOpenPane}
+                      onShell={(c) => { setRail("shell"); setToShell(c); }}
                       streaming={streaming && i === messages.length - 1}
                       onSend={(t) => void send(t)}
                       // Only the newest turn may run a search, and only once:
@@ -805,22 +936,6 @@ export function Chat(props: Props) {
 
           <Attachments files={files} reading={reading} onRemove={(n) => setFiles((p) => p.filter((f) => f.name !== n))} />
 
-          {messages.length > 0 && (
-            <ContextMeter
-              pieces={pieces}
-              limit={props.contextSize}
-              baseUrl={props.engine.running ? props.engine.base_url : null}
-              canCompact={canCompact(messages)}
-              compacting={compacting}
-              onCompact={() => void compactNow()}
-            />
-          )}
-          {props.canUndoCompact && (
-            <p className="hint ctx-undo">
-              Earlier messages were replaced by a summary.{" "}
-              <button className="linkbtn" onClick={() => props.onUndoCompact?.()}>Undo that</button>
-            </p>
-          )}
 
           <div className="composerow">
             <div className="composergrow">

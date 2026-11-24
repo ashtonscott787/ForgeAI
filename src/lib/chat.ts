@@ -74,7 +74,13 @@ export interface StreamHandle {
 
 export interface StreamCallbacks {
   onToken: (text: string) => void;
-  onDone: (stats: { tokens: number; answered: number; seconds: number }) => void;
+  /**
+   * `finish` is the engine's own reason for stopping — "stop" when the model
+   * chose to, "length" when it hit the token limit. Without it, a reply cut
+   * off mid-thought and a model that simply said nothing are the same event
+   * to the caller, and they need different advice.
+   */
+  onDone: (stats: { tokens: number; answered: number; seconds: number; finish?: string | null }) => void;
   onError: (message: string) => void;
 }
 
@@ -82,12 +88,16 @@ export function streamChat(
   baseUrl: string,
   messages: ChatMessage[],
   cb: StreamCallbacks,
+  /** The engine's key for this launch; without it the engine answers 401. */
+  apiKey?: string,
 ): StreamHandle {
   const controller = new AbortController();
   const started = performance.now();
   let tokens = 0;
   /** True while the model's working is arriving, so the tag can be closed. */
   let inReasoning = false;
+  /** Why the engine stopped: "stop", "length", or nothing if it never said. */
+  let finish: string | null = null;
   /** Counted apart, so "thought but did not answer" can be told from "said nothing".  */
   let answered = 0;
 
@@ -120,7 +130,10 @@ export function streamChat(
       const send = (body: unknown) =>
         fetch(`${baseUrl}/v1/chat/completions`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -184,9 +197,14 @@ export function streamChat(
             if (payload === "[DONE]") continue;
             try {
               const json = JSON.parse(payload) as {
-                choices?: { delta?: { content?: string; reasoning_content?: string } }[];
+                choices?: { delta?: { content?: string; reasoning_content?: string }; finish_reason?: string | null }[];
               };
-              const delta = json.choices?.[0]?.delta;
+              const choice = json.choices?.[0];
+              // Why the reply ended. "length" means the limit was reached,
+              // which is the difference between a model that said nothing
+              // and a model that was cut off before it could start.
+              if (choice?.finish_reason) finish = choice.finish_reason;
+              const delta = choice?.delta;
               // A reasoning model's working does not arrive in `content`.
               // llama.cpp splits it into `reasoning_content`, and reading only
               // `content` meant a model that thought its way to an answer
@@ -215,10 +233,10 @@ export function streamChat(
       }
       // A reply that was all working and no answer still has a tag to close.
       if (inReasoning) { inReasoning = false; cb.onToken("</think>"); }
-      cb.onDone({ tokens, answered, seconds: (performance.now() - started) / 1000 });
+      cb.onDone({ tokens, answered, seconds: (performance.now() - started) / 1000, finish });
     } catch (e) {
       if ((e as Error).name === "AbortError") {
-        cb.onDone({ tokens, answered, seconds: (performance.now() - started) / 1000 });
+        cb.onDone({ tokens, answered, seconds: (performance.now() - started) / 1000, finish });
         return;
       }
       // A bare browser error ("Failed to fetch", "network error") names

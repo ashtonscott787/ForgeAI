@@ -1,13 +1,16 @@
 /**
- * The only place the frontend talks to the Rust core.
+ * The only place the frontend talks to the main process.
  *
- * Every type mirrors a `serde` type in the shell or in `forge-core`. If the two
- * drift, the build breaks here rather than at runtime.
+ * Every type mirrors what electron/main.cjs returns. If the two drift, the
+ * build breaks here rather than at runtime.
+ *
+ * This used to fall back to Tauri's IPC when the Electron bridge was absent,
+ * which meant an Electron app shipping @tauri-apps/api in its bundle for a
+ * path it can never take. The Rust shell in src-tauri/ is not what gets
+ * built or released. A missing bridge is now a fault that says so.
  */
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import { listen as tauriListen } from "@tauri-apps/api/event";
 
-/** Electron exposes `window.forge` from its preload; Tauri exposes its own IPC. */
+/** Electron exposes `window.forge` from its preload. */
 type Bridge = {
   invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   on: (event: string, cb: (payload: unknown) => void) => () => void;
@@ -16,13 +19,33 @@ type Bridge = {
 const bridge: Bridge | undefined =
   typeof window !== "undefined" ? (window as unknown as { forge?: Bridge }).forge : undefined;
 
+/** The same sentence for both, because they fail for the same one reason. */
+const noBridge = (what: string) =>
+  new Error(
+    `Forge AI cannot reach its own main process (${what}). The window was loaded without its preload script, `
+    + "which should not be possible in the installed app — re-download it.",
+  );
+
 function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (bridge) return bridge.invoke(cmd, args) as Promise<T>;
-  return tauriInvoke<T>(cmd, args);
+  return Promise.reject(noBridge(cmd));
 }
+let warnedNoBridge = false;
+/**
+ * Subscribing without a bridge is a no-op, not a rejection.
+ *
+ * A caller awaits an invoke and can handle its failure; nobody awaits a
+ * subscription, so rejecting one produces an unhandled rejection for every
+ * event the app listens to — three of them before the window had finished
+ * drawing. It warns once and returns an unsubscribe that does nothing.
+ */
 function listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<() => void> {
   if (bridge) return Promise.resolve(bridge.on(event, (p) => cb({ payload: p as T })));
-  return tauriListen<T>(event, cb);
+  if (!warnedNoBridge) {
+    warnedNoBridge = true;
+    console.warn(noBridge("events").message);
+  }
+  return Promise.resolve(() => undefined);
 }
 
 export type Backend = "metal" | "cuda" | "vulkan" | "cpu";
@@ -153,6 +176,12 @@ export interface EngineStatus {
   port: number;
   model_file: string | null;
   base_url: string;
+  /**
+   * The engine's key for this launch. It binds to 127.0.0.1, which does not
+   * keep out other programs on this machine — a web page can reach localhost
+   * and the engine answers any origin. Every request carries this.
+   */
+  api_key?: string;
 }
 
 export interface InstalledModel {
@@ -190,6 +219,29 @@ export interface ClusterStatus {
   engine_running: boolean;
   worker: { running: boolean; host: string; port: number; log: string[] };
   addresses: { name: string; address: string; private: boolean }[];
+}
+
+/** A download that stopped partway and was never picked up again. */
+export interface PartialDownload {
+  part: string;
+  file_name: string;
+  bytes: number;
+  at: number;
+  superseded: boolean;
+}
+
+export interface ShellStatus {
+  open: boolean;
+  cwd: string;
+  platform: string;
+}
+export interface ShellResult {
+  ok: boolean;
+  code?: number;
+  output?: string;
+  why?: string;
+  refused?: boolean;
+  timedOut?: boolean;
 }
 
 export interface WorkshopFormat { id: string; label: string; note: string }
@@ -569,6 +621,22 @@ export const api = {
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
   /** Other computers, and this one as a worker. Nothing is contacted unless `check`. */
+  /**
+   * The shell. Nothing here runs without the person pressing Run: the
+   * assistant can propose a command, and that is all it can do.
+   */
+  partialDownloads: () => invoke<PartialDownload[]>("partial_downloads"),
+  discardPartial: (part: string) => invoke<{ ok: boolean; why?: string }>("discard_partial", { part }),
+  shellStatus: () => invoke<ShellStatus>("shell_status"),
+  shellOpen: (cwd?: string) => invoke<{ ok: boolean; why?: string } & ShellStatus>("shell_open", { cwd }),
+  shellRun: (command: string) => invoke<ShellResult & ShellStatus>("shell_run", { command }),
+  shellInterrupt: () => invoke<{ ok: boolean }>("shell_interrupt"),
+  shellClose: () => invoke<{ ok: boolean } & ShellStatus>("shell_close"),
+  /** Whether a command would be refused, without running it. */
+  shellCheck: (command: string) => invoke<{ allowed: boolean; why: string | null }>("shell_check", { command }),
+  shellPickFolder: () => invoke<{ ok: boolean; cwd?: string }>("shell_pick_folder"),
+  onShellData: (cb: (e: { chunk: string }) => void) => listen<{ chunk: string }>("shell://data", (e) => cb(e.payload)),
+
   /** Making a model from one already installed: smaller, or with an adapter baked in. */
   workshopStatus: () => invoke<WorkshopStatus>("workshop_status"),
   workshopSuggest: (source: string, format: string) => invoke<string>("workshop_suggest", { source, format }),

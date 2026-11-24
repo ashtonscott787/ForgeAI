@@ -80,9 +80,11 @@ export function Agents({
       const file = agent.model || installed[0]?.file_name || "";
       if (!file) { setLog((l) => [...l, { kind: "note", text: "No model is installed, so there is nothing to run this on." }]); return; }
       let base = "";
+      let key: string | undefined;
       try {
         const st = await api.ensureEngine(file);
         base = st.base_url;
+        key = st.api_key;
       } catch (e) {
         setLog((l) => [...l, { kind: "note", text: `The model could not start: ${e instanceof Error ? e.message : String(e)}` }]);
         return;
@@ -97,7 +99,7 @@ export function Agents({
             onToken: (t: string) => { reply += t; },
             onDone: () => resolve(),
             onError: (e: string) => { reply = reply || `The model could not answer: ${e}`; resolve(); },
-          });
+          }, key);
         });
         if (stop.current) break;
 
