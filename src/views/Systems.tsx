@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Finding, type SecurityReport, type StatusRow, type SystemStatus } from "../lib/ipc";
+import { ClusterPanel } from "../components/ClusterPanel";
 
 /**
  * What is connected, drawn rather than listed.
@@ -110,6 +111,8 @@ export function Systems({ onAsk }: { onAsk: (text: string) => void }) {
               ))}
             </ul>
           )}
+
+          <ClusterPanel />
 
           <Security report={audit} onAsk={onAsk} onRefresh={() => void api.securityAudit().then(setAudit).catch(() => undefined)} />
         </div>

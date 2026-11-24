@@ -75,7 +75,11 @@ const step = async (name, fn) => {
   });
 
   await step("the browser opens a real https page in a <webview>", async () => {
-    await win.getByRole("button", { name: "Browser", exact: true }).click();
+    // The browser stopped being a page of its own in "Fewer pages, a fixed
+    // permission list, and a built-in assistant": it is a pane beside the
+    // chat now, opened from the globe. This test went on clicking a button
+    // that no longer existed, and five checks failed for that one reason.
+    await win.getByRole("button", { name: "Open the browser" }).click();
     await win.getByLabel("Address or search").fill("example.com");
     await win.getByRole("button", { name: "Go", exact: true }).click();
     await win.waitForSelector("webview", { timeout: 10_000 });

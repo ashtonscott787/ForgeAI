@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 if [ -z "$FORGE_CHROMIUM" ] && [ -x /opt/pw-browsers/chromium ]; then
   export FORGE_CHROMIUM=/opt/pw-browsers/chromium
 fi
-SUITES=(settings-ui journeys-ui mcp-ui mailsetup-ui cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui boot-ui mailbox-ui systems-ui people-ui context-ui)
+SUITES=(settings-ui journeys-ui mcp-ui mailsetup-ui cloud-ui browser-ui chat-ui agents-ui documents-ui search-ui responsive-ui mail-ui boot-ui mailbox-ui systems-ui people-ui context-ui cluster-ui)
 FAILED=()
 
 echo "== unit tests"
@@ -47,6 +47,26 @@ for s in "${SUITES[@]}"; do
     FAILED+=("$s")
   fi
 done
+
+# The real Electron, with a real <webview>. It is slower than the rest, and
+# leaving it out of this script is how it came to spend months testing a
+# button that had been removed: five checks failed for one stale selector and
+# nobody saw, because nothing ran it. Set FORGE_SKIP_E2E=1 to leave it out.
+if [ "${FORGE_SKIP_E2E:-0}" != "1" ]; then
+  echo
+  echo "== electron e2e"
+  # Chosen before running, never as a fallback after one: `A || B` gives a
+  # genuinely failing run a free second attempt, which is how a red suite
+  # once reported green. macOS has no xvfb-run and needs none.
+  if command -v xvfb-run >/dev/null 2>&1; then E2E=(xvfb-run -a node); else E2E=(node); fi
+  if out=$("${E2E[@]}" tests/e2e/electron.e2e.cjs 2>&1); then
+    echo "$out" | tail -1
+  else
+    echo "$out" | grep -E "^FAIL" -A 3 | head -20
+    echo "$out" | tail -1
+    FAILED+=("electron-e2e")
+  fi
+fi
 
 echo
 echo "────────────────────────────"

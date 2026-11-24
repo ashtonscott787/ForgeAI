@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { WorkshopPanel } from "../components/WorkshopPanel";
 import {
   api,
   CAP_LABEL,
@@ -291,6 +292,13 @@ export function Models(props: Props) {
             {busy.custom ?? "Download"}
           </button>
         </div>
+      )}
+
+      {props.installed.length > 0 && (
+        <>
+          <h3 className="secthead">Your own</h3>
+          <WorkshopPanel installed={props.installed} />
+        </>
       )}
 
       {installed.length > 0 && (

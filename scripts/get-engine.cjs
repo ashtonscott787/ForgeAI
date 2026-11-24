@@ -33,6 +33,16 @@ const root = path.join(__dirname, "..");
 const engineDir = path.join(root, "engine");
 const binName = process.platform === "win32" ? "llama-server.exe" : "llama-server";
 
+/**
+ * The binaries kept out of the archive.
+ *
+ * Adding one here is adding a capability to the shipped app, so the list is
+ * short and each name is one the app calls by name. ggml-rpc-server is what
+ * makes a second computer usable: llama-server is pointed at it with --rpc
+ * and layers of the model run there instead.
+ */
+const WANTED = /^(llama-server|ggml-rpc-server|llama-quantize|llama-export-lora)(\.exe)?$/;
+
 function die(message) {
   console.error(`\nCould not set up the engine: ${message}\n`);
   process.exit(1);
@@ -86,7 +96,14 @@ function main() {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory() && !entry.isSymbolicLink()) { walk(p); continue; }
-      if (/^llama-server(\.exe)?$/.test(entry.name) || /\.(dylib|so|dll)$/.test(entry.name) || /^LICENSE/.test(entry.name)) {
+      // What the app actually runs, and nothing else: the archive holds
+      // around sixty files and most of them are development tools.
+      //   llama-server      answers chat requests
+      //   ggml-rpc-server   lends this machine's compute to another one, so a
+      //                     model can be split across computers
+      //   llama-quantize    makes a smaller copy of a model
+      //   llama-export-lora bakes an adapter into a model, producing a new one
+      if (WANTED.test(entry.name) || /\.(dylib|so|dll)$/.test(entry.name) || /^LICENSE/.test(entry.name)) {
         const dest = path.join(engineDir, entry.name);
         // Copy a link as a link. Dereferencing it writes a full duplicate of
         // the library under each of its names — three copies of every dylib,
@@ -107,7 +124,14 @@ function main() {
   if (!copied) die("the archive held no engine files.");
   console.log(`Copied ${copied} files into engine/`);
 
-  try { fs.chmodSync(path.join(engineDir, binName), 0o755); } catch { /* already executable */ }
+  // Every tool the app may run, not just the server: a ggml-rpc-server that
+  // arrives without the executable bit fails at the moment somebody tries to
+  // link a second computer, which is a long way from here.
+  for (const name of fs.readdirSync(engineDir)) {
+    if (WANTED.test(name)) {
+      try { fs.chmodSync(path.join(engineDir, name), 0o755); } catch { /* already executable */ }
+    }
+  }
   finish();
 }
 

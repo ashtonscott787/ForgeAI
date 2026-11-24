@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  What the hardened runtime is asked to allow.
+
+  Signing with a Developer ID means opting into the hardened runtime, which
+  by default forbids the things a browser engine must do. Each entry below is
+  here because something would not run without it, and nothing is here "just
+  in case": every entitlement is a hole in the protection, and an unused one
+  is a hole for nothing.
+
+  - allow-jit and allow-unsigned-executable-memory: V8 compiles JavaScript to
+    machine code at runtime. Chromium does not start without these.
+  - disable-library-validation: the app loads the llama.cpp engine libraries
+    that ship beside it. They are signed with the same certificate, but the
+    engine also dlopen()s its backends by name at runtime, which validation
+    refuses.
+  - network.client and network.server: the engine is an HTTP server on
+    localhost that the app talks to, and sharing this machine's model with
+    another computer listens for connections.
+  - files.user-selected.read-write: documents the person picks, and the
+    folder models are downloaded into.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <key>com.apple.security.network.server</key>
+  <true/>
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+</dict>
+</plist>

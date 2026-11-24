@@ -147,6 +147,73 @@ const BRIDGE = String.raw`(() => {
     agent_list: () => (state.agents || (state.agents = [])),
     mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady), provider: "other", imap_host: cfg.mailReady ? "imap.example.com" : "", imap_port: 993, can_read: Boolean(cfg.mailReady) }),
     mail_save: () => ({ ok: true }),
+    // More than one computer. The worker never runs in a test; what is
+    // checked is that the interface refuses the dangerous choices and says
+    // which machines are actually in use.
+    cluster_status: () => state.cluster || (state.cluster = {
+      available: cfg.noWorker ? false : true,
+      enabled: false,
+      peers: [],
+      using: [],
+      engine_running: false,
+      worker: { running: false, host: "127.0.0.1", port: 50052, log: [] },
+      addresses: [{ name: "en0", address: "192.168.1.42", private: true }],
+    }),
+    cluster_set: (a) => {
+      const c = handlers.cluster_status();
+      if (a && Array.isArray(a.peers)) {
+        const bad = a.peers.find((t) => !/^[A-Za-z0-9._-]+(:\d+)?$/.test(String(t).trim()));
+        // No template literals in here: this whole block lives inside a
+        // String.raw template, and a backtick ends it.
+        if (bad) return { ok: false, why: '"' + bad + '" is not an address.' };
+        c.peers = a.peers.map((t) => {
+          const [h, p] = String(t).trim().split(":");
+          return { host: h, port: Number(p) || 50052, label: h + ":" + (Number(p) || 50052), ok: null };
+        });
+      }
+      if (a && a.enabled !== undefined) c.enabled = Boolean(a.enabled);
+      return { ok: true, ...c };
+    },
+    cluster_check: () => {
+      const c = handlers.cluster_status();
+      c.peers = c.peers.map((p, i) => (i === 0 ? { ...p, ok: true, ms: 7 } : { ...p, ok: false, why: "nothing is listening on that port" }));
+      return c;
+    },
+    worker_set: (a) => {
+      const c = handlers.cluster_status();
+      if (a && a.enabled && a.host === "0.0.0.0" && !a.allowPublic) {
+        return { ok: false, why: "Listening on every interface would offer this machine to any network it joins, and the worker has no password of any kind." };
+      }
+      c.worker = { running: Boolean(a && a.enabled), host: (a && a.host) || c.worker.host, port: (a && a.port) || c.worker.port, log: a && a.enabled ? ["worker listening"] : [] };
+      return { ok: true, ...c };
+    },
+    // Making a model from one already installed.
+    workshop_status: () => state.shop || (state.shop = {
+      formats: [
+        { id: "Q4_K_M", label: "Q4_K_M", note: "The usual choice. About half the size of Q8 and hard to tell apart in use." },
+        { id: "Q6_K", label: "Q6_K", note: "Close to indistinguishable from Q8, and smaller." },
+      ],
+      can_shrink: true,
+      can_combine: true,
+      job: null,
+    }),
+    workshop_suggest: ({ source, format }) => String(source).replace(/\.gguf$/i, "").replace(/[-.]Q\d[A-Z0-9_]*$/i, "") + "-" + format + ".gguf",
+    workshop_shrink: ({ name }) => {
+      const st = handlers.workshop_status();
+      st.job = { kind: "shrink", out: name, started: Date.now(), log: ["quantizing…"] };
+      return { ok: true, ...st };
+    },
+    workshop_combine: ({ adapter, name }) => {
+      const st = handlers.workshop_status();
+      if (!/\.gguf$/i.test(String(adapter))) return { ok: false, why: "The adapter has to be a .gguf file." };
+      st.job = { kind: "combine", out: name, started: Date.now(), log: ["merging…"] };
+      return { ok: true, ...st };
+    },
+    workshop_stop: () => {
+      const st = handlers.workshop_status();
+      st.job = null;
+      return { ok: true, ...st };
+    },
     system_status: () => ({
       at: Date.now(), worst: "failed", headline: "1 not working",
       counts: { connected: 4, failed: 1, off: 2, not_set_up: 2 },

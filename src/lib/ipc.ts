@@ -169,6 +169,37 @@ export interface LinkReadiness {
   explanation: string;
 }
 
+/** One other computer that can run part of a model for this one. */
+export interface ClusterPeer {
+  host: string;
+  port: number;
+  label: string;
+  /** null until it has been checked. */
+  ok: boolean | null;
+  ms?: number;
+  why?: string;
+}
+
+export interface ClusterStatus {
+  /** Whether this copy of the app ships the worker at all. */
+  available: boolean;
+  enabled: boolean;
+  peers: ClusterPeer[];
+  /** The machines the running engine is actually using. */
+  using: string[];
+  engine_running: boolean;
+  worker: { running: boolean; host: string; port: number; log: string[] };
+  addresses: { name: string; address: string; private: boolean }[];
+}
+
+export interface WorkshopFormat { id: string; label: string; note: string }
+export interface WorkshopStatus {
+  formats: WorkshopFormat[];
+  can_shrink: boolean;
+  can_combine: boolean;
+  job: { kind: "shrink" | "combine"; out: string; started: number; log: string[] } | null;
+}
+
 export interface Attachment {
   name: string;
   path: string;
@@ -537,6 +568,21 @@ export const api = {
     listen<{ seconds: number; tail: string }>("engine://loading", (e) => cb(e.payload)),
   engineStatus: () => invoke<EngineStatus>("engine_status"),
   linkReadiness: () => invoke<LinkReadiness>("link_readiness"),
+  /** Other computers, and this one as a worker. Nothing is contacted unless `check`. */
+  /** Making a model from one already installed: smaller, or with an adapter baked in. */
+  workshopStatus: () => invoke<WorkshopStatus>("workshop_status"),
+  workshopSuggest: (source: string, format: string) => invoke<string>("workshop_suggest", { source, format }),
+  workshopShrink: (a: { source: string; format: string; name?: string }) =>
+    invoke<{ ok: boolean; why?: string } & Partial<WorkshopStatus>>("workshop_shrink", a),
+  workshopCombine: (a: { source: string; adapter: string; name: string }) =>
+    invoke<{ ok: boolean; why?: string } & Partial<WorkshopStatus>>("workshop_combine", a),
+  workshopStop: () => invoke<{ ok: boolean } & Partial<WorkshopStatus>>("workshop_stop"),
+  clusterStatus: (check = false) => invoke<ClusterStatus>("cluster_status", { check }),
+  clusterCheck: () => invoke<ClusterStatus>("cluster_check"),
+  clusterSet: (a: { peers?: string[]; enabled?: boolean }) =>
+    invoke<{ ok: boolean; why?: string } & Partial<ClusterStatus>>("cluster_set", a),
+  workerSet: (a: { enabled: boolean; host?: string; port?: number; allowPublic?: boolean }) =>
+    invoke<{ ok: boolean; why?: string } & Partial<ClusterStatus>>("worker_set", a),
   shareStatus: () => invoke<ShareStatus>("share_status"),
   contactsList: (pendingOnly = false) => invoke<ContactRow[]>("contacts_list", { pending_only: pendingOnly }),
   contactsDecide: (a: { email: string; fact_id: string; state: "confirmed" | "rejected" }) => invoke<ContactFact | null>("contacts_decide", a),

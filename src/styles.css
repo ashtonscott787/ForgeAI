@@ -1718,3 +1718,56 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
   .wg-line { stroke-dashoffset: 0; animation: none; }
   .wg-tip, .wg-x, .wg-label { opacity: 1; animation: none; }
 }
+
+/* ------------------------------------------------------------------ *
+ * More than one computer.
+ * ------------------------------------------------------------------ */
+.sub { margin: 18px 0 8px; font-size: 0.95em; }
+.peers { list-style: none; margin: 0 0 10px; padding: 0; }
+.peer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.peer-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--fg-3, #8b8b94);
+  flex: none;
+}
+.peer.good .peer-dot { background: var(--ok, #35b36b); }
+.peer.bad .peer-dot { background: var(--bad, #d9534f); }
+.peer-name { font-weight: 600; }
+.peer-state { color: var(--muted); font-size: 0.88em; }
+.peer-using {
+  margin-left: auto;
+  font-size: 0.8em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ok, #35b36b);
+  color: #06250f;
+}
+.peer-add { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+.peer-add input { flex: 1; min-width: 220px; }
+.worker-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
+.worker-row label { display: flex; flex-direction: column; gap: 4px; }
+.worker-port { color: var(--muted); padding-bottom: 8px; }
+.worker-log {
+  max-height: 150px;
+  overflow: auto;
+  font-size: 0.78em;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--line);
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+.sheet-warn {
+  border-left: 3px solid var(--warn, #b8860b);
+  padding: 6px 0 6px 10px;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.9em;
+}

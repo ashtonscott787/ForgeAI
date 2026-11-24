@@ -91,7 +91,19 @@ const root = () => path.join(app.getPath("userData"));
 const modelsDir = () => { const d = path.join(root(), "models"); fs.mkdirSync(d, { recursive: true }); return d; };
 const settingsFile = () => path.join(root(), "settings.json");
 const engineDir = () => app.isPackaged ? path.join(process.resourcesPath, "engine") : path.join(__dirname, "..", "engine-dev");
+const cluster = require("./cluster.cjs");
+const workshop = require("./workshop.cjs");
+/** The one job the workshop is running, if any. One at a time, on purpose:
+ *  two quantisations at once on a laptop is two slow jobs, not two fast ones. */
+let shopJob = null;
+/** Machines this engine run is actually using. Empty means this one alone. */
+let clusterUsing = [];
+/** This machine lending itself out, if it is. */
+let workerProc = null;
+const workerLog = [];
 const serverBin = () => path.join(engineDir(), process.platform === "win32" ? "llama-server.exe" : "llama-server");
+const exe = (name) => path.join(engineDir(), process.platform === "win32" ? `${name}.exe` : name);
+const rpcWorkerBin = () => exe("ggml-rpc-server");
 
 // ── settings ────────────────────────────────────────────────
 /**
@@ -116,6 +128,18 @@ const DEFAULTS = {
   threads: null,
   selected_model: null,
   experimental_cluster: false,
+  /**
+   * Other computers that lend their compute to this one, as "host:port".
+   * Adding one contacts nothing; they are reached when a model is started
+   * and the ones that answer are the ones used.
+   */
+  cluster_peers: [],
+  /** Use them. Off means every model runs on this machine alone. */
+  cluster_enabled: false,
+  /** This machine lending itself to another. Off until it is switched on. */
+  worker_enabled: false,
+  worker_host: "127.0.0.1",
+  worker_port: 50052,
   // How the weights are run: "gpu" offloads everything it can, "cpu" keeps
   // them off the GPU entirely, "split" offloads a chosen number of layers.
   run_mode: "gpu",
@@ -505,12 +529,31 @@ async function startEngine({ modelFile }) {
     "--n-gpu-layers", String(layers),
   ];
   if (settings.threads) args.push("--threads", String(settings.threads));
+  // Other computers. They are checked first and only the ones that answered
+  // are passed: handing the engine an address nothing is listening on makes
+  // it refuse to start, so one laptop asleep would read as a broken app.
+  // Written into the engine log once it is open, a few lines below, so the
+  // reason a machine was left out is in the same place as everything else
+  // about the run.
+  const peerNotes = [];
+  clusterUsing = [];
+  if (settings.cluster_enabled && (settings.cluster_peers || []).length) {
+    const peers = (settings.cluster_peers || []).map((t) => cluster.parsePeer(t)).filter(Boolean);
+    const checked = await cluster.reachAll(peers);
+    clusterUsing = checked.filter((p) => p.ok).map((p) => p.label);
+    args.push(...cluster.rpcFlags(checked));
+    for (const p of checked) {
+      peerNotes.push(p.ok ? `cluster: using ${p.label} (answered in ${p.ms}ms)` : `cluster: NOT using ${p.label} — ${p.why}`);
+    }
+    if (!clusterUsing.length) peerNotes.push("cluster: no other computer answered, so this model runs on this machine alone.");
+  }
   // A vision model's projector sits beside it; the engine reads images only with it.
   const projector = path.join(modelsDir(), projectorName(safeName(modelFile)));
   if (fs.existsSync(projector)) args.push("--mmproj", projector);
   // --no-mmap reads the whole file into RAM instead of paging it from disk.
   if (settings.load_into_memory) args.push("--no-mmap");
   const log = openEngineLog(logFile());
+  for (const note of peerNotes) log.write(`${note}\n`);
   const proc = spawn(serverBin(), args, { cwd: engineDir(), windowsHide: true, env: { ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH } });
   // Both output streams feed one guarded log. The log is closed exactly once, on
   // close, and any later chunk is dropped rather than written to an ended stream.
@@ -1612,6 +1655,165 @@ function register(win) {
     return shareStatus();
   });
 
+  // ── one model across more than one computer ───────────
+  //
+  // Two halves that can be used in either direction: peers this machine
+  // borrows, and a worker this machine lends. Nothing here contacts anything
+  // until it is asked to.
+  const clusterState = async (check = false) => {
+    const peers = (settings.cluster_peers || []).map((t) => cluster.parsePeer(t)).filter(Boolean);
+    const rows = check
+      ? await cluster.reachAll(peers)
+      : peers.map((p) => ({ ...p, label: cluster.peerLabel(p), ok: null }));
+    return {
+      available: fs.existsSync(rpcWorkerBin()),
+      enabled: Boolean(settings.cluster_enabled),
+      peers: rows,
+      using: clusterUsing,
+      engine_running: Boolean(engine.proc),
+      worker: {
+        running: Boolean(workerProc),
+        host: settings.worker_host,
+        port: Number(settings.worker_port) || cluster.DEFAULT_PORT,
+        log: workerLog.slice(-12),
+      },
+      addresses: cluster.localAddresses(),
+    };
+  };
+
+  h("cluster_status", ({ check } = {}) => clusterState(Boolean(check)));
+
+  h("cluster_set", async (a) => {
+    const list = Array.isArray(a?.peers) ? a.peers : settings.cluster_peers;
+    // Kept as text exactly as it parses, so a typo is refused here rather
+    // than at the moment somebody is waiting for an answer.
+    const clean = [];
+    for (const entry of list || []) {
+      const p = cluster.parsePeer(entry);
+      if (!p) return { ok: false, why: `"${entry}" is not an address. Write it as a name or address, optionally with a port: studio.local:50052` };
+      const label = cluster.peerLabel(p);
+      if (!clean.includes(label)) clean.push(label);
+    }
+    settings = { ...settings, cluster_peers: clean, cluster_enabled: a?.enabled === undefined ? settings.cluster_enabled : Boolean(a.enabled) };
+    saveSettings(settings);
+    return { ok: true, ...(await clusterState(false)) };
+  });
+
+  h("cluster_check", () => clusterState(true));
+
+  h("worker_set", async (a) => {
+    const want = Boolean(a?.enabled);
+    if (workerProc) {
+      try { workerProc.kill(); } catch { /* already gone */ }
+      workerProc = null;
+    }
+    if (!want) {
+      settings = { ...settings, worker_enabled: false };
+      saveSettings(settings);
+      return { ok: true, ...(await clusterState(false)) };
+    }
+    if (!fs.existsSync(rpcWorkerBin())) {
+      return { ok: false, why: "This copy of Forge AI has no worker in it. Re-download the app." };
+    }
+    const host = String(a?.host || settings.worker_host || "127.0.0.1");
+    const port = Number(a?.port) > 0 ? Number(a.port) : Number(settings.worker_port) || cluster.DEFAULT_PORT;
+    try {
+      workerLog.length = 0;
+      workerProc = cluster.startWorker({
+        bin: rpcWorkerBin(),
+        host,
+        port,
+        allowPublic: a?.allowPublic === true,
+        cwd: engineDir(),
+        env: { ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH },
+        onLine: (line) => { workerLog.push(line); if (workerLog.length > 200) workerLog.shift(); },
+      });
+      workerProc.on("exit", (code) => {
+        workerLog.push(`the worker stopped (${code})`);
+        workerProc = null;
+      });
+    } catch (e) {
+      workerProc = null;
+      return { ok: false, why: e.message };
+    }
+    settings = { ...settings, worker_enabled: true, worker_host: host, worker_port: port };
+    saveSettings(settings);
+    return { ok: true, ...(await clusterState(false)) };
+  });
+
+  // ── making a model from one you already have ──────────
+  const shopEnv = () => ({ ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH });
+  const shopState = () => ({
+    formats: workshop.FORMATS,
+    can_shrink: fs.existsSync(exe("llama-quantize")),
+    can_combine: fs.existsSync(exe("llama-export-lora")),
+    job: shopJob
+      ? { kind: shopJob.kind, out: shopJob.out, started: shopJob.started, log: shopJob.log.slice(-14) }
+      : null,
+  });
+
+  h("workshop_status", () => shopState());
+  h("workshop_suggest", ({ source, format }) => workshop.suggestName(String(source || ""), String(format || "Q4_K_M")));
+
+  const begin = (kind, plan, bin, argsFor) => {
+    if (shopJob) return { ok: false, why: "One job at a time. Wait for the current one, or stop it." };
+    if (!plan.ok) return plan;
+    if (!fs.existsSync(bin)) return { ok: false, why: `This copy of Forge AI has no ${path.basename(bin)} in it. Re-download the app.` };
+    const control = new AbortController();
+    shopJob = { kind, out: plan.out, started: Date.now(), log: [], control };
+    const job = shopJob;
+    // Deliberately not awaited: these take minutes, and the window must stay
+    // answerable while one runs. Progress is read with workshop_status.
+    void workshop
+      .finishInto({
+        dest: plan.dest,
+        run: (part) =>
+          workshop.runTool({
+            bin,
+            args: argsFor(part),
+            cwd: engineDir(),
+            env: shopEnv(),
+            signal: control.signal,
+            onLine: (line) => { job.log.push(line); if (job.log.length > 400) job.log.shift(); },
+          }),
+      })
+      .then((r) => {
+        job.log.push(r.ok ? `Finished: ${r.file}` : `Did not finish: ${r.why}`);
+        job.done = r;
+      })
+      .finally(() => {
+        // Kept briefly so the last lines can be read, then cleared.
+        setTimeout(() => { if (shopJob === job) shopJob = null; }, 20_000);
+      });
+    return { ok: true, ...shopState() };
+  };
+
+  h("workshop_shrink", ({ source, format, name }) =>
+    begin(
+      "shrink",
+      workshop.planShrink({ dir: modelsDir(), source, format, outName: name }),
+      exe("llama-quantize"),
+      // The source is read, never written: the output path is the second
+      // argument and llama-quantize creates it.
+      (part) => [path.join(modelsDir(), safeName(String(source))), part, String(format)],
+    ),
+  );
+
+  h("workshop_combine", ({ source, adapter, name }) =>
+    begin(
+      "combine",
+      workshop.planCombine({ dir: modelsDir(), source, adapter, outName: name }),
+      exe("llama-export-lora"),
+      (part) => ["-m", path.join(modelsDir(), safeName(String(source))), "-o", part, "--lora", String(adapter)],
+    ),
+  );
+
+  h("workshop_stop", () => {
+    if (!shopJob) return { ok: true, ...shopState() };
+    try { shopJob.control.abort(); } catch { /* already finished */ }
+    return { ok: true, ...shopState() };
+  });
+
   h("link_readiness", () => {
     let addr = null;
     for (const list of Object.values(os.networkInterfaces())) for (const i of list || []) {
@@ -1620,10 +1822,12 @@ function register(win) {
     return {
       mesh_interface_detected: !!addr,
       mesh_address: addr,
-      distributed_inference_enabled: false,
-      explanation: addr
-        ? "A private mesh address was found on this machine, so the networking side of clustering is in place. Running one model across two computers is still not implemented, so every model runs here."
-        : "No private mesh network was found. Clustering is not implemented yet either, so every model runs on this computer.",
+      distributed_inference_enabled: Boolean(settings.cluster_enabled && (settings.cluster_peers || []).length),
+      explanation: settings.cluster_enabled && (settings.cluster_peers || []).length
+        ? `Splitting a model across computers is switched on, with ${(settings.cluster_peers || []).length} other machine(s) listed. Each is checked when a model starts, and only the ones that answer are used.`
+        : addr
+          ? "A private mesh address was found on this machine. Splitting a model across computers is available and switched off, so every model runs here."
+          : "Splitting a model across computers is available and switched off, so every model runs here.",
     };
   });
 }
@@ -1744,5 +1948,17 @@ app.whenReady().then(() => {
   reminders.schedule();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on("window-all-closed", () => { stopEngine(); reminders.stop(); app.quit(); });
-app.on("before-quit", stopEngine);
+/**
+ * Closing the app stops lending this machine out.
+ *
+ * A worker left listening after the window closed would be a port on the
+ * network belonging to a program the person believes they have quit.
+ */
+function stopWorker() {
+  if (workerProc) {
+    try { workerProc.kill(); } catch { /* already gone */ }
+    workerProc = null;
+  }
+}
+app.on("window-all-closed", () => { stopEngine(); stopWorker(); reminders.stop(); app.quit(); });
+app.on("before-quit", () => { stopEngine(); stopWorker(); });
