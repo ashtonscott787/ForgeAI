@@ -161,18 +161,30 @@ function cores(platform = process.platform, rawRun = tryRun) {
  * runs at all. A machine is judged on the memory a model can actually use:
  * its graphics memory where that is separate, its system memory where the
  * two are one pool.
+ *
+ * A tier decides how big a model, how long a context and how precise a
+ * conversation cache. It does NOT decide whether the graphics hardware is
+ * used, and the field for that is deliberately absent here.
+ *
+ * It was not absent in 0.7.1, and the result was a regression on every
+ * 8 GB Apple Silicon Mac: 60% of 8 GB is 4.8 GB, which falls under the
+ * 5 GB line, so those machines landed in Tiny — and Tiny carried
+ * gpu_layers: 0. An M3 went from 47 tokens a second to 25.8, and from 207
+ * to 15.8 reading the prompt, because the unified memory it was being
+ * protected from is the same memory its GPU uses.
  */
 const TIERS = [
   {
     id: "tiny",
     label: "Tiny",
-    says: "Small memory and no graphics card. Everything is sized to leave the machine usable.",
+    // Says nothing about graphics: an 8 GB Mac lands here and has very
+    // capable graphics indeed.
+    says: "Small memory. Models and context are kept small so the machine stays usable.",
     max_model_bytes: 1.6 * GiB,
     context: 4096,
     parallel: 1,
     flash_attention: false,
     kv_type: "q8_0",
-    gpu_layers: 0,
   },
   {
     id: "small",
@@ -183,7 +195,6 @@ const TIERS = [
     parallel: 1,
     flash_attention: true,
     kv_type: "q8_0",
-    gpu_layers: 999,
   },
   {
     id: "medium",
@@ -194,7 +205,6 @@ const TIERS = [
     parallel: 1,
     flash_attention: true,
     kv_type: "f16",
-    gpu_layers: 999,
   },
   {
     id: "large",
@@ -205,11 +215,23 @@ const TIERS = [
     parallel: 1,
     flash_attention: true,
     kv_type: "f16",
-    gpu_layers: 999,
   },
 ];
 
 const tierById = (id) => TIERS.find((t) => t.id === id) || null;
+
+/**
+ * How many layers go to the graphics hardware.
+ *
+ * Everything, wherever there is hardware to put them on; nothing where
+ * there is not. Size of machine has no bearing on it — a small machine with
+ * a GPU still wants the GPU.
+ */
+const layersFor = (accelerated) => (accelerated ? 999 : 0);
+
+/** A tier with the one setting that depends on the hardware filled in. */
+const settingsFor = (tier, accelerated) =>
+  tier ? { ...tier, gpu_layers: layersFor(accelerated) } : null;
 
 /**
  * Which tier this machine is.
@@ -225,7 +247,7 @@ function tierFor({ ram_bytes, vram_bytes, unified, accelerated }) {
   const usable = unified || !vram_bytes ? pool * 0.6 : pool * 0.9;
   let i = usable >= 20 * GiB ? 3 : usable >= 10 * GiB ? 2 : usable >= 5 * GiB ? 1 : 0;
   if (!accelerated && i > 1) i = 1;
-  return TIERS[i];
+  return settingsFor(TIERS[i], accelerated);
 }
 
 /**
@@ -282,5 +304,5 @@ function describeMachine(platform = process.platform, arch = process.arch, rawRu
 }
 
 module.exports = {
-  GiB, TIERS, tierById, tierFor, detectGpu, cores, freeBytes, kvCacheBytes, fits, describeMachine, tryRun,
+  GiB, TIERS, tierById, tierFor, settingsFor, layersFor, detectGpu, cores, freeBytes, kvCacheBytes, fits, describeMachine, tryRun,
 };

@@ -210,8 +210,11 @@ function hardware() {
       // and unusable is reported as what it is rather than as what the
       // machine could do with a different build.
       : "cpu";
+  // The override has to go through the same resolution as the detected
+  // tier, or choosing a tier by hand would reintroduce the missing
+  // gpu_layers it was just taken out for.
   const chosen = settings?.tier_override && hardware_.tierById(settings.tier_override);
-  const tier = chosen || hardware_.tierById(m.tier);
+  const tier = hardware_.settingsFor(chosen || hardware_.tierById(m.tier), m.accelerated);
   return {
     schema: 1, id: 1, name: os.hostname(), os: process.platform === "win32" ? "windows" : process.platform,
     backend, trust: "selfhost",
@@ -674,6 +677,16 @@ async function startEngine({ modelFile }) {
   // --no-mmap reads the whole file into RAM instead of paging it from disk.
   if (settings.load_into_memory) args.push("--no-mmap");
   const log = openEngineLog(logFile());
+  // What was chosen and why, in the log, so "is it using the GPU" can be
+  // answered by reading rather than by inference. The key is not among
+  // these: it is the one argument that must never be written down.
+  log.write(
+    `forge: ${me.tier_label} tier${me.tier_is_override ? " (chosen by hand)" : ""} on ${me.gpu_name || me.gpu_kind}`
+    + ` — ${layers} GPU layers, ${ctx} context, ${tune.parallel} slot, ${tune.kv_type} cache`
+    + `${tune.flash_attention ? ", flash attention" : ""}.\n`
+    + `forge: ${(me.free_bytes / 1024 ** 3).toFixed(1)} GB free, model is ${(size / 1024 ** 3).toFixed(2)} GB`
+    + `${kv ? `, conversation cache about ${(kv / 1024 ** 3).toFixed(2)} GB` : ""}.\n`,
+  );
   for (const note of peerNotes) log.write(`${note}\n`);
 
   /**

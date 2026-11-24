@@ -98,3 +98,12 @@ test("the key is used as a header and never written into a response", () => {
     assert.doesNotMatch(share, bad, "no response carries the engine object");
   }
 });
+
+test("the engine log says what was chosen, and never the key", () => {
+  // "Is it using the GPU" should be answerable by reading the log rather
+  // than by inference — that question cost a release.
+  const block = main.slice(main.indexOf("const log = openEngineLog"), main.indexOf("const proc = spawn(serverBin"));
+  assert.match(block, /GPU layers/, "the layer count is written down");
+  assert.match(block, /tier/, "and which tier produced it");
+  assert.doesNotMatch(block, /engineKey/, "the key is the one argument never logged");
+});

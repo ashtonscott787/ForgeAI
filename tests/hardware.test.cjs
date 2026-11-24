@@ -113,10 +113,44 @@ test("every tier asks for one conversation slot", () => {
   }
 });
 
+// The regression that 0.7.1 shipped. 60% of 8 GB is 4.8 GB, under the 5 GB
+// line, so every 8 GB Apple Silicon Mac landed in Tiny — and Tiny carried
+// gpu_layers: 0. Measured on an M3: 47 tokens a second became 25.8, and
+// reading the prompt went from 207 to 15.8.
+test("a small machine with graphics still uses its graphics", () => {
+  const t = hw.tierFor({ ram_bytes: 8 * GiB, vram_bytes: 8 * GiB, unified: true, accelerated: true });
+  assert.equal(t.id, "tiny", "it is still a small machine");
+  assert.ok(t.gpu_layers > 0, "and it still uses the hardware it has");
+});
+
+test("a tier never decides whether the graphics hardware is used", () => {
+  // The field is absent from the list on purpose: a tier that carries it
+  // can carry a wrong one, which is exactly what happened.
+  for (const tier of hw.TIERS) {
+    assert.ok(!("gpu_layers" in tier), `${tier.id} does not carry gpu_layers`);
+    assert.doesNotMatch(tier.says, /graphics card|no gpu/i, `${tier.id} does not claim anything about graphics`);
+  }
+  // Only the hardware decides it, at every size.
+  for (const ram of [4, 8, 16, 64]) {
+    const on = hw.tierFor({ ram_bytes: ram * GiB, vram_bytes: ram * GiB, unified: true, accelerated: true });
+    const off = hw.tierFor({ ram_bytes: ram * GiB, vram_bytes: null, unified: false, accelerated: false });
+    assert.ok(on.gpu_layers > 0, `${ram}GB with acceleration offloads`);
+    assert.equal(off.gpu_layers, 0, `${ram}GB without acceleration does not`);
+  }
+});
+
+test("choosing a tier by hand still uses the graphics hardware", () => {
+  // The override path resolves through the same function; doing it any
+  // other way is how the missing setting would come back.
+  const chosen = hw.settingsFor(hw.tierById("tiny"), true);
+  assert.ok(chosen.gpu_layers > 0);
+  assert.equal(hw.settingsFor(hw.tierById("large"), false).gpu_layers, 0);
+  assert.equal(hw.settingsFor(null, true), null);
+});
+
 test("the small tiers save memory and the large ones do not need to", () => {
   const by = Object.fromEntries(hw.TIERS.map((t) => [t.id, t]));
   assert.equal(by.tiny.kv_type, "q8_0", "a compressed conversation cache");
-  assert.equal(by.tiny.gpu_layers, 0, "and nothing on a graphics card it does not have");
   assert.equal(by.large.kv_type, "f16", "full precision where there is room");
   assert.ok(by.large.context > by.tiny.context * 4);
 });

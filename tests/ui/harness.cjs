@@ -151,7 +151,7 @@ const BRIDGE = String.raw`(() => {
     // measurements are shown and the verdict can be overridden.
     tiers: () => ({
       tiers: [
-        { id: "tiny", label: "Tiny", says: "Small memory and no graphics card. Everything is sized to leave the machine usable.", max_model_bytes: 1.6 * 1024 ** 3, context: 4096, parallel: 1, flash_attention: false, kv_type: "q8_0", gpu_layers: 0 },
+        { id: "tiny", label: "Tiny", says: "Small memory. Models and context are kept small so the machine stays usable.", max_model_bytes: 1.6 * 1024 ** 3, context: 4096, parallel: 1, flash_attention: false, kv_type: "q8_0", gpu_layers: 999 },
         { id: "small", label: "Small", says: "Enough for a small model with room to work.", max_model_bytes: 3.5 * 1024 ** 3, context: 8192, parallel: 1, flash_attention: true, kv_type: "q8_0", gpu_layers: 999 },
         { id: "medium", label: "Medium", says: "A 7-8B model fits comfortably, with a long conversation.", max_model_bytes: 7 * 1024 ** 3, context: 16384, parallel: 1, flash_attention: true, kv_type: "f16", gpu_layers: 999 },
         { id: "large", label: "Large", says: "Room for a large model and a long context at full precision.", max_model_bytes: 24 * 1024 ** 3, context: 32768, parallel: 1, flash_attention: true, kv_type: "f16", gpu_layers: 999 },

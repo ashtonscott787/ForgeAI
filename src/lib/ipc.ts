@@ -63,6 +63,12 @@ export interface TierSettings {
   parallel: number;
   flash_attention: boolean;
   kv_type: string;
+  /**
+   * Resolved from the hardware, not from the tier. A tier decides size,
+   * context and cache precision; whether the graphics hardware is used is
+   * never its business — in 0.7.1 it was, and every 8 GB Apple Silicon Mac
+   * ran on the processor alone.
+   */
   gpu_layers: number;
 }
 
