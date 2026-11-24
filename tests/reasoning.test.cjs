@@ -24,21 +24,52 @@ test("the models that think out loud are recognised by their file name", () => {
   for (const m of plain) assert.equal(r.isReasoning(m), false, String(m));
 });
 
-test("a reasoning model gets several times the room, and a cap on thinking", () => {
+test("the caller's limit is the limit on the answer, and thinking is added on top", () => {
   const plain = r.budgetFor("gemma-2-2b-it.gguf", 1024);
   assert.equal(plain.max_tokens, 1024);
+  assert.equal(plain.answer_tokens, 1024);
   assert.equal(plain.reasoning_budget, null);
 
   const thinker = r.budgetFor("DeepSeek-R1-Distill-Qwen-1.5B.gguf", 1024);
-  assert.ok(thinker.max_tokens >= 4096, "room to think and then answer");
-  assert.ok(thinker.reasoning_budget < thinker.max_tokens, "thinking cannot take all of it");
-  assert.ok(thinker.max_tokens - thinker.reasoning_budget >= 1000, "and an answer's worth is left underneath");
+  assert.equal(thinker.answer_tokens, 1024, "the answer is the length that was asked for");
+  assert.ok(thinker.reasoning_budget > 0, "and the thinking has its own room");
+  assert.equal(thinker.max_tokens, thinker.answer_tokens + thinker.reasoning_budget);
 });
 
-test("a tiny limit still leaves a reasoning model somewhere to answer", () => {
-  const b = r.budgetFor("QwQ-32B.gguf", 50);
-  assert.ok(b.max_tokens >= 3072, "a floor, so a small ask is not a blank reply");
-  assert.ok(b.max_tokens - b.reasoning_budget > 0);
+// The defect this replaced: budgetFor multiplied the caller's number by
+// four and took a floor of 3072, so max_tokens: 20 returned roughly six
+// hundred tokens of text that stopped mid-word.
+test("a small limit stays small", () => {
+  const b = r.budgetFor("QwQ-32B.gguf", 20);
+  assert.equal(b.answer_tokens, 20, "twenty means twenty");
+  assert.ok(b.max_tokens < 3072 + 20, "no floor overriding what was asked");
+  assert.ok(b.reasoning_budget > 0, "thinking still has room, separately");
+});
+
+test("the answer is held to the asked length even if the engine ignores the budget", () => {
+  // reasoning_budget is llama.cpp's own field. An engine that does not know
+  // it either refuses the request — and the retry sends no budget at all —
+  // or ignores it. Either way nothing else caps the output.
+  const long = "word ".repeat(400);
+  const capped = r.capAnswer(long, 20);
+  assert.equal(capped.cut, true);
+  assert.ok(capped.text.length <= 20 * 4, "about twenty tokens of characters");
+  assert.doesNotMatch(capped.text, /\s$/, "and it does not end in a dangling space");
+
+  const short = r.capAnswer("Wellington.", 20);
+  assert.equal(short.cut, false);
+  assert.equal(short.text, "Wellington.", "a short answer is untouched");
+});
+
+test("a cut-off answer is reported as cut off, and still returned", () => {
+  const note = r.explainTruncated({ content: "the long answer", finishReason: "length", answerTokens: 20 });
+  assert.match(note, /cut off at the 20-token limit/);
+  // A complete answer is never annotated.
+  assert.equal(r.explainTruncated({ content: "done", finishReason: "stop", answerTokens: 20 }), null);
+  // An empty one belongs to explainEmpty, which says something different.
+  assert.equal(r.explainTruncated({ content: "", finishReason: "length", answerTokens: 20 }), null);
+  assert.equal(r.wasTruncated({ content: "x", finishReason: "length" }), true);
+  assert.equal(r.wasTruncated({ content: "", finishReason: "length" }), false);
 });
 
 test("the request carries the budget only when it is needed", () => {

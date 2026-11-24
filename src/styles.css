@@ -1940,3 +1940,12 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 }
 .licence-no { background: var(--bad-soft); color: var(--bad-fg); }
 .licence-if { background: var(--warn-soft); color: var(--warn-fg); }
+
+/* A reply that ran out of room rather than finishing. */
+.cutoff {
+  margin: 6px 0 0;
+  font-size: 0.85em;
+  color: var(--warn-fg);
+  border-left: 3px solid var(--warn);
+  padding-left: 9px;
+}

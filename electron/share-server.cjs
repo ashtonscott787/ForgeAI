@@ -136,9 +136,13 @@ function createServer(deps) {
         // kind of model this is. A reasoning model under someone else's
         // default spends the whole allowance thinking and returns an empty
         // string, which this endpoint would pass on as the answer.
-        const sized = body.max_tokens === undefined && body.max_completion_tokens === undefined
-          ? reasoning.requestFields(match.file_name)
-          : {};
+        // A caller that named a limit gets that limit on the answer, with
+        // room for thinking added on top where the model needs it. A caller
+        // that named none gets the default sized for the kind of model.
+        const wantedTokens = Number.isFinite(body.max_tokens) ? body.max_tokens
+          : Number.isFinite(body.max_completion_tokens) ? body.max_completion_tokens
+            : undefined;
+        const sized = reasoning.requestFields(match.file_name, wantedTokens);
         const out = Buffer.from(JSON.stringify({ ...body, ...sized, model: match.file_name }), "utf8");
         const target = new URL("/v1/chat/completions", engine.base_url);
         const up = http.request(

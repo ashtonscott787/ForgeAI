@@ -31,6 +31,13 @@ export interface ChatMessage {
   images?: string[];
   /** Files the user attached to this turn. */
   files?: { name: string; bytes: number; kind: string; readable: boolean }[];
+  /**
+   * True when the engine stopped at the token limit rather than because the
+   * model had finished. The text is still worth having; what is not
+   * acceptable is showing a reply that ends mid-word with nothing to say
+   * it was cut.
+   */
+  truncated?: boolean;
   /** What the built-in browser did to produce this turn, shown as a collapsed summary. */
   browser?: BrowserActivity;
 }

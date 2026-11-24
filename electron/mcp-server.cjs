@@ -174,8 +174,9 @@ const TOOLS = [
         prompt: { type: "string", description: "What the local model should do." },
         system: { type: "string", description: "Optional instruction about how to answer." },
         model: { type: "string", description: "A file name from forge_models. Defaults to the only model, or FORGE_MODEL." },
-        max_tokens: { type: "integer", description: "Upper bound on the length of the reply. Default 1024." },
+        max_tokens: { type: "integer", description: "Upper bound on the length of the ANSWER, in tokens. Default 1024. A model that thinks before answering is given room for that on top of this, so this number is what you get back." },
         temperature: { type: "number", description: "0 for the same answer every time, higher for more variety. Default 0.7." },
+        strict: { type: "boolean", description: "When true, an answer that had to be cut off at the limit is returned as an error instead of as a partial answer with a note. Default false." },
       },
       required: ["prompt"],
     },
@@ -250,7 +251,12 @@ async function call(name, args = {}) {
       // 1024 tokens flat, the shipped R1 distill spent all of them thinking
       // and returned an empty string, which this tool passed on as the
       // answer.
+      // The caller's limit is a limit on the answer. Room for thinking is
+      // added on top of it, never instead of it: multiplying the caller's
+      // number by four and taking a floor of 3072 turned max_tokens: 20
+      // into roughly six hundred tokens ending mid-word.
       const fields = reasoning.requestFields(file, args.max_tokens);
+      const budget = reasoning.budgetFor(file, args.max_tokens);
       const body = {
         messages,
         ...fields,
@@ -258,25 +264,54 @@ async function call(name, args = {}) {
         stream: false,
       };
       let r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, body, 600_000, e.key);
+      // Whether the engine accepted the thinking budget at all, which
+      // decides whether anything but this code is capping the output.
+      let budgetAccepted = Boolean(fields.reasoning_budget);
       if (r && r.error && fields.reasoning_budget) {
         // An older build refuses the field outright rather than ignoring it.
         const { reasoning_budget: _drop, ...plain } = body;
+        budgetAccepted = false;
         r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, plain, 600_000, e.key);
       }
       const choice = r && r.choices && r.choices[0];
-      const message = (choice && choice.message) || {};
-      const text = typeof message.content === "string" ? message.content : "";
       if (!choice) throw new Error(`The engine answered in an unexpected shape: ${JSON.stringify(r).slice(0, 300)}`);
+      const message = choice.message || {};
+      const raw = typeof message.content === "string" ? message.content : "";
       // Never hand back an empty string as though it were an answer.
       const why = reasoning.explainEmpty({
-        content: text,
+        content: raw,
         reasoning: message.reasoning_content,
         finishReason: choice.finish_reason,
         modelLabel: file,
-        maxTokens: fields.max_tokens,
+        maxTokens: budget.answer_tokens,
       });
       if (why) throw new Error(why);
-      return text.trim();
+
+      // Held to the length asked for whatever the engine did with the
+      // budget, then reported if it had to be cut.
+      const capped = reasoning.capAnswer(raw.trim(), budget.answer_tokens);
+      const note = capped.cut
+        ? `Answer was cut off at the ${budget.answer_tokens}-token limit.`
+        : reasoning.explainTruncated({
+          content: raw,
+          finishReason: choice.finish_reason,
+          answerTokens: budget.answer_tokens,
+        });
+
+      if (!note) return capped.text;
+      // strict: true is for a caller that would rather fail than act on
+      // half an answer. Everyone else gets the text and the warning.
+      if (args.strict === true) throw new Error(`${note} Ask for more tokens, or set strict to false to receive the partial answer.`);
+      return [
+        { type: "text", text: capped.text },
+        {
+          type: "text",
+          text: note
+            + (budget.reasoning && !budgetAccepted
+              ? " (This engine did not accept a separate thinking budget, so the limit was applied to the reply itself.)"
+              : ""),
+        },
+      ];
     }
     default:
       throw new Error(`No such tool: ${name}`);
@@ -300,7 +335,13 @@ function handle(msg) {
   if (method === "ping") return {};
   if (method === "tools/call") {
     return call(params && params.name, (params && params.arguments) || {}).then(
-      (text) => ({ content: [{ type: "text", text: String(text) }] }),
+      // A tool may answer with several content items — an answer and a note
+      // that it was cut off, say — rather than only a string.
+      (out) => ({
+        content: Array.isArray(out)
+          ? out.map((item) => (item && item.type ? item : { type: "text", text: String(item) }))
+          : [{ type: "text", text: String(out) }],
+      }),
       // A failed tool is reported to the caller as a result it can read and
       // act on, not as a protocol error, which is what the specification asks
       // for and what lets the model try something else.

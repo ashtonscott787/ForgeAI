@@ -690,6 +690,16 @@ export function Chat(props: Props) {
           return;
         }
         endRun(run);
+        // An answer that ran out of room is marked, so the reply that stops
+        // mid-sentence says why rather than looking finished.
+        if (hitLimit) {
+          writeTo(convId, (prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last && last.role === "assistant") copy[copy.length - 1] = { ...last, truncated: true };
+            return copy;
+          });
+        }
         // The prompt is not counted by the stream, so it is estimated from
         // its length — roughly four characters a token for English. It is an
         // estimate and the figure it feeds says so.
@@ -880,6 +890,18 @@ export function Chat(props: Props) {
                   </div>
                 )}
               </div>
+              {m.truncated && (
+                <p className="cutoff">
+                  This answer was cut off at the reply limit.{" "}
+                  <button
+                    className="linkbtn"
+                    disabled={streaming}
+                    onClick={() => void send("Carry on from exactly where you stopped. Do not repeat anything you have already written.")}
+                  >
+                    Continue
+                  </button>
+                </p>
+              )}
               {m.perf && <PerfLine perf={m.perf} />}
               {m.role === "assistant" && i === messages.length - 1 && !streaming && m.content && (
                 <div className="turnacts">
