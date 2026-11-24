@@ -1897,3 +1897,46 @@ h1{font-family:var(--serif);font-size:33px;font-weight:600;letter-spacing:-.018e
 .partials { display: flex; flex-direction: column; gap: 8px; }
 .partial { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .partial-acts { margin-left: auto; display: flex; gap: 6px; }
+
+/* What this computer was judged to be. */
+.tiers { display: grid; gap: 8px; margin: 8px 0; }
+.tier {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.tier:hover { border-color: var(--line-strong); }
+.tier.on { border-color: var(--ember-line); background: var(--ember-soft); }
+.tier-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.tier-detected {
+  font-size: 0.72em;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  color: var(--fg-2);
+}
+.tier-says { color: var(--fg-2); font-size: 0.9em; }
+.tier-nums { color: var(--fg-3); font-size: 0.82em; }
+
+.speedrow { display: flex; align-items: center; gap: 12px; margin: 10px 0 2px; }
+.speedrow button { margin-left: auto; }
+
+/* What a model's licence actually permits. */
+.licence { font-size: 0.76em; color: var(--fg-3); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+.licence-no, .licence-if {
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  font-size: 0.95em;
+}
+.licence-no { background: var(--bad-soft); color: var(--bad-fg); }
+.licence-if { background: var(--warn-soft); color: var(--warn-fg); }

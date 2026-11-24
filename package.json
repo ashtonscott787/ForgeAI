@@ -1,7 +1,7 @@
 {
   "name": "forge-ai",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "packageManager": "pnpm@10.28.0",
   "type": "module",
   "scripts": {
@@ -31,6 +31,7 @@
     "test:ui:people": "node tests/ui/people-ui.cjs",
     "test:ui:context": "node tests/ui/context-ui.cjs",
     "test:ui:cluster": "node tests/ui/cluster-ui.cjs",
+    "test:ui:tiers": "node tests/ui/tiers-ui.cjs",
     "acceptance": "node scripts/acceptance.cjs"
   },
   "dependencies": {

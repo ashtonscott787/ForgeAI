@@ -147,6 +147,22 @@ const BRIDGE = String.raw`(() => {
     agent_list: () => (state.agents || (state.agents = [])),
     mail_status: () => ({ configured: Boolean(cfg.mailReady), host: cfg.mailReady ? "smtp.example.com" : "", port: 587, secure: false, user: "", from: cfg.mailReady ? "you@example.com" : "", has_password: Boolean(cfg.mailReady), provider: "other", imap_host: cfg.mailReady ? "imap.example.com" : "", imap_port: 993, can_read: Boolean(cfg.mailReady) }),
     mail_save: () => ({ ok: true }),
+    // What the machine was judged to be. The point of the tests is that the
+    // measurements are shown and the verdict can be overridden.
+    tiers: () => ({
+      tiers: [
+        { id: "tiny", label: "Tiny", says: "Small memory and no graphics card. Everything is sized to leave the machine usable.", max_model_bytes: 1.6 * 1024 ** 3, context: 4096, parallel: 1, flash_attention: false, kv_type: "q8_0", gpu_layers: 0 },
+        { id: "small", label: "Small", says: "Enough for a small model with room to work.", max_model_bytes: 3.5 * 1024 ** 3, context: 8192, parallel: 1, flash_attention: true, kv_type: "q8_0", gpu_layers: 999 },
+        { id: "medium", label: "Medium", says: "A 7-8B model fits comfortably, with a long conversation.", max_model_bytes: 7 * 1024 ** 3, context: 16384, parallel: 1, flash_attention: true, kv_type: "f16", gpu_layers: 999 },
+        { id: "large", label: "Large", says: "Room for a large model and a long context at full precision.", max_model_bytes: 24 * 1024 ** 3, context: 32768, parallel: 1, flash_attention: true, kv_type: "f16", gpu_layers: 999 },
+      ],
+      machine: handlers.detect_hardware(),
+    }),
+    set_tier: ({ tier }) => { state.tier = tier; return handlers.detect_hardware(); },
+    speed_get: () => (state.speed
+      ? { valid: true, tok_s: state.speed, describe: "about 24 words a second" }
+      : { valid: false, describe: "not measured yet" }),
+    speed_measure: () => { state.speed = 32; return { ok: true, valid: true, tok_s: 32, describe: "about 24 words a second" }; },
     partial_downloads: () => state.partials || (state.partials = cfg.partials || []),
     discard_partial: ({ part }) => {
       state.partials = (state.partials || []).filter((p) => p.part !== part);
@@ -394,8 +410,31 @@ const BRIDGE = String.raw`(() => {
       return hit ? { text: 'From the document ' + hit.documents[0].name + ' - stub passage', packs: [hit.name] } : { text: "", packs: [] };
     },
     stop_engine: () => { calls.push({ cmd: "stop_engine", args: {} }); if (window.__engineStop) window.__engineStop(); return null; },
-    detect_hardware: () => ({ schema: 1, id: 1, name: "Test Mac", os: "macOS", backend: "metal", trust: "selfhost", ram_bytes: 16 * 2 ** 30, vram_bytes: 0, unified_memory: true, usable_model_bytes: (cfg.usableGb || 8) * 2 ** 30, runtimes: [], links: [], load: 0, online: true }),
-    catalogue: () => ({ schema: 1, generated_at: "2026-01-01", models: [] }),
+    detect_hardware: () => {
+      const detected = cfg.tier || "small";
+      const tier = state.tier || detected;
+      const shapes = { tiny: 4096, small: 8192, medium: 16384, large: 32768 };
+      return {
+        schema: 1, id: 1, name: "Test Mac", os: "macOS", backend: "metal", trust: "selfhost",
+        ram_bytes: 16 * 2 ** 30,
+        free_bytes: (cfg.freeGb || 9) * 2 ** 30,
+        vram_bytes: cfg.vramGb ? cfg.vramGb * 2 ** 30 : 0,
+        vram_known: Boolean(cfg.vramGb),
+        gpu_name: cfg.gpuName || "Apple M3",
+        gpu_kind: cfg.gpuKind || "apple",
+        accelerated: cfg.accelerated !== false,
+        cores: 8, performance_cores: 4,
+        tier, tier_label: tier.charAt(0).toUpperCase() + tier.slice(1),
+        tier_says: "Enough for a small model with room to work.",
+        tier_detected: detected,
+        tier_is_override: Boolean(state.tier) && state.tier !== detected,
+        tier_settings: { id: tier, label: tier, says: "", max_model_bytes: 3.5 * 2 ** 30, context: shapes[tier], parallel: 1, flash_attention: true, kv_type: tier === "tiny" || tier === "small" ? "q8_0" : "f16", gpu_layers: 999 },
+        unified_memory: true,
+        usable_model_bytes: (cfg.usableGb || 8) * 2 ** 30,
+        runtimes: [], links: [], load: 0, online: true,
+      };
+    },
+    catalogue: () => ({ schema: 1, generated_at: "2026-01-01", models: cfg.catalogue || [] }),
     cpu_label: () => "Test CPU",
     link_readiness: () => ({ tailscale: "unavailable" }),
     // A stateful stand-in for the reminder commands (the real module is in electron/reminders.cjs).

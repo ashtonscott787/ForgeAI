@@ -1,4 +1,5 @@
 import { CloudPanel } from "../components/CloudPanel";
+import { TierPanel } from "../components/TierPanel";
 import { SkillsPanel, ConnectorsPanel } from "../components/Extensions";
 import { McpPanel } from "../components/McpPanel";
 import { ConnectPanel } from "../components/ConnectPanel";
@@ -212,17 +213,20 @@ export function SettingsView({
             </div>
           </div>
 
+          <TierPanel />
+
           <div className="panel">
             <div className="panel-h"><span className="t">Inference</span></div>
             <div className="panel-b">
               <Field
                 label="Context size"
-                hint="Tokens the model can see at once. Larger uses more memory."
+                hint="Tokens the model can see at once. Larger uses more memory. Left to the machine unless you choose."
               >
                 <select
-                  value={settings.context_size}
-                  onChange={(e) => save({ context_size: Number(e.target.value) })}
+                  value={settings.context_size ?? ""}
+                  onChange={(e) => save({ context_size: e.target.value ? Number(e.target.value) : null })}
                 >
+                  <option value="">Chosen for this computer</option>
                   {[2048, 4096, 8192, 16384, 32768].map((n) => (
                     <option key={n} value={n}>{n.toLocaleString()}</option>
                   ))}

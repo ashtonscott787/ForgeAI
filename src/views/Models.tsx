@@ -49,6 +49,12 @@ export function Models(props: Props) {
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState("All");
   const [cap, setCap] = useState("All");
+  /**
+   * On by default. A model that cannot legally be used in a business sitting
+   * unmarked beside ones that can is the kind of quiet trap somebody only
+   * discovers after they have built on it.
+   */
+  const [commercialOnly, setCommercialOnly] = useState(true);
   const [maxParams, setMaxParams] = useState(70);
   const [quant, setQuant] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<Record<string, DownloadProgress>>({});
@@ -98,6 +104,10 @@ export function Models(props: Props) {
     if (family !== "All" && e.family !== family) return false;
     if (cap !== "All" && !e.caps.includes(cap as never)) return false;
     if (maxParams < 70 && e.params_b > maxParams) return false;
+    // Unknown counts as excluded here: somebody asking this question wants a
+    // list they can act on, and "nobody has checked" belongs in it no more
+    // than "no" does.
+    if (commercialOnly && e.licence && e.licence.commercial_ok !== true) return false;
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     return (
@@ -107,6 +117,9 @@ export function Models(props: Props) {
       e.caps.some((c) => c.includes(q))
     );
   });
+
+  /** How many the licence filter is keeping back, so it is never silent. */
+  const hidden = entries.filter((e) => e.licence && e.licence.commercial_ok !== true).length;
 
   /**
    * Picks up a stopped download by matching its file name to a catalogue
@@ -399,7 +412,21 @@ export function Models(props: Props) {
                   {c === "All" ? "All capabilities" : (CAP_LABEL[c] ?? c)}
                 </button>
               ))}
+              <button
+                className={`fchip${commercialOnly ? " on" : ""}`}
+                aria-pressed={commercialOnly}
+                title="Hide models whose licence does not permit commercial use, and ones where nobody has checked"
+                onClick={() => setCommercialOnly((v) => !v)}
+              >
+                Usable in a business
+              </button>
             </div>
+            {commercialOnly && hidden > 0 && (
+              <p className="hint licence-hidden">
+                {hidden} model{hidden === 1 ? "" : "s"} hidden: their licences do not permit commercial use, or
+                Forge AI has not checked them.
+              </p>
+            )}
           </div>
           <div className="grid">
         {shown.map((e) => {
@@ -418,6 +445,14 @@ export function Models(props: Props) {
                   <div className="mcard-sub">
                     {e.developer} · {e.params_b}B · {Math.round(e.max_context / 1024)}K context
                   </div>
+                  {e.licence && (
+                    <div className={`licence ${e.licence.kind}`} title={e.licence.says}>
+                      {e.licence.label}
+                      {e.licence.commercial_ok === false && <span className="licence-no">not for commercial use</span>}
+                      {e.licence.commercial_ok === null && <span className="licence-no">licence not checked</span>}
+                      {e.licence.kind === "conditions" && <span className="licence-if">conditions apply</span>}
+                    </div>
+                  )}
                   </div>
                 </div>
                 <span className={`pill fit-${fit.kind}`}>{fit.label}</span>

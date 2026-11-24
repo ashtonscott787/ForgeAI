@@ -52,6 +52,20 @@ export type Backend = "metal" | "cuda" | "vulkan" | "cpu";
 export type Trust = "selfhost" | "approved" | "pending";
 export type Quant = "q4km" | "q5km" | "q6k" | "q80" | "f16";
 
+export type Tier = "tiny" | "small" | "medium" | "large";
+
+export interface TierSettings {
+  id: Tier;
+  label: string;
+  says: string;
+  max_model_bytes: number;
+  context: number;
+  parallel: number;
+  flash_attention: boolean;
+  kv_type: string;
+  gpu_layers: number;
+}
+
 export interface MachineCapability {
   schema: number;
   id: number;
@@ -60,7 +74,22 @@ export interface MachineCapability {
   backend: Backend;
   trust: Trust;
   ram_bytes: number;
+  /** Free right now, not total: what a model can actually be loaded into. */
+  free_bytes: number;
   vram_bytes: number;
+  /** False when the card is known but its memory is not. Zero would be a lie. */
+  vram_known: boolean;
+  gpu_name: string;
+  gpu_kind: string;
+  accelerated: boolean;
+  cores: number;
+  performance_cores: number;
+  tier: Tier;
+  tier_label: string;
+  tier_says: string;
+  tier_detected: Tier;
+  tier_is_override: boolean;
+  tier_settings: TierSettings;
   unified_memory: boolean;
   usable_model_bytes: number;
   runtimes: string[];
@@ -90,6 +119,15 @@ export interface CatalogueEntry {
   /** Zero means Forge has not measured it. Show "unmeasured", never a guess. */
   reference_tok_s: number;
   note?: string;
+  /** What the licence actually permits. `commercial_ok: null` means nobody has checked. */
+  licence?: {
+    id: string;
+    known: boolean;
+    label: string;
+    kind: "free" | "conditions" | "research" | "unknown";
+    commercial_ok: boolean | null;
+    says: string;
+  };
 }
 
 export interface Catalogue { schema: number; generated_at: string; models: CatalogueEntry[] }
@@ -137,8 +175,9 @@ export interface Health {
 
 export interface Settings {
   theme: "light" | "dark" | "system";
-  context_size: number;
-  gpu_layers: number;
+  /** Null means the tier decides, which is the default. */
+  context_size: number | null;
+  gpu_layers: number | null;
   threads: number | null;
   selected_model: string | null;
   experimental_cluster: boolean;
@@ -581,6 +620,12 @@ export const api = {
   /** The date, this machine and (if a location is set) the weather. */
   environmentFacts: () => invoke<{ brief: string }>("environment-facts"),
   detectHardware: () => invoke<MachineCapability>("detect_hardware"),
+  /** How fast this machine really is, measured on the model that is loaded. */
+  speedGet: () => invoke<{ valid: boolean; tok_s?: number; counted?: boolean; describe: string; model_file?: string; for_model?: string | null }>("speed_get"),
+  speedMeasure: () => invoke<{ ok?: boolean; why?: string; valid?: boolean; tok_s?: number; describe?: string }>("speed_measure"),
+  /** The four tiers, and which one this machine was put in. */
+  tiers: () => invoke<{ tiers: TierSettings[]; machine: MachineCapability }>("tiers"),
+  setTier: (tier: Tier | null) => invoke<MachineCapability>("set_tier", { tier }),
   cpuLabel: () => invoke<string>("cpu_label"),
   getSettings: () => invoke<Settings>("get_settings"),
   setSettings: (settings: Settings) => invoke<void>("set_settings", { settings }),

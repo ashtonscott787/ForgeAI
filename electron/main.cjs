@@ -92,6 +92,9 @@ const root = () => path.join(app.getPath("userData"));
 const modelsDir = () => { const d = path.join(root(), "models"); fs.mkdirSync(d, { recursive: true }); return d; };
 const settingsFile = () => path.join(root(), "settings.json");
 const engineDir = () => app.isPackaged ? path.join(process.resourcesPath, "engine") : path.join(__dirname, "..", "engine-dev");
+const hardware_ = require("./hardware.cjs");
+const benchmark = require("./benchmark.cjs");
+const licences = require("./licences.cjs");
 const cluster = require("./cluster.cjs");
 const workshop = require("./workshop.cjs");
 const terminal = require("./terminal.cjs");
@@ -127,8 +130,14 @@ const DEFAULTS = {
    * one never runs it.
    */
   mcp_servers: [],
-  context_size: 8192,
-  gpu_layers: 999,
+  /**
+   * Nothing, so the machine decides. A number here is a person's own
+   * choice and overrides what the tier would have picked.
+   */
+  context_size: null,
+  gpu_layers: null,
+  /** One of tiny/small/medium/large, set by hand. Null means detected. */
+  tier_override: null,
   threads: null,
   selected_model: null,
   experimental_cluster: false,
@@ -188,16 +197,42 @@ function usableBytes(ram, vram, unified) {
   return Math.max(0, Math.min(Math.floor(pool * headroom), pool - 3 * GiB));
 }
 function hardware() {
-  const ram = os.totalmem();
+  // Detected, not assumed. This used to report vram_bytes: 0 on every
+  // machine ever made and pick the backend from "is this an Apple chip",
+  // so a PC with a 24 GB card ran everything on its processor and was
+  // offered the same model as an eight-year-old laptop.
+  const m = hardware_.describeMachine();
   const mac = process.platform === "darwin";
   const metal = mac && process.arch === "arm64";
-  // The Windows build ships the CPU engine, so report CPU honestly even if a GPU exists.
-  const backend = metal ? "metal" : "cpu";
+  const backend =
+    metal ? "metal"
+      // The shipped engine is CPU-only off macOS, so a card that is there
+      // and unusable is reported as what it is rather than as what the
+      // machine could do with a different build.
+      : "cpu";
+  const chosen = settings?.tier_override && hardware_.tierById(settings.tier_override);
+  const tier = chosen || hardware_.tierById(m.tier);
   return {
     schema: 1, id: 1, name: os.hostname(), os: process.platform === "win32" ? "windows" : process.platform,
-    backend, trust: "selfhost", ram_bytes: ram, vram_bytes: 0, unified_memory: mac,
+    backend, trust: "selfhost",
+    ram_bytes: m.ram_bytes,
+    free_bytes: m.free_bytes,
+    vram_bytes: m.gpu.vram_bytes ?? 0,
+    vram_known: m.gpu.vram_bytes !== null,
+    gpu_name: m.gpu.name,
+    gpu_kind: m.gpu.kind,
+    accelerated: m.accelerated,
+    cores: m.cores,
+    performance_cores: m.performance_cores,
+    tier: tier.id,
+    tier_label: tier.label,
+    tier_says: tier.says,
+    tier_detected: m.tier,
+    tier_is_override: Boolean(chosen),
+    tier_settings: tier,
+    unified_memory: m.gpu.unified,
     usable_model_bytes: Math.min(
-      usableBytes(ram, 0, mac),
+      usableBytes(m.ram_bytes, m.gpu.unified ? 0 : (m.gpu.vram_bytes ?? 0), m.gpu.unified),
       Number(settings?.memory_budget_bytes) > 0 ? Number(settings.memory_budget_bytes) : Infinity,
     ),
     memory_budget_bytes: Number(settings?.memory_budget_bytes) || null, runtimes: [RUNTIME_ID], links: [], load: 0, online: true,
@@ -544,15 +579,50 @@ async function startEngine({ modelFile }) {
   }
   const size = fs.statSync(model).size;
   if (size < 1024 * 1024) throw new Error("That model file is far too small to be a model — the download was probably cut short. Delete it and download it again.");
+
+  // The machine decides the defaults; anything the person has set
+  // themselves still wins. One size for every computer was how an 8 GB
+  // laptop came to reserve four conversations' worth of memory at 8192
+  // tokens each while running one.
+  const me = hardware();
+  const tune = me.tier_settings;
+  const ctx = Number(settings.context_size) > 0 ? Number(settings.context_size) : tune.context;
+
+  // Will it fit in what is free right now — not in what the machine has.
+  let shape = null;
+  try { shape = gguf.describeFile(model); } catch { /* an unreadable header is not a reason to refuse */ }
+  const kv = hardware_.kvCacheBytes({
+    block_count: shape?.block_count,
+    embedding_length: shape?.embedding_length,
+    context: ctx,
+    kv_type: tune.kv_type,
+  });
+  const room = hardware_.fits({ model_bytes: size, kv_bytes: kv, free_bytes: me.free_bytes });
+  if (!room.ok) {
+    const gb = (n) => `${(n / 1024 ** 3).toFixed(1)} GB`;
+    throw new Error(
+      `${modelFile} needs about ${gb(room.needed)} with a ${ctx.toLocaleString()}-token context, and `
+      + `${gb(room.have)} is free on this machine right now — ${gb(room.short)} short. `
+      + "Close something, choose a smaller model, or lower the context size in Settings.",
+    );
+  }
+
   const port = await freePort();
   const layers =
-    settings.run_mode === "cpu" ? 0 : settings.run_mode === "split" ? Math.max(0, Number(settings.split_layers) || 0) : Number(settings.gpu_layers) || 999;
+    settings.run_mode === "cpu" ? 0
+      : settings.run_mode === "split" ? Math.max(0, Number(settings.split_layers) || 0)
+        : Number(settings.gpu_layers) > 0 ? Number(settings.gpu_layers)
+          : tune.gpu_layers;
   const args = [
     "--model", model,
-    "--ctx-size", String(settings.context_size),
+    "--ctx-size", String(ctx),
     "--port", String(port),
     "--host", "127.0.0.1",
     "--n-gpu-layers", String(layers),
+    // One conversation, not four. The engine reserves the context for every
+    // slot it is given, so the default of 4 took four times the memory on a
+    // desktop application that holds one conversation at a time.
+    "--parallel", String(tune.parallel),
     // Without this the engine answers anybody who can reach the port,
     // which on this machine includes any open web page.
     "--api-key", engineKey,
@@ -567,7 +637,19 @@ async function startEngine({ modelFile }) {
     // read it, so it gets 401 whatever the origin header says.
     "--no-cors-credentials",
   ];
-  if (settings.threads) args.push("--threads", String(settings.threads));
+  // Performance cores only, where the distinction exists: spreading
+  // threads onto an Apple chip's efficiency cores makes generation slower.
+  args.push("--threads", String(Number(settings.threads) > 0 ? Number(settings.threads) : me.performance_cores));
+  // Saving memory where there is not much, at full precision where there is.
+  //
+  // Kept together and kept track of, because an engine that does not know a
+  // flag refuses to start rather than ignoring it — and a tuning flag is
+  // never worth the app failing to run a model at all. If the engine exits
+  // complaining about an argument, it is started again without these.
+  const tuning = [];
+  if (tune.flash_attention) tuning.push("--flash-attn", "on");
+  if (tune.kv_type !== "f16") tuning.push("--cache-type-k", tune.kv_type, "--cache-type-v", tune.kv_type);
+  args.push(...tuning);
   // Other computers. They are checked first and only the ones that answered
   // are passed: handing the engine an address nothing is listening on makes
   // it refuse to start, so one laptop asleep would read as a broken app.
@@ -593,37 +675,62 @@ async function startEngine({ modelFile }) {
   if (settings.load_into_memory) args.push("--no-mmap");
   const log = openEngineLog(logFile());
   for (const note of peerNotes) log.write(`${note}\n`);
-  const proc = spawn(serverBin(), args, { cwd: engineDir(), windowsHide: true, env: { ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH } });
-  // Both output streams feed one guarded log. The log is closed exactly once, on
-  // close, and any later chunk is dropped rather than written to an ended stream.
-  proc.stdout.on("data", (c) => log.write(c));
-  proc.stderr.on("data", (c) => log.write(c));
-  proc.once("close", () => log.close());
-  let exited = null;
-  proc.on("exit", (code) => { exited = code; if (engine.proc === proc) engine = { proc: null, port: 0, model_file: null }; });
-  proc.on("error", (e) => { exited = String(e); });
-  engine = { proc, port, model_file: modelFile };
-  const started = Date.now();
-  const deadline = started + 600_000; // a large model on a busy disk is slow
-  while (Date.now() < deadline) {
-    if (exited !== null) {
-      throw new Error(`the AI engine stopped while loading (${exited}).\n${logTail()}`);
+
+  /**
+   * One attempt at starting the engine, with a given set of extra flags.
+   *
+   * Separated out so it can be run twice: an engine that does not recognise
+   * a tuning flag refuses to start rather than ignoring it, and a slower
+   * answer is worth far more than no answer at all.
+   */
+  async function launch(extra) {
+    const full = [...args, ...extra];
+    const proc = spawn(serverBin(), full, { cwd: engineDir(), windowsHide: true, env: { ...process.env, PATH: engineDir() + path.delimiter + process.env.PATH } });
+    // Both output streams feed one guarded log. The log is closed exactly once, on
+    // close, and any later chunk is dropped rather than written to an ended stream.
+    proc.stdout.on("data", (c) => log.write(c));
+    proc.stderr.on("data", (c) => log.write(c));
+    let exited = null;
+    proc.on("exit", (code) => { exited = code; if (engine.proc === proc) engine = { proc: null, port: 0, model_file: null }; });
+    proc.on("error", (e) => { exited = String(e); });
+    engine = { proc, port, model_file: modelFile };
+    // The log belongs to the attempt that succeeds and stays open for as
+    // long as that engine runs. Closing it here would have ended the log
+    // the moment the engine became ready, which is exactly when it starts
+    // being worth reading.
+    const own = () => proc.once("close", () => log.close());
+    const started = Date.now();
+    const deadline = started + 600_000; // a large model on a busy disk is slow
+    while (Date.now() < deadline) {
+      if (exited !== null) {
+        return { ok: false, exited, tail: logTail() };
+      }
+      try {
+        const ok = await new Promise((r) => http.get(`http://127.0.0.1:${port}/health`, (res) => { res.resume(); r(res.statusCode === 200); }).on("error", () => r(false)));
+        if (ok) { touchEngine(); own(); return { ok: true }; }
+      } catch {
+        /* not listening yet */
+      }
+      try {
+        win?.webContents.send("engine://loading", { seconds: Math.round((Date.now() - started) / 1000), tail: logTail(2) });
+      } catch {
+        /* the window may be gone */
+      }
+      await new Promise((r) => setTimeout(r, 700));
     }
-    try {
-      const ok = await new Promise((r) => http.get(`http://127.0.0.1:${port}/health`, (res) => { res.resume(); r(res.statusCode === 200); }).on("error", () => r(false)));
-      if (ok) { touchEngine(); return status(); }
-    } catch {
-      /* not listening yet */
-    }
-    try {
-      win?.webContents.send("engine://loading", { seconds: Math.round((Date.now() - started) / 1000), tail: logTail(2) });
-    } catch {
-      /* the window may be gone */
-    }
-    await new Promise((r) => setTimeout(r, 700));
+    stopEngine();
+    return { ok: false, timeout: true, tail: logTail() };
   }
-  stopEngine();
-  throw new Error(`the AI engine did not become ready within 10 minutes.\n${logTail()}`);
+
+  let r = await launch(tuning);
+  if (!r.ok && !r.timeout && tuning.length && /unknown argument|invalid argument|error while handling argument|unrecognized/i.test(r.tail || "")) {
+    log.write(`\nThe engine refused one of ${tuning.join(" ")}, so it is being started again without them.\n`);
+    r = await launch([]);
+  }
+  if (r.ok) return status();
+  log.close();
+  if (r.timeout) throw new Error(`the AI engine did not become ready within 10 minutes.\n${r.tail}`);
+  throw new Error(`the AI engine stopped while loading (${r.exited}).\n${r.tail}`);
 }
 
 // ── IPC ─────────────────────────────────────────────────────
@@ -689,7 +796,13 @@ function register(win) {
   h("cpu_label", cpuLabel);
   h("get_settings", () => settings);
   h("set_settings", ({ settings: s }) => { settings = { ...DEFAULTS, ...s }; saveSettings(settings); });
-  h("catalogue", () => JSON.parse(fs.readFileSync(path.join(__dirname, "catalogue.json"), "utf8")));
+  h("catalogue", () => {
+    const raw = JSON.parse(fs.readFileSync(path.join(__dirname, "catalogue.json"), "utf8"));
+    // Each entry carries what its licence actually permits. The names were
+    // always there and nothing read them, so a research-only model sat in
+    // the library looking like any other.
+    return { ...raw, models: licences.annotate(raw.models || []) };
+  });
   h("installed_models", installed);
   h("download_model", (a) => downloadModel(win, { dir: modelsDir(), ...a }));
   // Downloads that stopped and were never picked up. Resuming already works;
@@ -1913,6 +2026,47 @@ function register(win) {
     if (!shopJob) return { ok: true, ...shopState() };
     try { shopJob.control.abort(); } catch { /* already finished */ }
     return { ok: true, ...shopState() };
+  });
+
+  // ── how fast this machine actually is ────────────────
+  //
+  // Measured once on the model that is loaded, and kept only while that is
+  // still the model and the settings are still the settings. Every
+  // reference speed in the catalogue is a placeholder, and a figure from
+  // somebody else's computer would say nothing about this one.
+  const speedFile = () => path.join(root(), "speed.json");
+  h("speed_get", () => {
+    const record = benchmark.load(speedFile());
+    const here = { model_file: engine.model_file, tier: hardware().tier };
+    return benchmark.stillValid(record, here)
+      ? { ...record, valid: true, describe: benchmark.describe(record.tok_s) }
+      : { valid: false, describe: benchmark.describe(0), for_model: record.model_file ?? null };
+  });
+  h("speed_measure", async () => {
+    if (!engine.proc) return { ok: false, why: "Nothing is loaded to measure. Start a model first." };
+    const r = await benchmark.measure({ baseUrl: `http://127.0.0.1:${engine.port}`, apiKey: engineKey });
+    if (!r.ok) return r;
+    const record = {
+      tok_s: r.tok_s,
+      counted: r.counted,
+      model_file: engine.model_file,
+      tier: hardware().tier,
+      at: Date.now(),
+    };
+    benchmark.save(speedFile(), record);
+    return { ok: true, ...record, valid: true, describe: benchmark.describe(r.tok_s) };
+  });
+
+  h("tiers", () => ({
+    tiers: hardware_.TIERS,
+    machine: hardware(),
+  }));
+  h("set_tier", ({ tier }) => {
+    const id = tier ? String(tier) : null;
+    if (id && !hardware_.tierById(id)) throw new Error(`There is no ${id} tier.`);
+    settings = { ...settings, tier_override: id };
+    saveSettings(settings);
+    return hardware();
   });
 
   h("link_readiness", () => {

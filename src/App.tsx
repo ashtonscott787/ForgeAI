@@ -53,8 +53,8 @@ type View = "chat" | "mail" | "people" | "agents" | "systems" | "models" | "memo
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
-  context_size: 8192,
-  gpu_layers: 999,
+  context_size: null,
+  gpu_layers: null,
   threads: null,
   selected_model: null,
   experimental_cluster: false,
@@ -639,7 +639,10 @@ export default function App() {
               onModelChange={setValue}
               onConfigurationChange={(v, c) => setConfigurations((p) => ({ ...p, [v]: c }))}
               onGoto={setView}
-              contextSize={settings.context_size}
+              // The tier's own context when nothing was chosen, so the
+              // meter measures against the window the engine was actually
+              // given rather than a number nobody set.
+              contextSize={settings.context_size ?? self?.tier_settings?.context ?? 8192}
               showThinking={settings.show_thinking === true}
               onOpenPane={(url) => {
                 setPanes((p) => ({ ...p, [activeId]: true }));
