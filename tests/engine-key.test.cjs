@@ -17,10 +17,15 @@ const main = read("electron", "main.cjs");
 const mcp = read("electron", "mcp-server.cjs");
 const share = read("electron", "share-server.cjs");
 const chat = read("src", "lib", "chat.ts");
+// The command line moved into one shared builder, so that is where the
+// flags live now. Both callers are checked separately in engine-args.test.
+const built = read("electron", "engine-args.cjs");
 
 test("every engine this app starts is started with a key", () => {
+  assert.match(built, /"--api-key"/, "the shared builder passes --api-key");
+  // And both callers hand it one, rather than starting an engine without.
   for (const [name, src] of [["the app", main], ["the MCP server", mcp]]) {
-    assert.match(src, /"--api-key"/, `${name} passes --api-key`);
+    assert.match(src, /apiKey:/, `${name} supplies a key to the builder`);
   }
 });
 
@@ -50,13 +55,13 @@ test("every caller sends it", () => {
 });
 
 test("credentials are refused, and the origin list is left alone on purpose", () => {
-  assert.match(main, /"--no-cors-credentials"/, "a page cannot use an ambient cookie against the engine");
+  assert.match(built, /"--no-cors-credentials"/, "a page cannot use an ambient cookie against the engine");
   // Tightening --cors-origins to "localhost" would break the app: its window
   // is loaded with loadFile, so its requests carry Origin: null, which does
   // not match, and the browser would refuse the reply. The key is the
   // control; this records why the obvious change was not made.
-  assert.doesNotMatch(main, /"--cors-origins"/, "origins are not narrowed blind");
-  assert.match(main, /Origin: null/, "and the reason is written down where the flag is");
+  assert.doesNotMatch(built, /"--cors-origins"/, "origins are not narrowed blind");
+  assert.match(built, /Origin: null/, "and the reason is written down beside the flag");
 });
 
 test("the flags passed are flags this engine has", () => {
@@ -102,8 +107,10 @@ test("the key is used as a header and never written into a response", () => {
 test("the engine log says what was chosen, and never the key", () => {
   // "Is it using the GPU" should be answerable by reading the log rather
   // than by inference — that question cost a release.
-  const block = main.slice(main.indexOf("const log = openEngineLog"), main.indexOf("const proc = spawn(serverBin"));
-  assert.match(block, /GPU layers/, "the layer count is written down");
-  assert.match(block, /tier/, "and which tier produced it");
+  assert.match(built, /GPU layers/, "the layer count is written down");
+  assert.match(built, /tier/, "and which tier produced it");
+  const block = main.slice(main.indexOf("const log = openEngineLog"), main.indexOf("async function launch"));
+  assert.match(block, /describeEngine/, "the app writes that line on every start");
   assert.doesNotMatch(block, /engineKey/, "the key is the one argument never logged");
+  assert.doesNotMatch(built, /console\.log|log\.write/, "and the builder never logs anything itself");
 });

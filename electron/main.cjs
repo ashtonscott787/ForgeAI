@@ -93,6 +93,8 @@ const modelsDir = () => { const d = path.join(root(), "models"); fs.mkdirSync(d,
 const settingsFile = () => path.join(root(), "settings.json");
 const engineDir = () => app.isPackaged ? path.join(process.resourcesPath, "engine") : path.join(__dirname, "..", "engine-dev");
 const hardware_ = require("./hardware.cjs");
+const engineArgs = require("./engine-args.cjs");
+const chunking = require("./chunking.cjs");
 const benchmark = require("./benchmark.cjs");
 const licences = require("./licences.cjs");
 const cluster = require("./cluster.cjs");
@@ -611,79 +613,45 @@ async function startEngine({ modelFile }) {
   }
 
   const port = await freePort();
-  const layers =
-    settings.run_mode === "cpu" ? 0
-      : settings.run_mode === "split" ? Math.max(0, Number(settings.split_layers) || 0)
-        : Number(settings.gpu_layers) > 0 ? Number(settings.gpu_layers)
-          : tune.gpu_layers;
-  const args = [
-    "--model", model,
-    "--ctx-size", String(ctx),
-    "--port", String(port),
-    "--host", "127.0.0.1",
-    "--n-gpu-layers", String(layers),
-    // One conversation, not four. The engine reserves the context for every
-    // slot it is given, so the default of 4 took four times the memory on a
-    // desktop application that holds one conversation at a time.
-    "--parallel", String(tune.parallel),
-    // Without this the engine answers anybody who can reach the port,
-    // which on this machine includes any open web page.
-    "--api-key", engineKey,
-    // Credentials are never needed — the key is sent in a header — and
-    // refusing them stops a page using an ambient cookie against the engine.
-    //
-    // The origin list is deliberately left alone. llama.cpp defaults to "*",
-    // and the obvious tightening ("localhost") would break this app: its
-    // window is loaded with loadFile, so its requests carry Origin: null,
-    // which "localhost" does not match and the browser would then refuse
-    // the reply. The key is what actually closes the hole — a page cannot
-    // read it, so it gets 401 whatever the origin header says.
-    "--no-cors-credentials",
-  ];
-  // Performance cores only, where the distinction exists: spreading
-  // threads onto an Apple chip's efficiency cores makes generation slower.
-  args.push("--threads", String(Number(settings.threads) > 0 ? Number(settings.threads) : me.performance_cores));
-  // Saving memory where there is not much, at full precision where there is.
-  //
-  // Kept together and kept track of, because an engine that does not know a
-  // flag refuses to start rather than ignoring it — and a tuning flag is
-  // never worth the app failing to run a model at all. If the engine exits
-  // complaining about an argument, it is started again without these.
-  const tuning = [];
-  if (tune.flash_attention) tuning.push("--flash-attn", "on");
-  if (tune.kv_type !== "f16") tuning.push("--cache-type-k", tune.kv_type, "--cache-type-v", tune.kv_type);
-  args.push(...tuning);
-  // Other computers. They are checked first and only the ones that answered
-  // are passed: handing the engine an address nothing is listening on makes
-  // it refuse to start, so one laptop asleep would read as a broken app.
-  // Written into the engine log once it is open, a few lines below, so the
-  // reason a machine was left out is in the same place as everything else
-  // about the run.
+
+  // Other computers, checked before the engine is told about them: an
+  // address nothing is listening on makes llama-server refuse to start, so
+  // one laptop asleep would read as a broken app.
   const peerNotes = [];
   clusterUsing = [];
   if (settings.cluster_enabled && (settings.cluster_peers || []).length) {
     const peers = (settings.cluster_peers || []).map((t) => cluster.parsePeer(t)).filter(Boolean);
     const checked = await cluster.reachAll(peers);
     clusterUsing = checked.filter((p) => p.ok).map((p) => p.label);
-    args.push(...cluster.rpcFlags(checked));
     for (const p of checked) {
       peerNotes.push(p.ok ? `cluster: using ${p.label} (answered in ${p.ms}ms)` : `cluster: NOT using ${p.label} — ${p.why}`);
     }
     if (!clusterUsing.length) peerNotes.push("cluster: no other computer answered, so this model runs on this machine alone.");
   }
-  // A vision model's projector sits beside it; the engine reads images only with it.
+
   const projector = path.join(modelsDir(), projectorName(safeName(modelFile)));
-  if (fs.existsSync(projector)) args.push("--mmproj", projector);
-  // --no-mmap reads the whole file into RAM instead of paging it from disk.
-  if (settings.load_into_memory) args.push("--no-mmap");
+  // One builder, shared with the MCP server. Two code paths assembling the
+  // same command line is how that server came to start engines with a
+  // fixed 4096-token context and no access key.
+  const plan = engineArgs.planEngine({
+    modelPath: model,
+    port,
+    settings,
+    machine: me,
+    apiKey: engineKey,
+    projectorPath: fs.existsSync(projector) ? projector : "",
+    rpcPeers: clusterUsing,
+  });
+  const args = plan.args;
+  const tuning = plan.tuning;
+  const layers = engineArgs.layersFrom(settings, tune.gpu_layers);
+
   const log = openEngineLog(logFile());
   // What was chosen and why, in the log, so "is it using the GPU" can be
   // answered by reading rather than by inference. The key is not among
   // these: it is the one argument that must never be written down.
   log.write(
-    `forge: ${me.tier_label} tier${me.tier_is_override ? " (chosen by hand)" : ""} on ${me.gpu_name || me.gpu_kind}`
-    + ` — ${layers} GPU layers, ${ctx} context, ${tune.parallel} slot, ${tune.kv_type} cache`
-    + `${tune.flash_attention ? ", flash attention" : ""}.\n`
+    `${engineArgs.describeEngine({ machine: me, contextTokens: ctx, layers })}\n`
     + `forge: ${(me.free_bytes / 1024 ** 3).toFixed(1)} GB free, model is ${(size / 1024 ** 3).toFixed(2)} GB`
     + `${kv ? `, conversation cache about ${(kv / 1024 ** 3).toFixed(2)} GB` : ""}.\n`,
   );
@@ -843,6 +811,24 @@ function register(win) {
     return Promise.all(filePaths.map(readAttachment));
   });
   h("read_files", ({ paths }) => Promise.all((Array.isArray(paths) ? paths : []).map(readAttachment)));
+  // The window asks for a plan rather than carrying its own copy of this.
+  // Two implementations of the same splitting is the arrangement that gave
+  // this app two engine manifests and two command-line builders.
+  h("chunk_plan", ({ text, question, contextTokens }) => {
+    const plan = chunking.planFor(String(text || ""), Number(contextTokens) || 8192);
+    return {
+      needed: plan.needed,
+      tokens: plan.tokens,
+      budget: plan.budget,
+      count: plan.parts.length,
+      describe: chunking.describePlan(plan),
+      prompts: plan.needed
+        ? plan.parts.map((part, i) => chunking.mapPrompt(String(question || ""), part, i, plan.parts.length))
+        : [],
+    };
+  });
+  h("chunk_reduce", ({ question, notes }) => chunking.reducePrompt(String(question || ""), Array.isArray(notes) ? notes : []));
+
   h("build_context", ({ files, question, budget }) => {
     const list = Array.isArray(files) ? files : [];
     const cap = Math.max(2000, Number(budget) || 24000);

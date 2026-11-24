@@ -31,6 +31,12 @@ const { spawn } = require("node:child_process");
 const env = require("./environment.cjs");
 
 const reasoning = require("./reasoning.cjs");
+const hardware = require("./hardware.cjs");
+const engineArgs = require("./engine-args.cjs");
+const chunking = require("./chunking.cjs");
+
+/** The context the engine was actually given, for the length check below. */
+const settingsContext = (machine) => machine.tier_settings.context;
 
 const PROTOCOL = "2025-06-18";
 const NAME = "forge-ai";
@@ -67,6 +73,17 @@ function models() {
     .sort((a, b) => a.file.localeCompare(b.file));
 }
 
+/** One completion, for the internal passes of a long read. */
+async function askOnce(e, file, messages, maxTokens) {
+  const fields = reasoning.requestFields(file, maxTokens);
+  const r = await postJson(`http://127.0.0.1:${e.port}/v1/chat/completions`, {
+    messages, ...fields, temperature: 0.2, stream: false,
+  }, 600_000, e.key);
+  const choice = r && r.choices && r.choices[0];
+  const text = choice && choice.message && typeof choice.message.content === "string" ? choice.message.content : "";
+  return reasoning.stripStrayThink(text).trim();
+}
+
 // ── the engine ──────────────────────────────────────────────
 const freePort = () => new Promise((res, rej) => {
   const s = net.createServer();
@@ -89,7 +106,19 @@ async function engineFor(file) {
   // one: 127.0.0.1 keeps other machines out and other programs on this one
   // in, and the engine answers any origin that asks.
   const key = require("node:crypto").randomBytes(24).toString("hex");
-  const proc = spawn(bin, ["--model", model, "--host", "127.0.0.1", "--port", String(port), "--ctx-size", "4096", "--no-webui", "--api-key", key], {
+  // The same builder the window uses. This used to assemble its own command
+  // line with a fixed --ctx-size 4096 and nothing else, so a ten-thousand
+  // token prompt through Claude Code failed against a context a sixth the
+  // size the window would have given it.
+  const machine = hardware.describeMachine();
+  const plan = engineArgs.planEngine({
+    modelPath: model,
+    port,
+    settings: {},
+    machine,
+    apiKey: key,
+  });
+  const proc = spawn(bin, [...plan.all, "--no-webui"], {
     cwd: engineDir(),
     windowsHide: true,
     stdio: ["ignore", "ignore", "pipe"],
@@ -112,7 +141,11 @@ async function engineFor(file) {
     if (ok) break;
     await new Promise((r) => setTimeout(r, 400));
   }
-  engine = { proc, port, file: path.basename(file), key };
+  engine = {
+    proc, port, file: path.basename(file), key,
+    context: Number(settingsContext(machine)),
+    mine: true,
+  };
   return engine;
 }
 
@@ -244,9 +277,40 @@ async function call(name, args = {}) {
     case "forge_ask": {
       const file = args.model || defaultModel();
       const e = await engineFor(file);
+      const base = `http://127.0.0.1:${e.port}`;
+      const prompt = String(args.prompt ?? "");
+      const budgetAhead = reasoning.budgetFor(file, args.max_tokens);
+
+      // How long it really is, from the engine's own vocabulary where it
+      // will answer. The estimate is out by a few percent on prose and far
+      // more on code, and the difference decides whether this works at all.
+      const counted = await chunking.countTokens({ baseUrl: base, apiKey: e.key, text: prompt });
+      const tokens = counted ?? chunking.estimateTokens(prompt);
+      const room = e.context - budgetAhead.max_tokens;
+
+      if (tokens > room) {
+        const plan = chunking.planFor(prompt, e.context);
+        if (!plan.needed || plan.parts.length < 2) {
+          // One thing that will not fit is not a document to read in
+          // pieces. The person gets the two numbers, not the engine's JSON.
+          throw new Error(chunking.tooLong({ tokens, contextTokens: e.context, answerTokens: budgetAhead.max_tokens }));
+        }
+        const question = args.system ? `${args.system}\n\n${"Answer the request above."}` : "Summarise what matters here.";
+        const notes = [];
+        for (let i = 0; i < plan.parts.length; i++) {
+          const part = await askOnce(e, file, [{ role: "user", content: chunking.mapPrompt(question, plan.parts[i], i, plan.parts.length) }], 700);
+          notes.push(part);
+        }
+        const joined = await askOnce(e, file, [{ role: "user", content: chunking.reducePrompt(question, notes) }], budgetAhead.answer_tokens);
+        return [
+          { type: "text", text: joined },
+          { type: "text", text: `That prompt was about ${tokens.toLocaleString()} tokens, past this model's ${e.context.toLocaleString()}-token window, so it was read in ${plan.parts.length} parts and answered from the notes.` },
+        ];
+      }
+
       const messages = [];
       if (args.system) messages.push({ role: "system", content: String(args.system) });
-      messages.push({ role: "user", content: String(args.prompt ?? "") });
+      messages.push({ role: "user", content: prompt });
       // A reasoning model needs room to think and then answer. Asked for
       // 1024 tokens flat, the shipped R1 distill spent all of them thinking
       // and returned an empty string, which this tool passed on as the

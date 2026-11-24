@@ -678,6 +678,12 @@ export const api = {
    * The shell. Nothing here runs without the person pressing Run: the
    * assistant can propose a command, and that is all it can do.
    */
+  /** Whether this text fits the window, and the passes to read it if not. */
+  chunkPlan: (text: string, question: string, contextTokens: number) =>
+    invoke<{ needed: boolean; tokens: number; budget: number; count: number; describe: string; prompts: string[] }>(
+      "chunk_plan", { text, question, contextTokens },
+    ),
+  chunkReduce: (question: string, notes: string[]) => invoke<string>("chunk_reduce", { question, notes }),
   partialDownloads: () => invoke<PartialDownload[]>("partial_downloads"),
   discardPartial: (part: string) => invoke<{ ok: boolean; why?: string }>("discard_partial", { part }),
   shellStatus: () => invoke<ShellStatus>("shell_status"),

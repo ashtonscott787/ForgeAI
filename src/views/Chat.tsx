@@ -16,7 +16,6 @@ import { ContextMeter } from "../components/ContextMeter";
 import { Terminal } from "../components/Terminal";
 import { COMPACT_INSTRUCTION, applyCompaction, canCompact, splitFor, transcriptOf } from "../lib/compact";
 import type { Piece } from "../lib/context";
-import { describePlan, mapPrompt, planFor, reducePrompt } from "../lib/chunking";
 import { choose } from "../lib/router";
 
 interface Props {
@@ -450,29 +449,29 @@ export function Chat(props: Props) {
     let sendContent = body;
     if (usable.length) {
       const whole = usable.map((f) => f.text).join("\n\n");
-      const plan = planFor(whole, props.contextSize);
-      // Far too long to extract from sensibly, and a local engine to do it
-      // with: read it in parts and answer from the notes. Selecting extracts
-      // from a 20,000-token document throws most of it away without saying
-      // so, and the answer then looks complete.
-      if (plan.needed && plan.parts.length > 1 && !cloud && props.engine.running) {
+      // The plan comes from the main process, which is also what the MCP
+      // server uses. One implementation of the splitting, not two.
+      const plan = !cloud && props.engine.running
+        ? await api.chunkPlan(whole, body, props.contextSize).catch(() => null)
+        : null;
+      if (plan && plan.needed && plan.count > 1) {
         try {
           const notes: string[] = [];
-          for (let i = 0; i < plan.parts.length; i++) {
+          for (let i = 0; i < plan.prompts.length; i++) {
             if (run.stopped) return;
-            setStatus(`Reading part ${i + 1} of ${plan.parts.length}…`);
-            notes.push(await once([{ role: "user", content: mapPrompt(body, plan.parts[i]!, i, plan.parts.length) }]));
+            setStatus(`Reading part ${i + 1} of ${plan.count}…`);
+            notes.push(await once([{ role: "user", content: plan.prompts[i]! }]));
           }
           if (run.stopped) return;
           contextChars = whole.length;
-          sendContent = reducePrompt(body, notes);
-          setStatus(describePlan(plan));
+          sendContent = await api.chunkReduce(body, notes);
+          setStatus(plan.describe);
         } catch (e) {
           if (run.stopped) return;
           failRun(run, `That document could not be read in parts: ${e instanceof Error ? e.message : String(e)}`);
           return;
         }
-      } else {
+            } else {
         setStatus(`Reading ${usable.length} file${usable.length > 1 ? "s" : ""}…`);
         try {
           const built = await api.buildContext(
